@@ -2,79 +2,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
+import Tag from "../components/Tag";
+import ProjectCard from "../components/ProjectCard";
 import useWindowWidth from "../hooks/useWindowWidth";
 import {
   FRESH,
   HERO_PROJECTS,
   NAV_LINKS,
-  TAG_COLORS,
   TRENDING,
   FILTERS,
 } from "../mock";
-
-function Tag({ label }) {
-  const colors = TAG_COLORS[label] || { bg: "#333", text: "#fff" };
-  return (
-    <span
-      style={{
-        background: colors.bg,
-        color: colors.text,
-        fontSize: "10px",
-        fontWeight: 700,
-        letterSpacing: "0.1em",
-        padding: "2px 8px",
-        borderRadius: "2px",
-        display: "inline-block",
-      }}
-    >
-      {label}
-    </span>
-  );
-}
-
-function FundingBar({ percent }) {
-  const clamped = Math.min(percent, 100);
-  return (
-    <div style={{ marginTop: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000" }}>{percent}%</span>
-        <span style={{ fontSize: "11px", color: "#888" }}>Funded</span>
-      </div>
-      <div style={{ height: "3px", background: "#e5e5e5", borderRadius: "2px", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${clamped}%`, background: "#cc0000", borderRadius: "2px" }} />
-      </div>
-    </div>
-  );
-}
-
-function ProjectCard({ project }) {
-  return (
-    <Link
-      to={`/project/${project.id}`}
-      style={{ textDecoration: "none", color: "inherit" }}
-    >
-      <div
-        style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s", height: "100%" }}
-        onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"}
-        onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
-      >
-        <div style={{ height: "160px", overflow: "hidden", position: "relative" }}>
-          <img src={project.img} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          <div style={{ position: "absolute", top: "10px", left: "10px" }}>
-            <Tag label={project.tag} />
-          </div>
-        </div>
-        <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: "6px" }}>
-          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#111", lineHeight: 1.35 }}>{project.title}</h3>
-          {project.desc && (
-            <p style={{ margin: 0, fontSize: "12px", color: "#666", lineHeight: 1.5 }}>{project.desc}</p>
-          )}
-          <FundingBar percent={project.funded} />
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 function HeroCard({ project, style, showDesc, showFundingBar }) {
   return (
