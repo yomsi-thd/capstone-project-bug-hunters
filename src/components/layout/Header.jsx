@@ -1,7 +1,7 @@
+import { Link, useLocation } from "react-router-dom";
+
 export default function Header({
   navLinks,
-  activeNav,
-  setActiveNav,
   search,
   setSearch,
   menuOpen,
@@ -12,6 +12,13 @@ export default function Header({
   isTablet,
   isDesktop,
 }) {
+  const { pathname } = useLocation();
+
+  const isActive = (path) => {
+    if (path === "/discover") return pathname === "/" || pathname === "/discover";
+    return pathname === path;
+  };
+
   return (
     <>
       <nav style={{
@@ -20,21 +27,33 @@ export default function Header({
         display: "flex", alignItems: "center", gap: isMobile ? "8px" : "32px",
         height: "56px", position: "sticky", top: 0, zIndex: 100,
       }}>
-        <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "#cc0000", lineHeight: 1.1, marginRight: "4px", flexShrink: 0 }}>
-          RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
-        </div>
+        <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
+          <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "#cc0000", lineHeight: 1.1 }}>
+            RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
+          </div>
+        </Link>
 
         {!isMobile && (
           <div style={{ display: "flex", gap: "4px", flex: 1 }}>
-            {navLinks.map(link => (
-              <button key={link} onClick={() => setActiveNav(link)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: "14px", fontWeight: activeNav === link ? 600 : 400,
-                color: activeNav === link ? "#cc0000" : "#444",
-                padding: "6px 12px",
-                borderBottom: activeNav === link ? "2px solid #cc0000" : "2px solid transparent",
-                transition: "all 0.15s",
-              }}>{link}</button>
+            {navLinks.map(({ label, path }) => (
+              path.startsWith("#") ? (
+                <a key={label} href={path} style={{
+                  textDecoration: "none",
+                  fontSize: "14px", fontWeight: 400,
+                  color: "#444",
+                  padding: "6px 12px",
+                  borderBottom: "2px solid transparent",
+                }}>{label}</a>
+              ) : (
+                <Link key={label} to={path} style={{
+                  textDecoration: "none",
+                  fontSize: "14px", fontWeight: isActive(path) ? 600 : 400,
+                  color: isActive(path) ? "#cc0000" : "#444",
+                  padding: "6px 12px",
+                  borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
+                  transition: "all 0.15s",
+                }}>{label}</Link>
+              )
             ))}
           </div>
         )}
@@ -48,27 +67,29 @@ export default function Header({
           </div>
         )}
 
-        {isTablet && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", fontSize: "18px" }}>🔍</button>
-        )}
-
-        {isMobile && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "18px" }}>🔍</button>
+        {(isTablet || isMobile) && (
+          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px" }} aria-label="Toggle search">🔍</button>
         )}
 
         {isDesktop && (
           <>
-            <button style={{ background: "none", border: "none", fontSize: "13px", color: "#444", cursor: "pointer", fontWeight: 500 }}>LOGIN</button>
-            <button style={{ background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", fontSize: "13px", fontWeight: 700, padding: "8px 16px", cursor: "pointer", letterSpacing: "0.03em" }}>START A PROJECT</button>
+            <Link to="/login" style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500 }}>LOGIN</Link>
+            <Link to="/create-project" style={{
+              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em",
+            }}>START A PROJECT</Link>
           </>
         )}
 
         {isTablet && (
-          <button style={{ background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", fontSize: "12px", fontWeight: 700, padding: "7px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>START</button>
+          <Link to="/create-project" style={{
+            textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+            fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+          }}>START</Link>
         )}
 
         {isMobile && (
-          <button onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444" }}>
+          <button onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444" }} aria-label="Toggle menu">
             {menuOpen ? "✕" : "☰"}
           </button>
         )}
@@ -85,18 +106,31 @@ export default function Header({
 
       {isMobile && menuOpen && (
         <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px" }}>
-          {navLinks.map(link => (
-            <button key={link} onClick={() => { setActiveNav(link); setMenuOpen(false); }} style={{
-              display: "block", width: "100%", background: "none", border: "none",
-              textAlign: "left", padding: "10px 4px", fontSize: "15px",
-              fontWeight: activeNav === link ? 700 : 400,
-              color: activeNav === link ? "#cc0000" : "#444", cursor: "pointer",
-              borderBottom: "1px solid #f5f5f5",
-            }}>{link}</button>
+          {navLinks.map(({ label, path }) => (
+            path.startsWith("#") ? (
+              <a key={label} href={path} onClick={() => setMenuOpen(false)} style={{
+                display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
+                fontWeight: 400, color: "#444", borderBottom: "1px solid #f5f5f5",
+              }}>{label}</a>
+            ) : (
+              <Link key={label} to={path} onClick={() => setMenuOpen(false)} style={{
+                display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
+                fontWeight: isActive(path) ? 700 : 400,
+                color: isActive(path) ? "#cc0000" : "#444",
+                borderBottom: "1px solid #f5f5f5",
+              }}>{label}</Link>
+            )
           ))}
           <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-            <button style={{ flex: 1, background: "#fff", border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#444" }}>LOGIN</button>
-            <button style={{ flex: 1, background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>START A PROJECT</button>
+            <Link to="/login" onClick={() => setMenuOpen(false)} style={{
+              flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
+              border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px",
+              fontWeight: 600, color: "#444",
+            }}>LOGIN</Link>
+            <Link to="/create-project" onClick={() => setMenuOpen(false)} style={{
+              flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
+              color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
+            }}>START A PROJECT</Link>
           </div>
         </div>
       )}

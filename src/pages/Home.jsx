@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
+import useWindowWidth from "../hooks/useWindowWidth";
 import {
   FRESH,
   HERO_PROJECTS,
@@ -10,22 +12,20 @@ import {
   FILTERS,
 } from "../mock";
 
-function useWindowWidth() {
-  const [width, setWidth] = useState(
-    typeof window !== "undefined" ? window.innerWidth : 1200
-  );
-  if (typeof window !== "undefined") {
-    window.addEventListener("resize", () => setWidth(window.innerWidth));
-  }
-  return width;
-}
-
 function Tag({ label }) {
   const colors = TAG_COLORS[label] || { bg: "#333", text: "#fff" };
   return (
     <span
-      style={{ background: colors.bg, color: colors.text }}
-      className="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-sm inline-block"
+      style={{
+        background: colors.bg,
+        color: colors.text,
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        padding: "2px 8px",
+        borderRadius: "2px",
+        display: "inline-block",
+      }}
     >
       {label}
     </span>
@@ -49,30 +49,85 @@ function FundingBar({ percent }) {
 
 function ProjectCard({ project }) {
   return (
-    <div
-      style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s" }}
-      onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"}
-      onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+    <Link
+      to={`/project/${project.id}`}
+      style={{ textDecoration: "none", color: "inherit" }}
     >
-      <div style={{ height: "160px", overflow: "hidden", position: "relative" }}>
-        <img src={project.img} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-        <div style={{ position: "absolute", top: "10px", left: "10px" }}>
-          <Tag label={project.tag} />
+      <div
+        style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", transition: "box-shadow 0.2s", height: "100%" }}
+        onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.10)"}
+        onMouseLeave={e => e.currentTarget.style.boxShadow = "none"}
+      >
+        <div style={{ height: "160px", overflow: "hidden", position: "relative" }}>
+          <img src={project.img} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <div style={{ position: "absolute", top: "10px", left: "10px" }}>
+            <Tag label={project.tag} />
+          </div>
+        </div>
+        <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: "6px" }}>
+          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#111", lineHeight: 1.35 }}>{project.title}</h3>
+          {project.desc && (
+            <p style={{ margin: 0, fontSize: "12px", color: "#666", lineHeight: 1.5 }}>{project.desc}</p>
+          )}
+          <FundingBar percent={project.funded} />
         </div>
       </div>
-      <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: "6px" }}>
-        <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#111", lineHeight: 1.35 }}>{project.title}</h3>
-        {project.desc && (
-          <p style={{ margin: 0, fontSize: "12px", color: "#666", lineHeight: 1.5 }}>{project.desc}</p>
-        )}
-        <FundingBar percent={project.funded} />
+    </Link>
+  );
+}
+
+function HeroCard({ project, style, showDesc, showFundingBar }) {
+  return (
+    <Link to={`/project/${project.id}`} style={{ textDecoration: "none", color: "inherit", ...style }}>
+      <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: "100%" }}>
+        <img
+          src={project.img}
+          alt={project.title}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        />
+        <div style={{
+          position: "absolute", inset: 0,
+          background: showDesc
+            ? "linear-gradient(to top, rgba(0,0,0,0.82) 40%, rgba(0,0,0,0.1) 100%)"
+            : showFundingBar
+              ? "linear-gradient(to top, rgba(0,0,0,0.70) 50%, rgba(0,0,0,0.1) 100%)"
+              : "rgba(0,0,0,0.25)",
+        }} />
+        <div style={{
+          position: "absolute",
+          bottom: showDesc ? undefined : "14px",
+          ...(showDesc ? { bottom: "28px", left: "28px", right: "28px" } : { left: "14px", right: showFundingBar ? "14px" : undefined }),
+        }}>
+          <Tag label={project.tag} />
+          <h3 style={{
+            margin: showDesc ? "8px 0 6px" : "6px 0 0",
+            fontSize: showDesc ? "26px" : "15px",
+            fontWeight: showDesc ? 800 : 700,
+            color: "#fff",
+            lineHeight: showDesc ? 1.2 : undefined,
+          }}>
+            {project.title}
+          </h3>
+          {showDesc && project.desc && (
+            <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.82)", lineHeight: 1.6 }}>
+              {project.desc}
+            </p>
+          )}
+          {showFundingBar && (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+              <div style={{ flex: 1, height: "3px", background: "rgba(255,255,255,0.3)", borderRadius: "2px" }}>
+                <div style={{ width: `${project.funded}%`, height: "100%", background: "#cc0000", borderRadius: "2px" }} />
+              </div>
+              <span style={{ fontSize: "11px", color: "#fff", fontWeight: 600 }}>{project.funded}%</span>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
 export default function Home() {
-  const [activeNav, setActiveNav] = useState("Discover");
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -96,10 +151,9 @@ export default function Home() {
 
   const containerPadding = isMobile ? "20px 16px" : isTablet ? "24px 20px" : "32px 24px";
 
-  // Hero: right column
   const SMALL_HERO_H = 200;
   const HERO_GAP = 12;
-  const largeHeroH = SMALL_HERO_H * 2 + HERO_GAP; // 412px
+  const largeHeroH = SMALL_HERO_H * 2 + HERO_GAP;
 
   return (
     <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
@@ -107,8 +161,6 @@ export default function Home() {
 
       <Header
         navLinks={NAV_LINKS}
-        activeNav={activeNav}
-        setActiveNav={setActiveNav}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}
@@ -122,7 +174,7 @@ export default function Home() {
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: containerPadding }}>
 
-        {/* ── Hero Grid ── */}
+        {/* Hero Grid */}
         <div style={{
           display: "grid",
           gridTemplateColumns: isDesktop ? "1fr 320px" : isTablet ? "1fr 1fr" : "1fr",
@@ -130,85 +182,42 @@ export default function Home() {
           gap: `${HERO_GAP}px`,
           marginBottom: isMobile ? "32px" : "48px",
         }}>
+          <HeroCard
+            project={HERO_PROJECTS[0]}
+            showDesc={!isMobile}
+            style={{
+              gridRow: isDesktop ? "1 / 3" : "auto",
+              gridColumn: isTablet ? "1 / -1" : "auto",
+              height: isMobile ? "260px" : isTablet ? "320px" : `${largeHeroH}px`,
+            }}
+          />
 
-          {/* Large hero */}
-          <div style={{
-            gridRow: isDesktop ? "1 / 3" : "auto",
-            gridColumn: isTablet ? "1 / -1" : "auto",
-            position: "relative",
-            borderRadius: "10px",
-            overflow: "hidden",
-            cursor: "pointer",
-            height: isMobile ? "260px" : isTablet ? "320px" : `${largeHeroH}px`,
-          }}>
-            <img
-              src={HERO_PROJECTS[0].img}
-              alt={HERO_PROJECTS[0].title}
-              style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-            />
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.82) 40%, rgba(0,0,0,0.1) 100%)" }} />
-            <div style={{ position: "absolute", bottom: isMobile ? "16px" : "28px", left: isMobile ? "16px" : "28px", right: isMobile ? "16px" : "28px" }}>
-              <Tag label={HERO_PROJECTS[0].tag} />
-              <h2 style={{ margin: "8px 0 6px", fontSize: isMobile ? "18px" : "26px", fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>
-                {HERO_PROJECTS[0].title}
-              </h2>
-              {!isMobile && (
-                <p style={{ margin: 0, fontSize: "13px", color: "rgba(255,255,255,0.82)", lineHeight: 1.6 }}>
-                  {HERO_PROJECTS[0].desc}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Small hero 1 — hidden on mobile */}
           {!isMobile && (
-            <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: isTablet ? "180px" : `${SMALL_HERO_H}px` }}>
-              <img
-                src={HERO_PROJECTS[1].img}
-                alt={HERO_PROJECTS[1].title}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-              />
-              <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to top, rgba(0,0,0,0.70) 50%, rgba(0,0,0,0.1) 100%)" }} />
-              <div style={{ position: "absolute", bottom: "14px", left: "14px", right: "14px" }}>
-                <Tag label={HERO_PROJECTS[1].tag} />
-                <h3 style={{ margin: "6px 0 4px", fontSize: "15px", fontWeight: 700, color: "#fff" }}>{HERO_PROJECTS[1].title}</h3>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ flex: 1, height: "3px", background: "rgba(255,255,255,0.3)", borderRadius: "2px" }}>
-                    <div style={{ width: `${HERO_PROJECTS[1].funded}%`, height: "100%", background: "#cc0000", borderRadius: "2px" }} />
-                  </div>
-                  <span style={{ fontSize: "11px", color: "#fff", fontWeight: 600 }}>{HERO_PROJECTS[1].funded}%</span>
-                </div>
-              </div>
-            </div>
+            <HeroCard
+              project={HERO_PROJECTS[1]}
+              showFundingBar
+              style={{ height: isTablet ? "180px" : `${SMALL_HERO_H}px` }}
+            />
           )}
 
-          {/* Small hero 2 — hidden on mobile */}
           {!isMobile && (
-            <div style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: isTablet ? "180px" : `${SMALL_HERO_H}px` }}>
-              <img
-                src={HERO_PROJECTS[2].img}
-                alt={HERO_PROJECTS[2].title}
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-              />
-              <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.25)" }} />
-              <div style={{ position: "absolute", bottom: "14px", left: "14px" }}>
-                <Tag label={HERO_PROJECTS[2].tag} />
-                <h3 style={{ margin: "6px 0 0", fontSize: "15px", fontWeight: 700, color: "#fff" }}>{HERO_PROJECTS[2].title}</h3>
-              </div>
-            </div>
+            <HeroCard
+              project={HERO_PROJECTS[2]}
+              style={{ height: isTablet ? "180px" : `${SMALL_HERO_H}px` }}
+            />
           )}
         </div>
 
-        {/* ── Trending Projects ── */}
+        {/* Trending Projects */}
         <div style={{ marginBottom: isMobile ? "32px" : "48px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "4px" }}>
             <div>
               <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>Trending Projects</h2>
               <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Projects gaining momentum across RMIT.</p>
             </div>
-            <button style={{ background: "none", border: "none", fontSize: "12px", color: "#cc0000", cursor: "pointer", fontWeight: 600, letterSpacing: "0.04em", whiteSpace: "nowrap" }}>
+            <Link to="/discover" style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, letterSpacing: "0.04em", whiteSpace: "nowrap", textDecoration: "none" }}>
               VIEW ALL →
-            </button>
+            </Link>
           </div>
           <div style={{
             display: "grid",
@@ -220,7 +229,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* ── Fresh Ideas ── */}
+        {/* Fresh Ideas */}
         <div style={{ marginBottom: isMobile ? "32px" : "48px" }}>
           <div style={{
             display: "flex",
@@ -295,7 +304,7 @@ export default function Home() {
         </div>
       </div>
 
-      <Footer />
+      <Footer isMobile={isMobile} />
     </div>
   );
 }
