@@ -1,4 +1,6 @@
 import { useState } from "react";
+import Header from "../components/layout/Header";
+import Footer from "../components/layout/Footer";
 
 const NAV_LINKS = ["Discover", "Departments", "Impact"];
 
@@ -158,103 +160,20 @@ export default function Home() {
         }
       `}</style>
 
-      {/* Navbar */}
-      <nav style={{
-        background: "#fff", borderBottom: "1px solid #ececec",
-        padding: isMobile ? "0 16px" : "0 40px",
-        display: "flex", alignItems: "center", gap: isMobile ? "8px" : "32px",
-        height: "56px", position: "sticky", top: 0, zIndex: 100,
-      }}>
-        {/* Logo */}
-        <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "#cc0000", lineHeight: 1.1, marginRight: "4px", flexShrink: 0 }}>
-          RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
-        </div>
-
-        {/* Desktop nav links */}
-        {!isMobile && (
-          <div style={{ display: "flex", gap: "4px", flex: 1 }}>
-            {NAV_LINKS.map(link => (
-              <button key={link} onClick={() => setActiveNav(link)} style={{
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: "14px", fontWeight: activeNav === link ? 600 : 400,
-                color: activeNav === link ? "#cc0000" : "#444",
-                padding: "6px 12px",
-                borderBottom: activeNav === link ? "2px solid #cc0000" : "2px solid transparent",
-                transition: "all 0.15s",
-              }}>{link}</button>
-            ))}
-          </div>
-        )}
-
-        {isMobile && <div style={{ flex: 1 }} />}
-
-        {/* Desktop search */}
-        {isDesktop && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "6px 12px", width: "200px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ border: "none", background: "none", outline: "none", fontSize: "13px", color: "#333", width: "100%" }} />
-          </div>
-        )}
-
-        {/* Tablet search icon */}
-        {isTablet && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", fontSize: "18px" }}>🔍</button>
-        )}
-
-        {/* Mobile search icon */}
-        {isMobile && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "18px" }}>🔍</button>
-        )}
-
-        {/* Desktop auth buttons */}
-        {isDesktop && (
-          <>
-            <button style={{ background: "none", border: "none", fontSize: "13px", color: "#444", cursor: "pointer", fontWeight: 500 }}>LOGIN</button>
-            <button style={{ background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", fontSize: "13px", fontWeight: 700, padding: "8px 16px", cursor: "pointer", letterSpacing: "0.03em" }}>START A PROJECT</button>
-          </>
-        )}
-
-        {/* Tablet login */}
-        {isTablet && (
-          <button style={{ background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", fontSize: "12px", fontWeight: 700, padding: "7px 12px", cursor: "pointer", whiteSpace: "nowrap" }}>START</button>
-        )}
-
-        {/* Mobile hamburger */}
-        {isMobile && (
-          <button onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444" }}>
-            {menuOpen ? "✕" : "☰"}
-          </button>
-        )}
-      </nav>
-
-      {/* Mobile expandable search */}
-      {(isMobile || isTablet) && searchOpen && (
-        <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "8px 12px" }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." autoFocus style={{ border: "none", background: "none", outline: "none", fontSize: "14px", color: "#333", width: "100%" }} />
-          </div>
-        </div>
-      )}
-
-      {/* Mobile menu dropdown */}
-      {isMobile && menuOpen && (
-        <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px" }}>
-          {NAV_LINKS.map(link => (
-            <button key={link} onClick={() => { setActiveNav(link); setMenuOpen(false); }} style={{
-              display: "block", width: "100%", background: "none", border: "none",
-              textAlign: "left", padding: "10px 4px", fontSize: "15px",
-              fontWeight: activeNav === link ? 700 : 400,
-              color: activeNav === link ? "#cc0000" : "#444", cursor: "pointer",
-              borderBottom: "1px solid #f5f5f5",
-            }}>{link}</button>
-          ))}
-          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-            <button style={{ flex: 1, background: "#fff", border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, cursor: "pointer", color: "#444" }}>LOGIN</button>
-            <button style={{ flex: 1, background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700, cursor: "pointer" }}>START A PROJECT</button>
-          </div>
-        </div>
-      )}
+      <Header
+        navLinks={NAV_LINKS}
+        activeNav={activeNav}
+        setActiveNav={setActiveNav}
+        search={search}
+        setSearch={setSearch}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        searchOpen={searchOpen}
+        setSearchOpen={setSearchOpen}
+        isMobile={isMobile}
+        isTablet={isTablet}
+        isDesktop={isDesktop}
+      />
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "20px 16px" : isTablet ? "24px 20px" : "32px 24px" }}>
 
@@ -354,23 +273,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer style={{ background: "#1a1a1a", color: "#fff", padding: isMobile ? "32px 16px 24px" : "40px 40px 32px" }}>
-        <div className="footer-inner" style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexDirection: isMobile ? "column" : "row", gap: isMobile ? "20px" : "0" }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: "16px", color: "#fff", marginBottom: "6px" }}>RMIT Launchpad</div>
-            <div style={{ fontSize: "12px", color: "#888" }}>© 2026 RMIT University. All rights reserved.</div>
-          </div>
-          <div className="footer-links" style={{ display: "flex", gap: isMobile ? "12px" : "32px", flexWrap: "wrap" }}>
-            {["About RMIT", "Research Ethics", "Terms of Service", "Privacy Policy", "Contact Support"].map(link => (
-              <a key={link} href="#" style={{ fontSize: "13px", color: "#aaa", textDecoration: "none" }}
-                onMouseEnter={e => e.target.style.color = "#fff"}
-                onMouseLeave={e => e.target.style.color = "#aaa"}
-              >{link}</a>
-            ))}
-          </div>
-        </div>
-      </footer>
+      <Footer isMobile={isMobile} />
     </div>
   );
 }
