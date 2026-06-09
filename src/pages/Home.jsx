@@ -96,7 +96,7 @@ export default function Home() {
 
   const containerPadding = isMobile ? "20px 16px" : isTablet ? "24px 20px" : "32px 24px";
 
-  // Hero: right column = 2 rows of 200px + 12px gap = 412px total height
+  // Hero: right column
   const SMALL_HERO_H = 200;
   const HERO_GAP = 12;
   const largeHeroH = SMALL_HERO_H * 2 + HERO_GAP; // 412px
@@ -131,7 +131,7 @@ export default function Home() {
           marginBottom: isMobile ? "32px" : "48px",
         }}>
 
-          {/* Large hero — spans both rows on desktop, full width on tablet */}
+          {/* Large hero */}
           <div style={{
             gridRow: isDesktop ? "1 / 3" : "auto",
             gridColumn: isTablet ? "1 / -1" : "auto",
