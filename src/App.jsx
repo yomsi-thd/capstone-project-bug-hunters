@@ -19,6 +19,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
 
+        <Route path="/creator-dashboard" element={<CreatorDashboard />} />
+
         <Route path="/discover" element={<Discover />} />
 
         <Route path="/login" element={<Login />} />
