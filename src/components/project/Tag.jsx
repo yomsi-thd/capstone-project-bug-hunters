@@ -1,4 +1,4 @@
-import { TAG_COLORS } from "../mock";
+import { TAG_COLORS } from "../../mock";
 
 export default function Tag({ label }) {
   const colors = TAG_COLORS[label] || { bg: "#333", text: "#fff" };
