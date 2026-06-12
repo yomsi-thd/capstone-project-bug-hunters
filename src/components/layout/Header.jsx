@@ -82,10 +82,13 @@ export default function Header({
         )}
 
         {isTablet && (
-          <Link to="/create-project" style={{
-            textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-            fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-          }}>START</Link>
+          <>
+            <Link to="/login" style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap" }}>LOGIN</Link>
+            <Link to="/create-project" style={{
+              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+              fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+            }}>START</Link>
+          </>
         )}
 
         {isMobile && (
