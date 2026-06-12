@@ -11,6 +11,7 @@ import MyProjects from "./pages/MyProjects";
 import Dashboard from "./pages/Dashboard";
 import Investments from "./pages/Investments";
 import Admin from "./pages/Admin";
+import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 
 function App() {
@@ -20,6 +21,8 @@ function App() {
         <Route path="/" element={<Home />} />
 
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
+
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
         <Route path="/discover" element={<Discover />} />
 
