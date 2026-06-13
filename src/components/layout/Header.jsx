@@ -1,5 +1,37 @@
 import { Link, useLocation } from "react-router-dom";
 
+function CCBadge({ ccBalance }) {
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", gap: "6px",
+      border: "1px solid #ddd", borderRadius: "6px",
+      padding: "5px 10px", background: "#fff", flexShrink: 0,
+    }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cc0000" strokeWidth="2.5">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
+      </svg>
+      <span style={{ fontSize: "12px", fontWeight: 700, color: "#111", whiteSpace: "nowrap" }}>
+        BALANCE&nbsp;
+        <span style={{ color: "#cc0000" }}>{ccBalance.toLocaleString()} CC</span>
+      </span>
+    </div>
+  );
+}
+
+function Avatar({ userName }) {
+  return (
+    <div style={{
+      width: "30px", height: "30px", borderRadius: "50%",
+      background: "#e8e8e8", border: "1px solid #ddd",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: "11px", fontWeight: 700, color: "#555", flexShrink: 0,
+    }}>
+      {userName ? userName.charAt(0).toUpperCase() : "U"}
+    </div>
+  );
+}
+
 export default function Header({
   navLinks,
   search,
@@ -11,6 +43,11 @@ export default function Header({
   isMobile,
   isTablet,
   isDesktop,
+  // Auth props (optional - defaults to logged out)
+  isLoggedIn = false,
+  ccBalance = 0,
+  userName = "",
+  onLogout,
 }) {
   const { pathname } = useLocation();
 
@@ -24,30 +61,29 @@ export default function Header({
       <nav style={{
         background: "#fff", borderBottom: "1px solid #ececec",
         padding: isMobile ? "0 16px" : "0 40px",
-        display: "flex", alignItems: "center", gap: isMobile ? "8px" : "32px",
+        display: "flex", alignItems: "center", gap: isMobile ? "8px" : "16px",
         height: "56px", position: "sticky", top: 0, zIndex: 100,
       }}>
+        {/* Logo */}
         <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
           <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "#cc0000", lineHeight: 1.1 }}>
             RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
           </div>
         </Link>
 
+        {/* Desktop nav links */}
         {!isMobile && (
           <div style={{ display: "flex", gap: "4px", flex: 1 }}>
             {navLinks.map(({ label, path }) => (
               path.startsWith("#") ? (
                 <a key={label} href={path} style={{
-                  textDecoration: "none",
-                  fontSize: "14px", fontWeight: 400,
-                  color: "#444",
-                  padding: "6px 12px",
-                  borderBottom: "2px solid transparent",
+                  textDecoration: "none", fontSize: "14px", fontWeight: 400,
+                  color: "#444", padding: "6px 12px", borderBottom: "2px solid transparent",
                 }}>{label}</a>
               ) : (
                 <Link key={label} to={path} style={{
-                  textDecoration: "none",
-                  fontSize: "14px", fontWeight: isActive(path) ? 600 : 400,
+                  textDecoration: "none", fontSize: "14px",
+                  fontWeight: isActive(path) ? 600 : 400,
                   color: isActive(path) ? "#cc0000" : "#444",
                   padding: "6px 12px",
                   borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
@@ -60,28 +96,58 @@ export default function Header({
 
         {isMobile && <div style={{ flex: 1 }} />}
 
-        {isDesktop && (
+        {/* Desktop search (logged out only) */}
+        {isDesktop && !isLoggedIn && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "6px 12px", width: "200px" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ border: "none", background: "none", outline: "none", fontSize: "13px", color: "#333", width: "100%" }} />
           </div>
         )}
 
+        {/* Mobile/tablet search toggle */}
         {(isTablet || isMobile) && (
           <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px" }} aria-label="Toggle search">🔍</button>
         )}
 
-        {isDesktop && (
+        {/* Desktop — Logged Out */}
+        {isDesktop && !isLoggedIn && (
           <>
-            <Link to="/login" style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500 }}>LOGIN</Link>
+            <Link to="/login" style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0 }}>LOGIN</Link>
             <Link to="/create-project" style={{
               textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em",
+              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
             }}>START A PROJECT</Link>
           </>
         )}
 
-        {isTablet && (
+        {/* Desktop — Logged In */}
+        {isDesktop && isLoggedIn && (
+          <>
+            <CCBadge ccBalance={ccBalance} />
+            <Link to="/create-project" style={{
+              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
+            }}>START A PROJECT</Link>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+              <Avatar userName={userName} />
+              <Link to="/dashboard" style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500 }}>Account</Link>
+            </div>
+            <button
+              onClick={onLogout}
+              style={{
+                display: "flex", alignItems: "center", gap: "4px",
+                background: "none", border: "none", cursor: "pointer",
+                fontSize: "13px", color: "#666", fontWeight: 500, padding: 0, flexShrink: 0,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+              Logout
+            </button>
+          </>
+        )}
+
+        {/* Tablet — Logged Out */}
+        {isTablet && !isLoggedIn && (
           <>
             <Link to="/login" style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap" }}>LOGIN</Link>
             <Link to="/create-project" style={{
@@ -91,6 +157,21 @@ export default function Header({
           </>
         )}
 
+        {/* Tablet — Logged In */}
+        {isTablet && isLoggedIn && (
+          <>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: "#cc0000", whiteSpace: "nowrap" }}>
+              {ccBalance.toLocaleString()} CC
+            </div>
+            <Link to="/create-project" style={{
+              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+              fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+            }}>START</Link>
+            <Avatar userName={userName} />
+          </>
+        )}
+
+        {/* Mobile hamburger */}
         {isMobile && (
           <button onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444" }} aria-label="Toggle menu">
             {menuOpen ? "✕" : "☰"}
@@ -98,6 +179,7 @@ export default function Header({
         )}
       </nav>
 
+      {/* Search dropdown (mobile/tablet) */}
       {(isMobile || isTablet) && searchOpen && (
         <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "8px 12px" }}>
@@ -107,6 +189,7 @@ export default function Header({
         </div>
       )}
 
+      {/* Mobile menu */}
       {isMobile && menuOpen && (
         <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px" }}>
           {navLinks.map(({ label, path }) => (
@@ -124,17 +207,36 @@ export default function Header({
               }}>{label}</Link>
             )
           ))}
-          <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-            <Link to="/login" onClick={() => setMenuOpen(false)} style={{
-              flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
-              border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px",
-              fontWeight: 600, color: "#444",
-            }}>LOGIN</Link>
-            <Link to="/create-project" onClick={() => setMenuOpen(false)} style={{
-              flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
-              color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
-            }}>START A PROJECT</Link>
-          </div>
+
+          {!isLoggedIn && (
+            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+              <Link to="/login" onClick={() => setMenuOpen(false)} style={{
+                flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
+                border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, color: "#444",
+              }}>LOGIN</Link>
+              <Link to="/create-project" onClick={() => setMenuOpen(false)} style={{
+                flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
+                color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
+              }}>START A PROJECT</Link>
+            </div>
+          )}
+
+          {isLoggedIn && (
+            <div style={{ marginTop: "12px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
+                Balance: {ccBalance.toLocaleString()} CC
+              </div>
+              <Link to="/dashboard" onClick={() => setMenuOpen(false)} style={{
+                display: "block", textDecoration: "none", padding: "10px 4px",
+                fontSize: "14px", color: "#333", borderBottom: "1px solid #f5f5f5",
+              }}>Account</Link>
+              <button onClick={() => { setMenuOpen(false); onLogout?.(); }} style={{
+                display: "block", width: "100%", textAlign: "left", background: "none",
+                border: "none", padding: "10px 4px", fontSize: "14px", color: "#cc0000",
+                cursor: "pointer", fontWeight: 600,
+              }}>Logout</button>
+            </div>
+          )}
         </div>
       )}
     </>
