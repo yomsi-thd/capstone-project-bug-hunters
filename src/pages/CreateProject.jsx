@@ -1,27 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const STEPS = [
-  { id: 1, label: "Basic Info" },
-  { id: 2, label: "Story & Media" },
-  { id: 3, label: "Team Members" },
-  { id: 4, label: "Funding Goals" },
-  { id: 5, label: "Review & Submit" },
-];
-
-const SCHOOLS = ["School of Engineering", "School of Design", "School of Business", "School of Science", "School of Computing"];
-
-const MOCK_TEAM = [
-  { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  rmitId: "a847291" },
-  { id: 2, name: "Chloe Chen",          role: "Student Developer", rmitId: "s3984021" },
-];
-
-const ROLE_BADGE = {
-  "Lead Researcher":   "bg-blue-100 text-blue-700",
-  "Student Developer": "bg-green-100 text-green-700",
-  "Co-Investigator":   "bg-purple-100 text-purple-700",
-  "Industry Advisor":  "bg-orange-100 text-orange-700",
-};
+import {
+  CREATE_PROJECT_STEPS as STEPS,
+  SCHOOLS,
+  MOCK_TEAM,
+  ROLE_BADGE,
+  CREATE_PROJECT_TIERS
+} from "../mock";
 
 function StepIndicator({ steps, current }) {
   return (
@@ -259,9 +244,7 @@ export default function CreateProject() {
   const [step, setStep] = useState(1);
   const [basicData, setBasicData] = useState({ title: "", school: "", goal: "", proposition: "" });
   const [team, setTeam] = useState(MOCK_TEAM);
-  const [tiers, setTiers] = useState([
-    { id: 1, name: "Digital Supporter", amount: "25", privileges: ["Name listed on digital contributor wall.", "Weekly email updates."] }
-  ]);
+  const [tiers, setTiers] = useState(CREATE_PROJECT_TIERS);
   const navigate = useNavigate();
 
   const renderStep = () => {

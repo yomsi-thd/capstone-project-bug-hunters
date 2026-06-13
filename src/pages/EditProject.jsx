@@ -1,23 +1,12 @@
 import { useState } from "react";
-
-const TABS = [
-  { id: "basic", label: "Basic Info",   icon: "ℹ" },
-  { id: "media", label: "Media",        icon: "🖼" },
-  { id: "team",  label: "Team",         icon: "👥" },
-  { id: "tiers", label: "Reward Tiers", icon: "🎁" },
-];
-
-const SCHOOLS = ["School of Engineering", "School of Design", "School of Business", "School of Science"];
-
-const MOCK_TIERS = [
-  { id: 1, name: "Digital Supporter",  amount: "25",  desc: "Digital certificate of appreciation, name in project credits, and monthly newsletter access." },
-  { id: 2, name: "Lab Access Partner", amount: "500", desc: "Exclusive physical lab tour, meeting with the research lead, and physical plaque installation." },
-];
-
-const ROLE_BADGE = {
-  "Lead Researcher":   "bg-blue-100 text-blue-700",
-  "Student Developer": "bg-green-100 text-green-700",
-};
+import {
+  EDIT_PROJECT_TABS as TABS,
+  SCHOOLS,
+  MOCK_TIERS,
+  ROLE_BADGE,
+  EDIT_PROJECT_INITIAL_DATA,
+  EDIT_PROJECT_INITIAL_TEAM,
+} from "../mock";
 
 function TabBasicInfo({ data, setData }) {
   return (
@@ -192,16 +181,8 @@ function TabTiers({ tiers, setTiers }) {
 
 export default function EditProject({ onClose }) {
   const [activeTab, setActiveTab] = useState("basic");
-  const [basicData, setBasicData] = useState({
-    title: "Autonomous Urban Transit",
-    school: "School of Engineering",
-    goal: "250000",
-    proposition: "Developing the next generation of AI-driven public transport for high-density metropolitan areas, focusing on safety, efficiency, and last-mile connectivity for RMIT's urban campus ecosystem.",
-  });
-  const [team, setTeam] = useState([
-    { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  rmitId: "e647291" },
-    { id: 2, name: "Chloe Chen",          role: "Student Developer", rmitId: "s3984021" },
-  ]);
+  const [basicData, setBasicData] = useState(EDIT_PROJECT_INITIAL_DATA);
+  const [team, setTeam] = useState(EDIT_PROJECT_INITIAL_TEAM);
   const [tiers, setTiers] = useState(MOCK_TIERS);
 
   const renderTab = () => {

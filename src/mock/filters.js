@@ -1,1 +1,0 @@
-export const FILTERS = ["ALL", "TECH", "ART", "SCIENCE"];
