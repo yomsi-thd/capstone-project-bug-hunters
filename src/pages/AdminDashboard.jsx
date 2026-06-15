@@ -1,6 +1,6 @@
 import { useState } from "react";
 import {
-  ADMIN_PROJECTS as PROJECTS,
+  ADMIN_PROJECTS as INITIAL_PROJECTS,
   ADMIN_STATUS_STYLE as STATUS_STYLE,
   ADMIN_CAT_STYLE as CAT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
@@ -10,18 +10,27 @@ export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState("projects");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
+  const [projects, setProjects] = useState(INITIAL_PROJECTS);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
-  const filtered = PROJECTS.filter(p => {
-    const matchSearch = p.title.toLowerCase().includes(search.toLowerCase()) || p.creator.toLowerCase().includes(search.toLowerCase());
+  const filtered = projects.filter(p => {
+    const matchSearch =
+      p.title.toLowerCase().includes(search.toLowerCase()) ||
+      p.creator.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "All Statuses" || p.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const confirmDelete = () => {
+    setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
+    setDeleteTarget(null);
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
-      {/* ── Sidebar ── */}
+      {/* Sidebar */}
       <aside className="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
         <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-lg bg-brand flex items-center justify-center text-white font-extrabold text-base shrink-0">R</div>
@@ -50,7 +59,7 @@ export default function AdminDashboard() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
+      {/* Main */}
       <div className="flex-1 flex flex-col">
         <header className="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-9 shrink-0">
           <div className="text-base font-extrabold text-brand">RMIT Launchpad Admin</div>
@@ -68,12 +77,12 @@ export default function AdminDashboard() {
           <h1 className="text-[28px] font-extrabold text-gray-900 mb-1">Project Management</h1>
           <p className="text-[14px] text-gray-400 mb-7">Oversee and manage all academic crowdfunding initiatives.</p>
 
-          {/* Stats */}
+          {/* Stats — now reactive to actual project list */}
           <div className="grid grid-cols-3 gap-4 mb-7">
             {[
-              { label: "Total Projects",    value: "142", icon: "▦",  accent: false },
-              { label: "Pending Approvals", value: "18",  icon: "📋", accent: false },
-              { label: "Flagged Content",   value: "3",   icon: "🚩", accent: true  },
+              { label: "Total Projects",    value: projects.length,                                  icon: "▦",  accent: false },
+              { label: "Pending Approvals", value: projects.filter(p => p.status === "Pending").length, icon: "📋", accent: false },
+              { label: "Flagged Content",   value: projects.filter(p => p.status === "Flagged").length, icon: "🚩", accent: true  },
             ].map(c => (
               <div key={c.label} className={`bg-white rounded-xl p-6 border ${c.accent ? "border-brand" : "border-gray-200"}`} style={{ borderWidth: c.accent ? "1.5px" : "1px" }}>
                 <div className="flex justify-between items-start mb-2">
@@ -89,7 +98,12 @@ export default function AdminDashboard() {
           <div className="bg-white border border-gray-200 rounded-t-xl px-5 py-4 flex gap-3 items-center">
             <div className="flex items-center gap-2 bg-gray-50 rounded-md px-3 py-2 flex-1">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects by name or creator..." className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search projects by name or creator..."
+                className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
+              />
             </div>
             <select className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-500 bg-white outline-none">
               <option>All Schools</option>
@@ -97,7 +111,11 @@ export default function AdminDashboard() {
               <option>School of Design</option>
               <option>School of Business</option>
             </select>
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-500 bg-white outline-none">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-500 bg-white outline-none"
+            >
               <option>All Statuses</option>
               <option>Active</option>
               <option>Pending</option>
@@ -117,11 +135,14 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p, i) => {
+                {filtered.length > 0 ? filtered.map((p, i) => {
                   const s = STATUS_STYLE[p.status];
                   const cc = CAT_STYLE[p.category] || "bg-gray-100 text-gray-600";
                   return (
-                    <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${i < filtered.length - 1 ? "border-b border-gray-50" : ""}`}>
+                    <tr
+                      key={p.id}
+                      className={`hover:bg-gray-50 transition-colors ${i < filtered.length - 1 ? "border-b border-gray-50" : ""}`}
+                    >
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <img src={p.img} alt={p.title} className="w-11 h-11 rounded-md object-cover shrink-0" />
@@ -148,17 +169,27 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-5 py-3.5">
                         <div className="flex gap-1.5">
-                          <button className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-gray-50 transition-colors">🗑</button>
+                          <button
+                            onClick={() => setDeleteTarget(p)}
+                            title="Delete project"
+                            className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-red-50 hover:border-brand transition-colors"
+                          >
+                            🗑
+                          </button>
                           <button className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-gray-50 transition-colors">⋮</button>
                         </div>
                       </td>
                     </tr>
                   );
-                })}
+                }) : (
+                  <tr>
+                    <td colSpan={5} className="px-5 py-10 text-center text-[13px] text-gray-400">No projects found.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
             <div className="px-5 py-3.5 flex justify-between items-center border-t border-gray-50">
-              <span className="text-[12px] text-gray-400">Showing 1–{filtered.length} of 142 projects</span>
+              <span className="text-[12px] text-gray-400">Showing 1–{filtered.length} of {projects.length} projects</span>
               <div className="flex gap-2">
                 {["Prev", "Next"].map(l => (
                   <button key={l} className="bg-white border border-gray-200 rounded-md px-4 py-1.5 text-[12px] text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">{l}</button>
@@ -168,6 +199,40 @@ export default function AdminDashboard() {
           </div>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-[400px] p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Delete Project</h2>
+            <p className="text-[14px] text-gray-500 leading-relaxed mb-6">
+              Are you sure you want to delete{" "}
+              <span className="font-bold text-gray-900">"{deleteTarget.title}"</span>?{" "}
+              This action is <span className="font-semibold text-gray-700">permanent</span> and cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2 text-[13px] font-bold cursor-pointer transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
