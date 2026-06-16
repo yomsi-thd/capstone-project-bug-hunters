@@ -13,6 +13,7 @@ import Investments from "./pages/Investments";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import AdminUserManagement from "./pages/AdminUserManagement";
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
 
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin-user-management" element={<AdminUserManagement />} />
 
         <Route path="/discover" element={<Discover />} />
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ADMIN_PROJECTS as INITIAL_PROJECTS,
   ADMIN_STATUS_STYLE as STATUS_STYLE,
@@ -7,6 +8,7 @@ import {
 } from "../mock";
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("projects");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
@@ -26,6 +28,13 @@ export default function AdminDashboard() {
     setDeleteTarget(null);
   };
 
+  const handleNavClick = (itemId) => {
+    setActiveNav(itemId);
+    if (itemId === "users") {
+      navigate("/admin-user-management");
+    }
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50 font-sans">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
@@ -43,7 +52,7 @@ export default function AdminDashboard() {
           {NAV_ITEMS.map(item => (
             <button
               key={item.id}
-              onClick={() => setActiveNav(item.id)}
+              onClick={() => handleNavClick(item.id)}
               className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-left cursor-pointer bg-transparent border-l-4 border-t-0 border-r-0 border-b-0 mb-0.5 transition-colors ${
                 activeNav === item.id
                   ? "border-brand text-brand font-bold bg-red-50"
