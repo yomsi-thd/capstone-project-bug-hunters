@@ -5,3 +5,4 @@ export * from "./adminApprovals";
 export * from "./createProject";
 export * from "./creatorDashboard";
 export * from "./editProject";
+export * from "./projectDetail";

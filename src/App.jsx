@@ -25,6 +25,7 @@ function App() {
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
 
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        
         <Route path="/admin-user-management" element={<AdminUserManagement />} />
         <Route path="/admin-approvals" element={<AdminApprovals />} />
 
