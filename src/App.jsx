@@ -14,6 +14,7 @@ import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import AdminUserManagement from "./pages/AdminUserManagement";
+import AdminApprovals from "./pages/AdminApprovals";
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
 
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/admin-user-management" element={<AdminUserManagement />} />
+        <Route path="/admin-approvals" element={<AdminApprovals />} />
 
         <Route path="/discover" element={<Discover />} />
 
