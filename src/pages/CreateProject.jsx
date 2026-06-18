@@ -10,11 +10,11 @@ import {
 
 function StepIndicator({ steps, current }) {
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible pb-4 md:pb-0 gap-6 md:gap-0 scrollbar-none shrink-0">
       {steps.map((s, i) => (
-        <div key={s.id} className="flex items-start gap-3 relative" style={{ paddingBottom: i < steps.length - 1 ? "24px" : 0 }}>
+        <div key={s.id} className={`flex items-center md:items-start gap-3 relative shrink-0 ${i < steps.length - 1 ? "pb-0 md:pb-6" : ""}`}>
           {i < steps.length - 1 && (
-            <div className="absolute left-[11px] top-6 w-0.5 h-6" style={{ background: s.id < current ? "#cc0000" : "#e5e7eb" }} />
+            <div className="hidden md:block absolute left-[11px] top-6 w-0.5 h-6" style={{ background: s.id < current ? "#cc0000" : "#e5e7eb" }} />
           )}
           <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold border-2 transition-colors ${
             s.id < current  ? "bg-brand border-brand text-white" :
@@ -25,7 +25,7 @@ function StepIndicator({ steps, current }) {
           </div>
           <div className="pt-0.5">
             <div className="text-[10px] text-gray-300 font-bold tracking-widest">STEP {s.id}</div>
-            <div className={`text-[13px] ${s.id === current ? "font-bold text-gray-900" : s.id < current ? "font-medium text-brand" : "font-normal text-gray-300"}`}>{s.label}</div>
+            <div className={`text-[13px] whitespace-nowrap ${s.id === current ? "font-bold text-gray-900" : s.id < current ? "font-medium text-brand" : "font-normal text-gray-300"}`}>{s.label}</div>
           </div>
         </div>
       ))}
@@ -126,7 +126,7 @@ function Step3({ team, setTeam }) {
       <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Add the core researchers, academic staff, and student developers driving this initiative.</p>
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
         <div className="text-[13px] font-bold text-gray-900 mb-3">Add a Member</div>
-        <div className="grid gap-2.5 mb-0" style={{ gridTemplateColumns: "1fr 1fr 1fr auto" }}>
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 mb-0">
           <div>
             <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">FULL NAME</label>
             <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="e.g., Dr. Jane Smith" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
@@ -142,7 +142,7 @@ function Step3({ team, setTeam }) {
             <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">RMIT ID</label>
             <input value={newMember.rmitId} onChange={e => setNewMember({ ...newMember, rmitId: e.target.value })} placeholder="e.g. s123456" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
           </div>
-          <button onClick={() => { if (newMember.name && newMember.role) { setTeam([...team, { ...newMember, id: Date.now() }]); setNewMember({ name: "", role: "", rmitId: "" }); }}} className="w-9 h-9 bg-brand hover:bg-red-800 text-white border-none rounded-md text-lg cursor-pointer flex items-center justify-center transition-colors self-end">+</button>
+          <button onClick={() => { if (newMember.name && newMember.role) { setTeam([...team, { ...newMember, id: Date.now() }]); setNewMember({ name: "", role: "", rmitId: "" }); }}} className="w-full sm:w-9 h-9 bg-brand hover:bg-red-800 text-white border-none rounded-md text-lg cursor-pointer flex items-center justify-center transition-colors self-end mt-2 sm:mt-0">+</button>
         </div>
       </div>
       {team.length > 0 && (
@@ -187,7 +187,7 @@ function Step4({ tiers, setTiers }) {
     <div>
       <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Reward Tiers <span className="font-normal text-gray-400">(Optional)</span></h2>
       <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Define structured backing tiers using Class Coins (CC).</p>
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="text-[14px] font-bold text-gray-900 mb-4">Create New Tier</div>
           <div className="mb-3.5">
@@ -260,30 +260,30 @@ export default function CreateProject() {
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
-      <header className="bg-white border-b border-gray-200 h-13 flex items-center justify-between px-10">
+      <header className="bg-white border-b border-gray-200 h-13 flex items-center justify-between px-4 md:px-10">
         <div className="text-[15px] font-extrabold text-brand tracking-widest py-3">RMIT LAUNCHPAD</div>
         <button onClick={() => navigate("/creator-dashboard")} className="bg-transparent border-none text-[13px] text-gray-400 cursor-pointer hover:text-gray-600">× CANCEL</button>
       </header>
-      <div className="max-w-4xl mx-auto px-6 py-10 grid gap-12" style={{ gridTemplateColumns: "200px 1fr" }}>
-        <div>
+      <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-10 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8 md:gap-12">
+        <div className="min-w-0">
           <div className="text-[14px] font-bold text-gray-900 mb-1">Create Project</div>
-          <div className="text-[12px] text-gray-400 mb-6">Submit your proposal for review.</div>
+          <div className="text-[12px] text-gray-400 mb-4 md:mb-6">Submit your proposal for review.</div>
           <StepIndicator steps={STEPS} current={step} />
         </div>
-        <div>
+        <div className="min-w-0">
           {renderStep()}
-          <div className="flex justify-between mt-9 pt-5 border-t border-gray-100">
-            <button className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">
+          <div className="flex flex-col sm:flex-row gap-3 justify-between mt-9 pt-5 border-t border-gray-100">
+            <button className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
               {step === STEPS.length ? "← BACK" : "SAVE DRAFT"}
             </button>
-            <div className="flex gap-2.5">
+            <div className="flex flex-col-reverse sm:flex-row gap-2.5 w-full sm:w-auto">
               {step > 1 && step < STEPS.length && (
-                <button onClick={() => setStep(s => s - 1)} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">← Back</button>
+                <button onClick={() => setStep(s => s - 1)} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">← Back</button>
               )}
               {step < STEPS.length ? (
-                <button onClick={() => setStep(s => Math.min(STEPS.length, s + 1))} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors">NEXT STEP →</button>
+                <button onClick={() => setStep(s => Math.min(STEPS.length, s + 1))} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">NEXT STEP →</button>
               ) : (
-                <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors">SUBMIT PROJECT FOR APPROVAL ▶</button>
+                <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SUBMIT PROJECT FOR APPROVAL ▶</button>
               )}
             </div>
           </div>

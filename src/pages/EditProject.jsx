@@ -15,7 +15,7 @@ function TabBasicInfo({ data, setData }) {
         <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Project Title</label>
         <input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">School / Department</label>
           <select value={data.school} onChange={e => setData({ ...data, school: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors">
@@ -52,9 +52,9 @@ function TabMedia() {
       <div>
         <label className="text-[12px] font-bold text-gray-600 block mb-2">Project Video</label>
         <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1.5">VIDEO OR YOUTUBE URL</div>
-        <div className="flex gap-2">
-          <input defaultValue="https://vimeo.com/20371781" className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
-          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors">SAVE</button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input defaultValue="https://vimeo.com/20371781" className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors w-full" />
+          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SAVE</button>
         </div>
       </div>
     </div>
@@ -71,7 +71,7 @@ function TabTeam({ team, setTeam }) {
         {team.map(m => {
           const initials = m.name.split(" ").map(n => n[0]).slice(0, 2).join("");
           return (
-            <div key={m.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <div key={m.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-2 sm:gap-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initials}</div>
                 <div>
@@ -82,7 +82,7 @@ function TabTeam({ team, setTeam }) {
                   <div className="text-[11px] text-gray-400">RMIT ID: {m.rmitId || "—"}</div>
                 </div>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 self-end sm:self-auto">
                 <button className="bg-transparent border-none text-[12px] text-brand font-semibold cursor-pointer hover:underline">Edit</button>
                 <button onClick={() => setTeam(team.filter(t => t.id !== m.id))} className="bg-transparent border-none text-[12px] text-brand font-semibold cursor-pointer hover:underline">Remove</button>
               </div>
@@ -154,7 +154,7 @@ function TabTiers({ tiers, setTiers }) {
         ) : (
           <div>
             <div className="text-[13px] font-bold text-gray-900 mb-3">New Tier</div>
-            <div className="grid grid-cols-2 gap-2.5 mb-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
               <div>
                 <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">TIER NAME</label>
                 <input value={newTier.name} onChange={e => setNewTier({ ...newTier, name: e.target.value })} placeholder="e.g., Gold Supporter" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
