@@ -1,0 +1,321 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import EditProject from "./EditProject";
+import { CREATOR_MY_PROJECTS, CREATOR_SIDEBAR_LINKS } from "../mock";
+
+const DEPT_STYLE = {
+  Engineering: "bg-blue-900 text-white",
+  Science: "bg-green-700 text-white",
+  Design: "bg-purple-700 text-white",
+  Business: "bg-yellow-800 text-white",
+};
+
+function StatCard({ label, value, icon }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-5 flex-1">
+      <div className="flex justify-between items-start mb-2">
+        <div className="text-[11px] font-bold text-gray-400 tracking-widest">{label}</div>
+        <span className="text-brand text-lg">{icon}</span>
+      </div>
+      <div className="text-[24px] sm:text-[28px] font-extrabold text-gray-900">{value}</div>
+    </div>
+  );
+}
+
+function ActiveProjectCard({ project, onEdit }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-[240px_1fr]">
+        <div className="h-44 sm:h-auto">
+          <img src={project.img} alt={project.title} className="w-full h-full object-cover" />
+        </div>
+        <div className="p-5 flex flex-col">
+          <div className="flex justify-between items-start mb-2 gap-2">
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm ${DEPT_STYLE[project.dept] || "bg-gray-200 text-gray-600"} shrink-0`}>
+              {project.dept.toUpperCase()}
+            </span>
+            <span className="text-[15px] font-extrabold text-brand shrink-0">{project.pct}%</span>
+          </div>
+          <h3 className="text-[17px] font-bold text-gray-900 mb-3">{project.title}</h3>
+          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+            <div className="h-full bg-brand rounded-full" style={{ width: `${project.pct}%` }} />
+          </div>
+          <div className="flex gap-8 mb-4">
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">RAISED</div>
+              <div className="text-[14px] font-bold text-gray-900">{project.raised}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">GOAL</div>
+              <div className="text-[14px] font-bold text-gray-900">{project.goal}</div>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 pt-4 mt-auto flex gap-2.5">
+            <button
+              onClick={() => onEdit(project)}
+              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+            >
+              ✎ EDIT PROJECT
+            </button>
+            <button className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors">
+              VIEW ANALYTICS
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SimpleProjectCard({ project, onEdit }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div className="grid grid-cols-1 sm:grid-cols-[200px_1fr]">
+        <div className="h-40 sm:h-auto">
+          <img src={project.img} alt={project.title} className="w-full h-full object-cover" />
+        </div>
+        <div className="p-5 flex flex-col">
+          <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm w-fit mb-2 ${DEPT_STYLE[project.dept] || "bg-gray-200 text-gray-600"}`}>
+            {project.dept.toUpperCase()}
+          </span>
+          <h3 className="text-[17px] font-bold text-gray-900 mb-2">{project.title}</h3>
+
+          {project.status === "Draft" && (
+            <p className="text-[13px] text-gray-400 italic mb-3">
+              Last edited {project.lastEdited}. Complete your project details to submit for review.
+            </p>
+          )}
+
+          {project.status === "Pending Review" && (
+            <div className="bg-gray-50 border border-gray-100 rounded-lg px-3.5 py-3 text-[12px] text-gray-500 leading-relaxed mb-3">
+              Your project is currently being reviewed by the RMIT {project.dept} Department board. You will receive an update within 3-5 business days.
+            </div>
+          )}
+
+          <div className="border-t border-gray-100 pt-4 mt-auto flex gap-2.5">
+            <button
+              onClick={() => onEdit(project)}
+              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+            >
+              ✎ EDIT PROJECT
+            </button>
+            <button className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors">
+              VIEW ANALYTICS
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SidebarShell({ active, sidebarOpen, onClose, onNavigate, onNewProject, onNewUpdate }) {
+  return (
+    <>
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={onClose} />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:relative md:translate-x-0`}
+      >
+        <div className="px-5 py-4 border-b border-gray-200">
+          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+        </div>
+
+        <div className="px-4 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
+            <div>
+              <div className="text-[13px] font-bold text-gray-900">Project Creator</div>
+              <div className="text-[11px] text-gray-400">School of Design</div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              onNewProject();
+              onClose();
+            }}
+            className="w-full bg-brand hover:bg-red-800 text-white text-[11px] font-bold tracking-wide py-1.5 rounded mb-1.5 transition-colors cursor-pointer border-none"
+          >
+            ⊕ NEW PROJECT
+          </button>
+          <button
+            onClick={() => {
+              onNewUpdate();
+              onClose();
+            }}
+            className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 text-[11px] font-bold tracking-wide py-1.5 rounded transition-colors cursor-pointer"
+          >
+            ↑ NEW UPDATE
+          </button>
+        </div>
+
+        <nav className="flex-1 p-2">
+          {CREATOR_SIDEBAR_LINKS.map(link => (
+            <button
+              key={link.id}
+              onClick={() => {
+                onNavigate(link.id);
+                onClose();
+              }}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] font-bold tracking-wide rounded text-left mb-0.5 transition-colors cursor-pointer border-none ${
+                active === link.id ? "bg-brand text-white" : "bg-transparent text-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              <span>{link.icon}</span>{link.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-2 border-t border-gray-200">
+          {["? Help Center", "→ Logout"].map(l => (
+            <button key={l} className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">{l}</button>
+          ))}
+        </div>
+      </aside>
+    </>
+  );
+}
+
+export default function CreatorMyProjects({ onBack, embedded = false }) {
+  const [projects] = useState(CREATOR_MY_PROJECTS);
+  const [editTarget, setEditTarget] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [active, setActive] = useState("myprojects");
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const navigate = useNavigate();
+
+  const totalProjects = projects.length;
+  const activeFunding = projects.filter(p => p.status === "Active").length;
+  const totalRaised = projects.reduce((sum, p) => {
+    if (p.status === "Active") {
+      const num = parseFloat(p.raised.replace(/[$,]/g, ""));
+      return sum + num;
+    }
+    return sum;
+  }, 0);
+
+  const handleSidebarClick = (id) => {
+    setActive(id);
+
+    if (id === "dashboard") {
+      navigate("/creator-dashboard");
+    }
+  };
+
+  const projectContent = (
+    <div className="max-w-5xl mx-auto p-4 sm:p-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+        <div>
+          {onBack && (
+            <button onClick={onBack} className="text-[12px] text-gray-400 hover:text-brand bg-transparent border-none cursor-pointer mb-2 transition-colors">
+              ← Back to Dashboard
+            </button>
+          )}
+          <h1 className="text-[22px] sm:text-[26px] font-extrabold text-gray-900 m-0">My Projects</h1>
+          <p className="text-[13px] text-gray-400 mt-1">Manage your ongoing research and creative initiatives.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
+        <StatCard label="TOTAL PROJECTS" value={totalProjects} icon="📁" />
+        <StatCard label="ACTIVE FUNDING" value={activeFunding} icon="📈" />
+        <StatCard label="TOTAL RAISED" value={`$${totalRaised.toLocaleString()}`} icon="💳" />
+      </div>
+
+      <div className="flex flex-col gap-5">
+        {projects.map(p =>
+          p.status === "Active" ? (
+            <ActiveProjectCard key={p.id} project={p} onEdit={setEditTarget} />
+          ) : (
+            <SimpleProjectCard key={p.id} project={p} onEdit={setEditTarget} />
+          )
+        )}
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {projectContent}
+        {editTarget && <EditProject project={editTarget} onClose={() => setEditTarget(null)} />}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
+      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      <SidebarShell
+        active={active}
+        sidebarOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNavigate={handleSidebarClick}
+        onNewProject={() => navigate("/create-project")}
+        onNewUpdate={() => setShowUpdateModal(true)}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="bg-white border-b border-gray-200 h-14 flex items-center px-4 md:hidden shrink-0">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="text-gray-500 hover:text-gray-900 focus:outline-none text-xl cursor-pointer mr-3"
+          >
+            ☰
+          </button>
+          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+          {projectContent}
+        </main>
+      </div>
+
+      {editTarget && <EditProject project={editTarget} onClose={() => setEditTarget(null)} />}
+
+      {showUpdateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-[500px] p-6 relative shadow-2xl overflow-y-auto max-h-full">
+            <button onClick={() => setShowUpdateModal(false)} className="absolute top-4 right-4 bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer">×</button>
+            <h2 className="text-lg font-extrabold text-gray-900 mb-4">Post Project Update</h2>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12px] text-blue-700 mb-4 leading-relaxed">
+              ℹ Updates are emailed directly to your backers and posted publicly on your project page.
+            </div>
+            <div className="mb-3">
+              <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">UPDATE TITLE</label>
+              <input placeholder="e.g., Prototype Phase 1 Completed!" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+            </div>
+            <div className="mb-3">
+              <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">UPDATE CONTENT</label>
+              <div className="border border-gray-200 rounded-md overflow-hidden">
+                <div className="bg-gray-50 border-b border-gray-200 px-3 py-1.5 flex gap-2">
+                  {["B", "I", "≡", "⊞", "🔗"].map(t => (
+                    <button key={t} className="bg-transparent border-none text-[13px] font-bold text-gray-500 px-1.5 py-0.5 hover:bg-gray-200 rounded cursor-pointer">{t}</button>
+                  ))}
+                </div>
+                <textarea placeholder="Share the details of your progress..." className="w-full border-none outline-none px-3 py-2.5 text-[13px] min-h-[80px] resize-y" />
+              </div>
+            </div>
+            <div className="mb-5">
+              <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">MEDIA ATTACHMENTS</label>
+              <div className="border-2 border-dashed border-gray-200 rounded-lg p-7 text-center cursor-pointer hover:border-brand transition-colors">
+                <div className="text-2xl text-gray-300 mb-1.5">☁</div>
+                <div className="text-[13px] font-semibold text-gray-600">Click to upload or drag and drop</div>
+                <div className="text-[11px] text-gray-300 mt-1">SVG, PNG, JPG or GIF (max. 800×400px)</div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2.5">
+              <button onClick={() => setShowUpdateModal(false)} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50">CANCEL</button>
+              <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2 text-[13px] font-bold cursor-pointer transition-colors">POST UPDATE</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

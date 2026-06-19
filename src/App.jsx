@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import Home from "./pages/Home";
 import CreatorDashboard from "./pages/CreatorDashboard";
+import CreatorMyProjects from "./pages/CreatorMyProjects";
 
 import Discover from "./pages/Discover";
 import Login from "./pages/Login";
@@ -23,6 +24,7 @@ function App() {
         <Route path="/" element={<Home />} />
 
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
+        <Route path="/creator-my-projects" element={<CreatorMyProjects/>} />
 
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         

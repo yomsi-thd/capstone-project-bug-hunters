@@ -179,11 +179,23 @@ function TabTiers({ tiers, setTiers }) {
   );
 }
 
-export default function EditProject({ onClose }) {
+export default function EditProject({ project, onClose }) {
   const [activeTab, setActiveTab] = useState("basic");
-  const [basicData, setBasicData] = useState(EDIT_PROJECT_INITIAL_DATA);
-  const [team, setTeam] = useState(EDIT_PROJECT_INITIAL_TEAM);
-  const [tiers, setTiers] = useState(MOCK_TIERS);
+
+  // If a `project` is passed in (e.g. clicked from My Projects), prefill from it.
+  // Otherwise fall back to the static mock defaults so the modal still works standalone.
+  const [basicData, setBasicData] = useState(() =>
+    project
+      ? {
+          title: project.title || EDIT_PROJECT_INITIAL_DATA.title,
+          school: project.dept ? `School of ${project.dept}` : EDIT_PROJECT_INITIAL_DATA.school,
+          goal: project.goal ? String(project.goal).replace(/[$,]/g, "") : EDIT_PROJECT_INITIAL_DATA.goal,
+          proposition: project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
+        }
+      : EDIT_PROJECT_INITIAL_DATA
+  );
+  const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
+  const [tiers, setTiers] = useState(project?.tiers || MOCK_TIERS);
 
   const renderTab = () => {
     switch (activeTab) {
@@ -196,9 +208,9 @@ export default function EditProject({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-sans">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-sans p-4">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col" style={{ width: "660px", maxHeight: "90vh" }}>
+      <div className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[660px]" style={{ maxHeight: "90vh" }}>
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
@@ -210,12 +222,12 @@ export default function EditProject({ onClose }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 shrink-0">
+        <div className="flex border-b border-gray-100 shrink-0 overflow-x-auto scrollbar-none">
           {TABS.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[12px] font-semibold cursor-pointer bg-transparent border-t-0 border-l-0 border-r-0 transition-colors ${
+              className={`flex-1 flex items-center justify-center gap-1.5 py-3 px-2 text-[12px] font-semibold cursor-pointer bg-transparent border-t-0 border-l-0 border-r-0 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "border-b-2 border-brand text-brand"
                   : "border-b-2 border-transparent text-gray-400 hover:text-gray-600"
@@ -230,9 +242,9 @@ export default function EditProject({ onClose }) {
         <div className="p-6 overflow-y-auto flex-1">{renderTab()}</div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-gray-100 flex justify-end gap-2.5 shrink-0">
-          <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">CANCEL CHANGES</button>
-          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors">SAVE CHANGES</button>
+        <div className="px-6 py-3.5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-2.5 shrink-0">
+          <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">CANCEL CHANGES</button>
+          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SAVE CHANGES</button>
         </div>
       </div>
     </div>
