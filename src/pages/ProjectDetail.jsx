@@ -5,7 +5,8 @@ import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import CommentList from "../components/project/CommentList";
 import useWindowWidth from "../hooks/useWindowWidth";
-import { NAV_LINKS, PROJECT_DETAIL, COMMENTS } from "../mock";
+import { PROJECT_DETAIL, COMMENTS } from "../mock";
+import { getNavLinks } from "../mock/navLinks";
 
 // TODO: Replace with real auth context + useParams for project id
 const MOCK_USER = { name: "Huy Nguyen", balance: 4500 };
@@ -108,7 +109,7 @@ export default function ProjectDetail() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        navLinks={NAV_LINKS}
+        navLinks={getNavLinks(isLoggedIn)}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}
