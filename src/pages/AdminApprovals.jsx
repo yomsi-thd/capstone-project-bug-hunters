@@ -257,28 +257,16 @@ export default function AdminApprovals() {
         ) : (
           <main className="flex-1 p-4 md:p-9 overflow-y-auto">
           {/* Header */}
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h1 className="text-[28px] font-extrabold text-gray-900 mb-1">Project Approvals</h1>
-              <p className="text-[14px] text-gray-400">Review and validate student project submissions for the upcoming funding cycle.</p>
-            </div>
-            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-md px-3 py-2 w-52">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Filter projects..."
-                className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
-              />
-            </div>
+          <div className="mb-6">
+            <h1 className="text-[28px] font-extrabold text-gray-900 mb-1">Project Approvals</h1>
+            <p className="text-[14px] text-gray-400">Review and validate student project submissions for the upcoming funding cycle.</p>
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-7">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
             {[
               { label: "Pending Review",    value: pending,  sub: `↑ 12%`, subColor: "text-green-500" },
               { label: "Approved (MoM)",    value: approved + 142, sub: null },
-              { label: "Average Review Time", value: "1.4d", sub: null },
             ].map(c => (
               <div key={c.label} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="text-[11px] font-semibold text-gray-400 mb-2">{c.label}</div>
@@ -290,9 +278,20 @@ export default function AdminApprovals() {
             ))}
           </div>
 
+          {/* Filter */}
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-md px-3 py-2 w-full sm:w-72 mb-5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filter projects..."
+              className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
+            />
+          </div>
+
           {/* Table */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <table className="w-full border-collapse">
+          <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+            <table className="min-w-[800px] w-full border-collapse">
               <thead>
                 <tr className="border-b border-gray-100">
                   {["Project Title", "Student Creator", "Department", "Submission Date", "Status", "Actions"].map(h => (
@@ -324,11 +323,11 @@ export default function AdminApprovals() {
                     {/* Status */}
                     <td className="px-5 py-3.5">
                       {p.status === "Approved" ? (
-                        <span className="bg-green-50 text-green-600 text-[10px] font-bold px-2.5 py-1 rounded-sm border border-green-200">● APPROVED</span>
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap bg-green-50 text-green-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-green-200">● APPROVED</span>
                       ) : p.status === "Changes Requested" ? (
-                        <span className="bg-yellow-50 text-yellow-600 text-[10px] font-bold px-2.5 py-1 rounded-sm border border-yellow-200">● CHANGES REQUESTED</span>
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap bg-yellow-50 text-yellow-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-yellow-200">● CHANGES REQUESTED</span>
                       ) : (
-                        <span className="bg-red-50 text-brand text-[10px] font-bold px-2.5 py-1 rounded-sm border border-red-200">● PENDING REVIEW</span>
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap bg-red-50 text-red-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-red-200">● PENDING REVIEW</span>
                       )}
                     </td>
                     {/* Actions */}
