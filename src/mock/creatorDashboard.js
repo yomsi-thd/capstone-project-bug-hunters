@@ -13,7 +13,8 @@ export const CREATOR_TIERS = [
 
 export const RECENT_BACKERS = ["Sarah Jenkins", "Dr. Alan Turing", "TechVentures Ltd."];
 
+
 export const CREATOR_SIDEBAR_LINKS = [
-  { id: "dashboard", label: "DASHBOARD",        icon: "▦" },
-  { id: "edit",      label: "EDIT PROJECT",      icon: "✎" },
+  { id: "dashboard",  label: "DASHBOARD",   icon: "▦" },
+  { id: "myprojects", label: "MY PROJECTS", icon: "📁" },
 ];

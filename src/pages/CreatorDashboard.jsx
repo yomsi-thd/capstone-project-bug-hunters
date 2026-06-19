@@ -1,24 +1,105 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import EditProject from "./EditProject";
+import CreatorMyProjects from "./CreatorMyProjects";
 import {
   CREATOR_DISCUSSIONS as DISCUSSIONS,
   CREATOR_TIERS as TIERS,
   RECENT_BACKERS,
-  CREATOR_SIDEBAR_LINKS as SIDEBAR_LINKS,
+  CREATOR_SIDEBAR_LINKS as RAW_SIDEBAR_LINKS,
 } from "../mock";
+
+// Remove the "Edit Project" sidebar link — editing now happens from My Projects
+const SIDEBAR_LINKS = RAW_SIDEBAR_LINKS.filter(link => link.id !== "edit");
 
 export default function CreatorDashboard() {
   const [active, setActive] = useState("dashboard");
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [showEditProject, setShowEditProject] = useState(false);
+  const [showMyProjects, setShowMyProjects] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   const handleSidebarClick = (id) => {
     setActive(id);
-    if (id === "edit") setShowEditProject(true);
+    if (id === "myprojects") {
+      setShowMyProjects(true);
+    } else {
+      setShowMyProjects(false);
+    }
   };
+
+  // ── Show My Projects page instead of the dashboard ──
+  if (showMyProjects) {
+    return (
+      <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
+        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+        {sidebarOpen && (
+          <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
+        )}
+
+        {/* Sidebar (kept so navigation stays consistent) */}
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:relative md:translate-x-0`}
+        >
+          <div className="px-5 py-4 border-b border-gray-200">
+            <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+          </div>
+
+          <div className="px-4 py-4 border-b border-gray-200">
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
+              <div>
+                <div className="text-[13px] font-bold text-gray-900">Project Creator</div>
+                <div className="text-[11px] text-gray-400">School of Design</div>
+              </div>
+            </div>
+            <button
+              onClick={() => { navigate("/create-project"); setSidebarOpen(false); }}
+              className="w-full bg-brand hover:bg-red-800 text-white text-[11px] font-bold tracking-wide py-1.5 rounded mb-1.5 transition-colors cursor-pointer border-none"
+            >
+              ⊕ NEW PROJECT
+            </button>
+            <button
+              onClick={() => { setShowUpdateModal(true); setSidebarOpen(false); }}
+              className="w-full bg-white hover:bg-gray-50 border border-gray-300 text-gray-600 text-[11px] font-bold tracking-wide py-1.5 rounded transition-colors cursor-pointer"
+            >
+              ↑ NEW UPDATE
+            </button>
+          </div>
+
+          <nav className="flex-1 p-2">
+            {SIDEBAR_LINKS.map(link => (
+              <button
+                key={link.id}
+                onClick={() => { handleSidebarClick(link.id); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-[11px] font-bold tracking-wide rounded text-left mb-0.5 transition-colors cursor-pointer border-none ${
+                  active === link.id ? "bg-brand text-white" : "bg-transparent text-gray-400 hover:bg-gray-50"
+                }`}
+              >
+                <span>{link.icon}</span>{link.label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="p-2 border-t border-gray-200">
+            {["? Help Center", "→ Logout"].map(l => (
+              <button key={l} className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">{l}</button>
+            ))}
+          </div>
+        </aside>
+
+        <div className="flex-1 flex flex-col min-w-0">
+          <header className="bg-white border-b border-gray-200 h-14 flex items-center px-4 md:hidden shrink-0">
+            <button onClick={() => setSidebarOpen(true)} className="text-gray-500 hover:text-gray-900 text-xl cursor-pointer mr-3 bg-transparent border-none">☰</button>
+            <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+          </header>
+          <CreatorMyProjects onBack={() => { setShowMyProjects(false); setActive("dashboard"); }} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
@@ -107,9 +188,11 @@ export default function CreatorDashboard() {
         </header>
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="mb-6">
-            <h1 className="text-xl md:text-[22px] font-extrabold text-gray-900 m-0">Dashboard Overview</h1>
-            <p className="text-[13px] text-gray-400 mt-1">Track your campaign's performance and manage your active projects.</p>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
+            <div>
+              <h1 className="text-xl md:text-[22px] font-extrabold text-gray-900 m-0">Dashboard Overview</h1>
+              <p className="text-[13px] text-gray-400 mt-1">Track your campaign's performance and manage your active projects.</p>
+            </div>
           </div>
 
           {/* Top stats */}
@@ -207,11 +290,6 @@ export default function CreatorDashboard() {
           </div>
         </main>
       </div>
-
-      {/* ── Edit Project Modal ── */}
-      {showEditProject && (
-        <EditProject onClose={() => { setShowEditProject(false); setActive("dashboard"); }} />
-      )}
 
       {/* ── Post Update Modal ── */}
       {showUpdateModal && (
