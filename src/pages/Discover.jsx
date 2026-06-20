@@ -5,7 +5,8 @@ import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import useWindowWidth from "../hooks/useWindowWidth";
-import { FRESH, HERO_PROJECTS, NAV_LINKS, TRENDING, FILTERS } from "../mock";
+import { FRESH, HERO_PROJECTS, TRENDING, FILTERS } from "../mock";
+import { getNavLinks } from "../mock/navLinks";
 
 // TODO: Replace with real auth context when backend is ready
 const MOCK_USER = { name: "Huy Nguyen", balance: 4500 };
@@ -115,7 +116,7 @@ export default function Discover() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        navLinks={NAV_LINKS}
+        navLinks={getNavLinks(isLoggedIn)}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}

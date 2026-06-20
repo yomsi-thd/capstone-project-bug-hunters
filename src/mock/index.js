@@ -7,3 +7,4 @@ export * from "./creatorDashboard";
 export * from "./creatorMyProjects";
 export * from "./editProject";
 export * from "./projectDetail";
+export * from "./myInvestments";
