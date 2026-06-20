@@ -4,6 +4,8 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import CommentList from "../components/project/CommentList";
+import InvestmentModal from "../components/project/InvestmentModal";
+import InvestmentSuccessModal from "../components/project/InvestmentSuccessModal";
 import useWindowWidth from "../hooks/useWindowWidth";
 import { PROJECT_DETAIL, COMMENTS } from "../mock";
 import { getNavLinks } from "../mock/navLinks";
@@ -97,6 +99,20 @@ export default function ProjectDetail() {
 
   const p = PROJECT_DETAIL;
 
+  // Invest flow: closed -> "invest" modal -> "success" modal -> closed
+  const [investStep, setInvestStep] = useState(null); // null | "invest" | "success"
+  const [investedAmount, setInvestedAmount] = useState(0);
+
+  const handleConfirmInvestment = (amount) => {
+    // TODO: call investmentService.invest(p.id, amount) when backend is ready
+    setInvestedAmount(amount);
+    setInvestStep("success");
+  };
+
+  const closeModals = () => {
+    setInvestStep(null);
+    setInvestedAmount(0);
+  };
 
   const tabs = [
     { id: "about", label: "About" },
@@ -167,7 +183,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={isMobile} />}
+            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={isMobile} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -244,11 +260,27 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={false} />}
+          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={false} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
       <Footer isMobile={isMobile} />
+
+      {investStep === "invest" && (
+        <InvestmentModal
+          project={p}
+          balance={MOCK_USER.balance}
+          onClose={closeModals}
+          onConfirm={handleConfirmInvestment}
+        />
+      )}
+
+      {investStep === "success" && (
+        <InvestmentSuccessModal
+          amount={investedAmount}
+          onClose={closeModals}
+        />
+      )}
 
       {/* DEV toggle — remove before production */}
       <button
@@ -268,7 +300,7 @@ export default function ProjectDetail() {
   );
 }
 
-function FundingSidebar({ p, isLoggedIn, isMobile }) {
+function FundingSidebar({ p, isLoggedIn, isMobile, onInvest }) {
   return (
     <div style={{
       border: "1px solid #e5e7eb", borderRadius: "10px",
@@ -305,6 +337,7 @@ function FundingSidebar({ p, isLoggedIn, isMobile }) {
 
       <button
         disabled={!isLoggedIn}
+        onClick={() => isLoggedIn && onInvest()}
         style={{
           width: "100%", background: isLoggedIn ? "#cc0000" : "#ccc",
           color: "#fff", border: "none", borderRadius: "6px",
@@ -315,7 +348,7 @@ function FundingSidebar({ p, isLoggedIn, isMobile }) {
         onMouseEnter={e => { if (isLoggedIn) e.currentTarget.style.background = "#aa0000"; }}
         onMouseLeave={e => { if (isLoggedIn) e.currentTarget.style.background = "#cc0000"; }}
       >
-        BACK THIS PROJECT
+        INVEST IN THIS PROJECT
       </button>
 
       <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
@@ -327,3 +360,5 @@ function FundingSidebar({ p, isLoggedIn, isMobile }) {
     </div>
   );
 }
+
+

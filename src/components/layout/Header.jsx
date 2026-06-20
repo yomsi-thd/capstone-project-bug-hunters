@@ -76,19 +76,30 @@ export default function Header({
           <div style={{ display: "flex", gap: "4px", flex: 1 }}>
             {navLinks.map(({ label, path }) => (
               path.startsWith("#") ? (
-                <a key={label} href={path} style={{
-                  textDecoration: "none", fontSize: "14px", fontWeight: 400,
-                  color: "#444", padding: "6px 12px", borderBottom: "2px solid transparent",
-                }}>{label}</a>
+                <a
+                  key={label} href={path}
+                  style={{
+                    textDecoration: "none", fontSize: "14px", fontWeight: 400,
+                    color: "#444", padding: "6px 12px", borderBottom: "2px solid transparent",
+                    transition: "color 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+                  onMouseLeave={e => e.currentTarget.style.color = "#444"}
+                >{label}</a>
               ) : (
-                <Link key={label} to={path} style={{
-                  textDecoration: "none", fontSize: "14px",
-                  fontWeight: isActive(path) ? 600 : 400,
-                  color: isActive(path) ? "#cc0000" : "#444",
-                  padding: "6px 12px",
-                  borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
-                  transition: "all 0.15s",
-                }}>{label}</Link>
+                <Link
+                  key={label} to={path}
+                  style={{
+                    textDecoration: "none", fontSize: "14px",
+                    fontWeight: isActive(path) ? 600 : 400,
+                    color: isActive(path) ? "#cc0000" : "#444",
+                    padding: "6px 12px",
+                    borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { if (!isActive(path)) e.currentTarget.style.color = "#cc0000"; }}
+                  onMouseLeave={e => { if (!isActive(path)) e.currentTarget.style.color = "#444"; }}
+                >{label}</Link>
               )
             ))}
           </div>
@@ -96,8 +107,8 @@ export default function Header({
 
         {isMobile && <div style={{ flex: 1 }} />}
 
-        {/* Desktop search (logged out only) */}
-        {isDesktop && !isLoggedIn && (
+        {/* Desktop search */}
+        {isDesktop && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "6px 12px", width: "200px" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ border: "none", background: "none", outline: "none", fontSize: "13px", color: "#333", width: "100%" }} />
@@ -106,17 +117,42 @@ export default function Header({
 
         {/* Mobile/tablet search toggle */}
         {(isTablet || isMobile) && (
-          <button onClick={() => setSearchOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px" }} aria-label="Toggle search">🔍</button>
+          <button
+            onClick={() => setSearchOpen(v => !v)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px", borderRadius: "4px", transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            aria-label="Toggle search"
+          >🔍</button>
         )}
 
         {/* Desktop — Logged Out */}
         {isDesktop && !isLoggedIn && (
           <>
-            <Link to="/login" style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0 }}>LOGIN</Link>
-            <Link to="/create-project" style={{
-              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
-            }}>START A PROJECT</Link>
+            <Link
+              to="/login"
+              style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0, transition: "color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+              onMouseLeave={e => e.currentTarget.style.color = "#444"}
+            >LOGIN</Link>
+            <Link
+              to="/create-project"
+              style={{
+                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
+                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#aa0000";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >START A PROJECT</Link>
           </>
         )}
 
@@ -124,13 +160,32 @@ export default function Header({
         {isDesktop && isLoggedIn && (
           <>
             <CCBadge ccBalance={ccBalance} />
-            <Link to="/create-project" style={{
-              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-              fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
-            }}>START A PROJECT</Link>
+            <Link
+              to="/create-project"
+              style={{
+                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
+                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#aa0000";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >START A PROJECT</Link>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
               <Avatar userName={userName} />
-              <Link to="/dashboard" style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500 }}>Account</Link>
+              <Link
+                to="/dashboard"
+                style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500, transition: "color 0.15s" }}
+                onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+                onMouseLeave={e => e.currentTarget.style.color = "#333"}
+              >Account</Link>
             </div>
             <button
               onClick={onLogout}
@@ -138,7 +193,10 @@ export default function Header({
                 display: "flex", alignItems: "center", gap: "4px",
                 background: "none", border: "none", cursor: "pointer",
                 fontSize: "13px", color: "#666", fontWeight: 500, padding: 0, flexShrink: 0,
+                transition: "color 0.15s",
               }}
+              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+              onMouseLeave={e => e.currentTarget.style.color = "#666"}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
               Logout
@@ -149,11 +207,22 @@ export default function Header({
         {/* Tablet — Logged Out */}
         {isTablet && !isLoggedIn && (
           <>
-            <Link to="/login" style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap" }}>LOGIN</Link>
-            <Link to="/create-project" style={{
-              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-              fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-            }}>START</Link>
+            <Link
+              to="/login"
+              style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap", transition: "color 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+              onMouseLeave={e => e.currentTarget.style.color = "#444"}
+            >LOGIN</Link>
+            <Link
+              to="/create-project"
+              style={{
+                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
+              onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+            >START</Link>
           </>
         )}
 
@@ -163,17 +232,29 @@ export default function Header({
             <div style={{ fontSize: "12px", fontWeight: 700, color: "#cc0000", whiteSpace: "nowrap" }}>
               {ccBalance.toLocaleString()} CC
             </div>
-            <Link to="/create-project" style={{
-              textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-              fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-            }}>START</Link>
+            <Link
+              to="/create-project"
+              style={{
+                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+                transition: "background 0.15s",
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
+              onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+            >START</Link>
             <Avatar userName={userName} />
           </>
         )}
 
         {/* Mobile hamburger */}
         {isMobile && (
-          <button onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444" }} aria-label="Toggle menu">
+          <button
+            onClick={() => setMenuOpen(v => !v)}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444", borderRadius: "4px", transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            aria-label="Toggle menu"
+          >
             {menuOpen ? "✕" : "☰"}
           </button>
         )}
@@ -194,30 +275,54 @@ export default function Header({
         <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px" }}>
           {navLinks.map(({ label, path }) => (
             path.startsWith("#") ? (
-              <a key={label} href={path} onClick={() => setMenuOpen(false)} style={{
-                display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
-                fontWeight: 400, color: "#444", borderBottom: "1px solid #f5f5f5",
-              }}>{label}</a>
+              <a
+                key={label} href={path} onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
+                  fontWeight: 400, color: "#444", borderBottom: "1px solid #f5f5f5",
+                  transition: "background 0.15s, padding-left 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+              >{label}</a>
             ) : (
-              <Link key={label} to={path} onClick={() => setMenuOpen(false)} style={{
-                display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
-                fontWeight: isActive(path) ? 700 : 400,
-                color: isActive(path) ? "#cc0000" : "#444",
-                borderBottom: "1px solid #f5f5f5",
-              }}>{label}</Link>
+              <Link
+                key={label} to={path} onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
+                  fontWeight: isActive(path) ? 700 : 400,
+                  color: isActive(path) ? "#cc0000" : "#444",
+                  borderBottom: "1px solid #f5f5f5",
+                  transition: "background 0.15s, padding-left 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+              >{label}</Link>
             )
           ))}
 
           {!isLoggedIn && (
             <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-              <Link to="/login" onClick={() => setMenuOpen(false)} style={{
-                flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
-                border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, color: "#444",
-              }}>LOGIN</Link>
-              <Link to="/create-project" onClick={() => setMenuOpen(false)} style={{
-                flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
-                color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
-              }}>START A PROJECT</Link>
+              <Link
+                to="/login" onClick={() => setMenuOpen(false)}
+                style={{
+                  flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
+                  border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, color: "#444",
+                  transition: "background 0.15s, border-color 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#ddd"; }}
+              >LOGIN</Link>
+              <Link
+                to="/create-project" onClick={() => setMenuOpen(false)}
+                style={{
+                  flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
+                  color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
+                onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+              >START A PROJECT</Link>
             </div>
           )}
 
@@ -226,15 +331,27 @@ export default function Header({
               <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
                 Balance: {ccBalance.toLocaleString()} CC
               </div>
-              <Link to="/dashboard" onClick={() => setMenuOpen(false)} style={{
-                display: "block", textDecoration: "none", padding: "10px 4px",
-                fontSize: "14px", color: "#333", borderBottom: "1px solid #f5f5f5",
-              }}>Account</Link>
-              <button onClick={() => { setMenuOpen(false); onLogout?.(); }} style={{
-                display: "block", width: "100%", textAlign: "left", background: "none",
-                border: "none", padding: "10px 4px", fontSize: "14px", color: "#cc0000",
-                cursor: "pointer", fontWeight: 600,
-              }}>Logout</button>
+              <Link
+                to="/dashboard" onClick={() => setMenuOpen(false)}
+                style={{
+                  display: "block", textDecoration: "none", padding: "10px 4px",
+                  fontSize: "14px", color: "#333", borderBottom: "1px solid #f5f5f5",
+                  transition: "background 0.15s, padding-left 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+              >Account</Link>
+              <button
+                onClick={() => { setMenuOpen(false); onLogout?.(); }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left", background: "none",
+                  border: "none", padding: "10px 4px", fontSize: "14px", color: "#cc0000",
+                  cursor: "pointer", fontWeight: 600,
+                  transition: "background 0.15s, padding-left 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+              >Logout</button>
             </div>
           )}
         </div>

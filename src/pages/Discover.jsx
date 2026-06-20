@@ -62,7 +62,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, isLoggedIn }) {
                 padding: "8px 18px", cursor: "pointer",
               }}
             >
-              BACK THIS PROJECT
+              INVEST IN THIS PROJECT
             </button>
           )}
 
