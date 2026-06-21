@@ -6,6 +6,7 @@ import CreatorMyProjects from "./pages/CreatorMyProjects";
 
 import Discover from "./pages/Discover";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import ProjectDetail from "./pages/ProjectDetail";
 import CreateProject from "./pages/CreateProject";
 import MyProjects from "./pages/MyProjects";
@@ -34,6 +35,8 @@ function App() {
         <Route path="/discover" element={<Discover />} />
 
         <Route path="/login" element={<Login />} />
+
+        <Route path="/register" element={<Register />} />
 
         <Route path="/project/:id" element={<ProjectDetail />} />
 
