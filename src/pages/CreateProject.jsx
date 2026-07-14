@@ -262,7 +262,7 @@ export default function CreateProject() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
       <header className="bg-white border-b border-gray-200 h-13 flex items-center justify-between px-4 md:px-10">
         <div className="text-[15px] font-extrabold text-brand tracking-widest py-3">RMIT LAUNCHPAD</div>
-        <button onClick={() => navigate("/creator-dashboard")} className="bg-transparent border-none text-[13px] text-gray-400 cursor-pointer hover:text-gray-600">× CANCEL</button>
+        <button onClick={() => navigate(-1)} className="bg-transparent border-none text-[13px] text-gray-400 cursor-pointer hover:text-gray-600">× CANCEL</button>
       </header>
       <div className="max-w-4xl mx-auto px-4 md:px-6 py-6 md:py-10 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8 md:gap-12">
         <div className="min-w-0">

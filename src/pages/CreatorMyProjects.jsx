@@ -59,7 +59,7 @@ function ActiveProjectCard({ project, onEdit }) {
               ✎ EDIT PROJECT
             </button>
             <button className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors">
-              VIEW ANALYTICS
+              PROJECT DETAILS
             </button>
           </div>
         </div>
