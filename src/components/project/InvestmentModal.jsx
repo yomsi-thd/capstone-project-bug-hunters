@@ -4,6 +4,7 @@ const QUICK_AMOUNTS = [25, 50, 100];
 
 export default function InvestmentModal({ project, balance, onClose, onConfirm }) {
   const [amount, setAmount] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
 
   const handleQuickAmount = (val) => setAmount(val);
   const handleMax = () => setAmount(balance);
@@ -19,6 +20,7 @@ export default function InvestmentModal({ project, balance, onClose, onConfirm }
   return (
     <div
       onClick={onClose}
+      className="lp-overlay"
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -27,9 +29,11 @@ export default function InvestmentModal({ project, balance, onClose, onConfirm }
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="lp-modal"
         style={{
           background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "550px",
           maxHeight: "90vh", overflowY: "auto",
+          borderTop: "5px solid #cc0000",
         }}
       >
         {/* Header */}
@@ -81,18 +85,24 @@ export default function InvestmentModal({ project, balance, onClose, onConfirm }
           </div>
 
           <div style={{
-            display: "flex", alignItems: "center", border: "1px solid #ddd",
+            display: "flex", alignItems: "center",
+            border: `1px solid ${inputFocused ? "#cc0000" : "#ddd"}`,
+            boxShadow: inputFocused ? "0 0 0 3px rgba(204,0,0,0.1)" : "none",
             borderRadius: "6px", padding: "15px 20px", marginBottom: "18px",
+            transition: "border-color 0.15s, box-shadow 0.15s",
           }}>
-            <span style={{ fontSize: "27px", fontWeight: 800, color: "#111", marginRight: "10px" }}>CC</span>
+            <span style={{ fontSize: "27px", fontWeight: 800, color: "#cc0000", marginRight: "10px" }}>CC</span>
             <input
               value={amount === 0 ? "" : amount}
               onChange={handleInputChange}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
               placeholder="0"
               inputMode="numeric"
               style={{
                 border: "none", outline: "none", flex: 1, textAlign: "right",
                 fontSize: "27px", fontWeight: 800, color: "#111",
+                background: "transparent",
               }}
             />
           </div>
@@ -105,23 +115,28 @@ export default function InvestmentModal({ project, balance, onClose, onConfirm }
                 onClick={() => handleQuickAmount(val)}
                 disabled={val > balance}
                 style={{
-                  flex: 1, background: amount === val ? "#cc0000" : "#4338ca",
+                  flex: 1,
+                  background: amount === val ? "#cc0000" : "#fff",
+                  color: amount === val ? "#fff" : "#444",
+                  border: "1px solid",
+                  borderColor: amount === val ? "#cc0000" : "#ddd",
                   opacity: val > balance ? 0.4 : 1,
-                  color: "#fff", border: "none", borderRadius: "6px",
+                  borderRadius: "6px",
                   fontSize: "14px", fontWeight: 700, padding: "14px 8px",
                   cursor: val > balance ? "not-allowed" : "pointer",
-                  transition: "transform 0.12s, box-shadow 0.12s, background 0.15s",
+                  transition: "transform 0.12s, box-shadow 0.12s, background 0.15s, border-color 0.15s, color 0.15s",
                 }}
                 onMouseEnter={e => {
                   if (val > balance) return;
                   e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.15)";
-                  if (amount !== val) e.currentTarget.style.background = "#332b9e";
+                  e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.12)";
+                  if (amount !== val) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.background = amount === val ? "#cc0000" : "#4338ca";
+                  e.currentTarget.style.background = amount === val ? "#cc0000" : "#fff";
+                  e.currentTarget.style.borderColor = amount === val ? "#cc0000" : "#ddd";
                 }}
                 onMouseDown={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(0) scale(0.97)"; }}
                 onMouseUp={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(-2px) scale(1)"; }}

@@ -193,6 +193,62 @@ code {
   }
 }
 
+/* ============================================================
+   Shared motion system — one animation vocabulary for the app.
+   Pages & components reference these classes so entrances and
+   interactions stay consistent across every screen. Add new
+   motion here (not inline) to keep the site in sync.
+   ============================================================ */
+@keyframes lp-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes lp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes lp-pop-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+
+/* Entrance for a page section or block. */
+.lp-reveal { animation: lp-fade-up 0.45s ease-out both; }
+
+/* Staggered entrance for children of a grid / list (cards, rows). */
+.lp-stagger > * { animation: lp-fade-up 0.45s ease-out both; }
+.lp-stagger > *:nth-child(1) { animation-delay: 0.04s; }
+.lp-stagger > *:nth-child(2) { animation-delay: 0.09s; }
+.lp-stagger > *:nth-child(3) { animation-delay: 0.14s; }
+.lp-stagger > *:nth-child(4) { animation-delay: 0.19s; }
+.lp-stagger > *:nth-child(5) { animation-delay: 0.24s; }
+.lp-stagger > *:nth-child(6) { animation-delay: 0.29s; }
+.lp-stagger > *:nth-child(7) { animation-delay: 0.34s; }
+.lp-stagger > *:nth-child(8) { animation-delay: 0.39s; }
+.lp-stagger > *:nth-child(n+9) { animation-delay: 0.44s; }
+
+/* Modal backdrop + card. */
+.lp-overlay { animation: lp-fade-in 0.2s ease-out; }
+.lp-modal   { animation: lp-pop-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* Reusable inline spinner (loading buttons). */
+.lp-spin { animation: lp-spin 0.7s linear infinite; }
+
+/* Consistent interactive lift for clickable cards. */
+.lp-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.lp-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10); }
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .lp-reveal,
+  .lp-stagger > *,
+  .lp-overlay,
+  .lp-modal { animation: none !important; }
+  .lp-card { transition: none; }
+  .lp-card:hover { transform: none; }
+}
+
 @media (max-width: 640px) {
   .home-content {
     padding: 20px 14px !important;

@@ -11,6 +11,7 @@ export default function InvestmentSuccessModal({ amount, onClose, transactionId 
   return (
     <div
       onClick={onClose}
+      className="lp-overlay"
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -19,6 +20,7 @@ export default function InvestmentSuccessModal({ amount, onClose, transactionId 
     >
       <div
         onClick={e => e.stopPropagation()}
+        className="lp-modal"
         style={{
           background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "420px",
           borderTop: "5px solid #cc0000", padding: "40px 32px 28px",

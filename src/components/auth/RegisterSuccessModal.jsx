@@ -1,6 +1,7 @@
 export default function RegisterSuccessModal({ onGoToLogin }) {
   return (
     <div
+      className="lp-overlay"
       style={{
         position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -8,19 +9,13 @@ export default function RegisterSuccessModal({ onGoToLogin }) {
       }}
     >
       <div
+        className="lp-modal"
         style={{
           background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "420px",
           borderTop: "5px solid #cc0000", padding: "40px 32px 28px",
-          textAlign: "center", animation: "regSuccessIn 0.35s ease-out",
+          textAlign: "center",
         }}
       >
-        <style>{`
-          @keyframes regSuccessIn {
-            from { opacity: 0; transform: translateY(16px) scale(0.97); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
-          }
-        `}</style>
-
         <div style={{
           width: "60px", height: "60px", borderRadius: "50%",
           background: "#cc0000", display: "flex", alignItems: "center",

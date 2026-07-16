@@ -140,17 +140,14 @@ export default function Register() {
         >
           {isSubmitting ? (
             <>
-              <span style={{
+              <span className="lp-spin" style={{
                 width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)",
                 borderTopColor: "#fff", borderRadius: "50%", display: "inline-block",
-                animation: "spin 0.7s linear infinite",
               }} />
               CREATING ACCOUNT...
             </>
           ) : "CREATE ACCOUNT"}
         </button>
-
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </form>
 
       {/* Divider */}

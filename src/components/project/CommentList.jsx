@@ -46,8 +46,19 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
               background: isLoggedIn && text.trim() ? "#cc0000" : "#ccc",
               color: "#fff", border: "none", borderRadius: "5px",
               fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "8px 20px", cursor: isLoggedIn ? "pointer" : "not-allowed",
-              transition: "background 0.15s",
+              padding: "8px 20px", cursor: isLoggedIn && text.trim() ? "pointer" : "not-allowed",
+              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+            }}
+            onMouseEnter={e => {
+              if (!isLoggedIn || !text.trim()) return;
+              e.currentTarget.style.background = "#aa0000";
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = isLoggedIn && text.trim() ? "#cc0000" : "#ccc";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
             POST COMMENT
