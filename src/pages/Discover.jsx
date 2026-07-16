@@ -5,24 +5,33 @@ import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import useWindowWidth from "../hooks/useWindowWidth";
+import { useAuth } from "../context/AuthContext";
 import { FRESH, HERO_PROJECTS, TRENDING, FILTERS } from "../mock";
-import { getNavLinks } from "../mock/navLinks";
 
-// TODO: Replace with real auth context when backend is ready
-const MOCK_USER = { name: "Huy Nguyen", balance: 4500 };
-
-function HeroCard({ project, style, showDesc, showFundingBar, isLoggedIn }) {
+function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
   return (
     <Link to={`/project/${project.id}`} style={{ textDecoration: "none", color: "inherit", ...style }}>
       <div
-        style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: "100%" }}
-        onMouseEnter={e => e.currentTarget.style.filter = "brightness(1.05)"}
-        onMouseLeave={e => e.currentTarget.style.filter = "none"}
+        style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: "100%", transition: "transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease" }}
+        onMouseEnter={e => {
+          e.currentTarget.style.filter = "brightness(1.05)";
+          e.currentTarget.style.transform = "translateY(-3px)";
+          e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.18)";
+          const img = e.currentTarget.querySelector("img");
+          if (img) img.style.transform = "scale(1.06)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.filter = "none";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
+          const img = e.currentTarget.querySelector("img");
+          if (img) img.style.transform = "scale(1)";
+        }}
       >
         <img
           src={project.img}
           alt={project.title}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.4s ease" }}
         />
         <div style={{
           position: "absolute", inset: 0,
@@ -53,13 +62,24 @@ function HeroCard({ project, style, showDesc, showFundingBar, isLoggedIn }) {
             </p>
           )}
 
-          {showDesc && isLoggedIn && (
+          {showDesc && canInvest && (
             <button
               onClick={e => { e.preventDefault(); /* TODO: open investment modal */ }}
               style={{
                 background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px",
                 fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
                 padding: "8px 18px", cursor: "pointer",
+                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#aa0000";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               INVEST IN THIS PROJECT
@@ -81,8 +101,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, isLoggedIn }) {
 }
 
 export default function Discover() {
-  // TODO: Replace with auth context
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const { canInvest } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [search, setSearch] = useState("");
@@ -116,7 +135,6 @@ export default function Discover() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        navLinks={getNavLinks(isLoggedIn)}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}
@@ -126,16 +144,12 @@ export default function Discover() {
         isMobile={isMobile}
         isTablet={isTablet}
         isDesktop={isDesktop}
-        isLoggedIn={isLoggedIn}
-        ccBalance={isLoggedIn ? MOCK_USER.balance : 0}
-        userName={isLoggedIn ? MOCK_USER.name : ""}
-        onLogout={() => setIsLoggedIn(false)}
       />
 
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: pad }}>
 
         {/* ── Hero Grid ── */}
-        <div style={{
+        <div className="lp-stagger" style={{
           display: "grid",
           gridTemplateColumns: isDesktop ? "1fr 320px" : isTablet ? "1fr 1fr" : "1fr",
           gridTemplateRows: isDesktop ? `${SMALL_H}px ${SMALL_H}px` : "auto",
@@ -145,7 +159,7 @@ export default function Discover() {
           <HeroCard
             project={HERO_PROJECTS[0]}
             showDesc={!isMobile}
-            isLoggedIn={isLoggedIn}
+            canInvest={canInvest}
             style={{
               gridRow: isDesktop ? "1 / 3" : "auto",
               gridColumn: isTablet ? "1 / -1" : "auto",
@@ -174,11 +188,16 @@ export default function Discover() {
               <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>Trending Projects</h2>
               <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Projects gaining momentum across RMIT.</p>
             </div>
-            <a href="#fresh" style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none" }}>
+            <a
+              href="#fresh"
+              style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none", display: "inline-block", transition: "opacity 0.15s, transform 0.15s" }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "translateX(3px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(0)"; }}
+            >
               VIEW ALL →
             </a>
           </div>
-          <div style={{
+          <div className="lp-stagger" style={{
             display: "grid",
             gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
             gap: "14px",
@@ -216,6 +235,16 @@ export default function Discover() {
                     padding: "5px 14px", cursor: "pointer",
                     letterSpacing: "0.04em", transition: "all 0.15s",
                   }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.10)";
+                    if (activeFilter !== f) e.currentTarget.style.borderColor = "#cc0000";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                    e.currentTarget.style.borderColor = activeFilter === f ? "#cc0000" : "#ddd";
+                  }}
                 >
                   {f}
                 </button>
@@ -223,7 +252,7 @@ export default function Discover() {
             </div>
           </div>
 
-          <div style={{
+          <div className="lp-stagger" style={{
             display: "grid",
             gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
             gap: "14px",
@@ -245,10 +274,21 @@ export default function Discover() {
                 background: "#fff", border: "1px solid #ccc", borderRadius: "5px",
                 fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em",
                 padding: "12px 36px", cursor: "pointer", color: "#444",
-                width: isMobile ? "100%" : "auto", transition: "background 0.15s",
+                width: isMobile ? "100%" : "auto",
+                transition: "background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s",
               }}
-              onMouseEnter={e => e.currentTarget.style.background = "#f5f5f5"}
-              onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#f5f5f5";
+                e.currentTarget.style.borderColor = "#cc0000";
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.10)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#fff";
+                e.currentTarget.style.borderColor = "#ccc";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             >
               LOAD MORE PROJECTS
             </button>
@@ -257,21 +297,6 @@ export default function Discover() {
       </div>
 
       <Footer isMobile={isMobile} />
-
-      {/* ── DEV ONLY: Auth toggle — remove before production ── */}
-      <button
-        onClick={() => setIsLoggedIn(v => !v)}
-        title="DEV: Toggle auth state"
-        style={{
-          position: "fixed", bottom: "20px", right: "20px", zIndex: 9999,
-          background: isLoggedIn ? "#cc0000" : "#555",
-          color: "#fff", border: "none", borderRadius: "20px",
-          padding: "7px 14px", fontSize: "11px", fontWeight: 700,
-          cursor: "pointer", opacity: 0.85, letterSpacing: "0.04em",
-        }}
-      >
-        {isLoggedIn ? "🔓 LOGGED IN" : "🔒 LOGGED OUT"}
-      </button>
     </div>
   );
 }

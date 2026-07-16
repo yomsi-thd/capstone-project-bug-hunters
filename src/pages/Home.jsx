@@ -8,7 +8,6 @@ import useWindowWidth from "../hooks/useWindowWidth";
 import {
   FRESH,
   HERO_PROJECTS,
-  NAV_LINKS,
   TRENDING,
   FILTERS,
 } from "../mock";
@@ -97,7 +96,6 @@ export default function Home() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        navLinks={NAV_LINKS}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}

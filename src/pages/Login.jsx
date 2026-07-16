@@ -3,9 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
 import useWindowWidth from "../hooks/useWindowWidth";
+import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const w = useWindowWidth();
   const isMobile = w < 640;
 
@@ -28,10 +30,16 @@ export default function Login() {
     if (!validate()) return;
 
     setIsSubmitting(true);
-    // TODO: call authService.login({ identifier, password, rememberMe }) when backend is ready
+    // TODO: call authService.login() when backend is ready. For now this checks
+    // the mock accounts in AuthContext (student1 / lecturer1).
     setTimeout(() => {
+      const result = login(identifier, password);
       setIsSubmitting(false);
-      navigate("/discover");
+      if (result.ok) {
+        navigate("/discover");
+      } else {
+        setErrors({ password: result.error });
+      }
     }, 600);
   };
 
@@ -104,17 +112,14 @@ export default function Login() {
         >
           {isSubmitting ? (
             <>
-              <span style={{
+              <span className="lp-spin" style={{
                 width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)",
                 borderTopColor: "#fff", borderRadius: "50%", display: "inline-block",
-                animation: "spin 0.7s linear infinite",
               }} />
               SIGNING IN...
             </>
           ) : "LOGIN"}
         </button>
-
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </form>
 
       {/* Divider */}

@@ -7,11 +7,8 @@ import CommentList from "../components/project/CommentList";
 import InvestmentModal from "../components/project/InvestmentModal";
 import InvestmentSuccessModal from "../components/project/InvestmentSuccessModal";
 import useWindowWidth from "../hooks/useWindowWidth";
+import { useAuth } from "../context/AuthContext";
 import { PROJECT_DETAIL, COMMENTS } from "../mock";
-import { getNavLinks } from "../mock/navLinks";
-
-// TODO: Replace with real auth context + useParams for project id
-const MOCK_USER = { name: "Huy Nguyen", balance: 4500 };
 
 function FundingBar({ percent }) {
   return (
@@ -38,6 +35,18 @@ function TabNav({ tabs, active, onChange }) {
             borderBottom: active === tab.id ? "2px solid #cc0000" : "2px solid transparent",
             marginBottom: "-2px", transition: "all 0.15s", position: "relative",
             display: "flex", alignItems: "center", gap: "6px",
+          }}
+          onMouseEnter={e => {
+            if (active !== tab.id) {
+              e.currentTarget.style.color = "#cc0000";
+              e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
+            }
+          }}
+          onMouseLeave={e => {
+            if (active !== tab.id) {
+              e.currentTarget.style.color = "#666";
+              e.currentTarget.style.borderBottomColor = "transparent";
+            }
           }}
         >
           {tab.label}
@@ -85,8 +94,7 @@ function EndorsedBadge() {
 }
 
 export default function ProjectDetail() {
-  // TODO: Replace with auth context
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const { isLoggedIn, canInvest, balance } = useAuth();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -125,7 +133,6 @@ export default function ProjectDetail() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        navLinks={getNavLinks(isLoggedIn)}
         search={search}
         setSearch={setSearch}
         menuOpen={menuOpen}
@@ -135,10 +142,6 @@ export default function ProjectDetail() {
         isMobile={isMobile}
         isTablet={isTablet}
         isDesktop={isDesktop}
-        isLoggedIn={isLoggedIn}
-        ccBalance={isLoggedIn ? MOCK_USER.balance : 0}
-        userName={isLoggedIn ? MOCK_USER.name : ""}
-        onLogout={() => setIsLoggedIn(false)}
       />
 
       {/* Hero image */}
@@ -151,7 +154,7 @@ export default function ProjectDetail() {
       </div>
 
       {/* Main content */}
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "24px 16px" : "32px 40px" }}>
+      <div className="lp-reveal" style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "24px 16px" : "32px 40px" }}>
         <div style={{
           display: "grid",
           gridTemplateColumns: isDesktop ? "1fr 300px" : "1fr",
@@ -183,7 +186,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={isMobile} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={isMobile} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -204,8 +207,12 @@ export default function ProjectDetail() {
 
                 {/* Gallery image */}
                 {p.gallery[0] && (
-                  <div style={{ borderRadius: "10px", overflow: "hidden", marginBottom: "28px", background: "#111" }}>
-                    <img src={p.gallery[0]} alt="Project gallery" style={{ width: "100%", maxHeight: "320px", objectFit: "cover", display: "block" }} />
+                  <div
+                    style={{ borderRadius: "10px", overflow: "hidden", marginBottom: "28px", background: "#111" }}
+                    onMouseEnter={e => { const img = e.currentTarget.querySelector("img"); if (img) img.style.transform = "scale(1.05)"; }}
+                    onMouseLeave={e => { const img = e.currentTarget.querySelector("img"); if (img) img.style.transform = "scale(1)"; }}
+                  >
+                    <img src={p.gallery[0]} alt="Project gallery" style={{ width: "100%", maxHeight: "320px", objectFit: "cover", display: "block", transition: "transform 0.4s ease" }} />
                   </div>
                 )}
 
@@ -260,7 +267,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} isMobile={false} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={false} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -269,7 +276,7 @@ export default function ProjectDetail() {
       {investStep === "invest" && (
         <InvestmentModal
           project={p}
-          balance={MOCK_USER.balance}
+          balance={balance}
           onClose={closeModals}
           onConfirm={handleConfirmInvestment}
         />
@@ -282,25 +289,11 @@ export default function ProjectDetail() {
         />
       )}
 
-      {/* DEV toggle — remove before production */}
-      <button
-        onClick={() => setIsLoggedIn(v => !v)}
-        title="DEV: Toggle auth state"
-        style={{
-          position: "fixed", bottom: "20px", right: "20px", zIndex: 9999,
-          background: isLoggedIn ? "#cc0000" : "#555",
-          color: "#fff", border: "none", borderRadius: "20px",
-          padding: "7px 14px", fontSize: "11px", fontWeight: 700,
-          cursor: "pointer", opacity: 0.85,
-        }}
-      >
-        {isLoggedIn ? "🔓 LOGGED IN" : "🔒 LOGGED OUT"}
-      </button>
     </div>
   );
 }
 
-function FundingSidebar({ p, isLoggedIn, isMobile, onInvest }) {
+function FundingSidebar({ p, canInvest, isMobile, onInvest }) {
   return (
     <div style={{
       border: "1px solid #e5e7eb", borderRadius: "10px",
@@ -336,17 +329,27 @@ function FundingSidebar({ p, isLoggedIn, isMobile, onInvest }) {
       </div>
 
       <button
-        disabled={!isLoggedIn}
-        onClick={() => isLoggedIn && onInvest()}
+        disabled={!canInvest}
+        onClick={() => canInvest && onInvest()}
         style={{
-          width: "100%", background: isLoggedIn ? "#cc0000" : "#ccc",
+          width: "100%", background: canInvest ? "#cc0000" : "#ccc",
           color: "#fff", border: "none", borderRadius: "6px",
           fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
-          padding: "14px", cursor: isLoggedIn ? "pointer" : "not-allowed",
-          transition: "background 0.15s",
+          padding: "14px", cursor: canInvest ? "pointer" : "not-allowed",
+          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
         }}
-        onMouseEnter={e => { if (isLoggedIn) e.currentTarget.style.background = "#aa0000"; }}
-        onMouseLeave={e => { if (isLoggedIn) e.currentTarget.style.background = "#cc0000"; }}
+        onMouseEnter={e => {
+          if (!canInvest) return;
+          e.currentTarget.style.background = "#aa0000";
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
+        }}
+        onMouseLeave={e => {
+          if (!canInvest) return;
+          e.currentTarget.style.background = "#cc0000";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
       >
         INVEST IN THIS PROJECT
       </button>

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
+import { AuthProvider } from "./context/AuthContext";
 import Home from "./pages/Home";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import CreatorMyProjects from "./pages/CreatorMyProjects";
@@ -20,8 +21,9 @@ import AdminApprovals from "./pages/AdminApprovals";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
         <Route path="/" element={<Home />} />
 
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
@@ -51,8 +53,9 @@ function App() {
         <Route path="/admin" element={<Admin />} />
 
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
 

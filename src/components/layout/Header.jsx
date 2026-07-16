@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import useWindowWidth from "../../hooks/useWindowWidth";
+import { useAuth } from "../../context/AuthContext";
+import { getNavLinksForUser } from "../../mock/navLinks";
 
 function CCBadge({ ccBalance }) {
   return (
@@ -32,23 +36,40 @@ function Avatar({ userName }) {
   );
 }
 
-export default function Header({
-  navLinks,
-  search,
-  setSearch,
-  menuOpen,
-  setMenuOpen,
-  searchOpen,
-  setSearchOpen,
-  isMobile,
-  isTablet,
-  isDesktop,
-  // Auth props (optional - defaults to logged out)
-  isLoggedIn = false,
-  ccBalance = 0,
-  userName = "",
-  onLogout,
-}) {
+export default function Header(props = {}) {
+  // Header is self-sufficient: it reads the signed-in user from AuthContext and
+  // manages its own menu/search state. Any prop passed in still overrides the
+  // internal default, so older call sites keep working unchanged.
+  const auth = useAuth();
+  const w = useWindowWidth();
+  const [menuOpenState, setMenuOpenState] = useState(false);
+  const [searchOpenState, setSearchOpenState] = useState(false);
+  const [searchState, setSearchState] = useState("");
+
+  const pick = (value, fallback) => (value !== undefined ? value : fallback);
+
+  const isMobile = pick(props.isMobile, w < 640);
+  const isTablet = pick(props.isTablet, w >= 640 && w < 1024);
+  const isDesktop = pick(props.isDesktop, w >= 1024);
+
+  const isLoggedIn = pick(props.isLoggedIn, auth.isLoggedIn);
+  const ccBalance = pick(props.ccBalance, auth.balance);
+  const userName = pick(props.userName, auth.user?.name ?? "");
+  const onLogout = pick(props.onLogout, auth.logout);
+  const navLinks = pick(props.navLinks, getNavLinksForUser(auth.user));
+
+  // Role-derived visibility: only Creators start projects; only Backers/Admins
+  // hold a Class Coin balance.
+  const canCreate = pick(props.isCreator, auth.isCreator);
+  const showBalance = pick(props.showBalance, auth.canInvest);
+
+  const search = pick(props.search, searchState);
+  const setSearch = pick(props.setSearch, setSearchState);
+  const menuOpen = pick(props.menuOpen, menuOpenState);
+  const setMenuOpen = pick(props.setMenuOpen, setMenuOpenState);
+  const searchOpen = pick(props.searchOpen, searchOpenState);
+  const setSearchOpen = pick(props.setSearchOpen, setSearchOpenState);
+
   const { pathname } = useLocation();
 
   const isActive = (path) => {
@@ -128,56 +149,38 @@ export default function Header({
 
         {/* Desktop — Logged Out */}
         {isDesktop && !isLoggedIn && (
-          <>
-            <Link
-              to="/login"
-              style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0, transition: "color 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
-              onMouseLeave={e => e.currentTarget.style.color = "#444"}
-            >LOGIN</Link>
-            <Link
-              to="/create-project"
-              style={{
-                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-                fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
-                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#aa0000";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "#cc0000";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >START A PROJECT</Link>
-          </>
+          <Link
+            to="/login"
+            style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0, transition: "color 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+            onMouseLeave={e => e.currentTarget.style.color = "#444"}
+          >LOGIN</Link>
         )}
 
         {/* Desktop — Logged In */}
         {isDesktop && isLoggedIn && (
           <>
-            <CCBadge ccBalance={ccBalance} />
-            <Link
-              to="/create-project"
-              style={{
-                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-                fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
-                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#aa0000";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "#cc0000";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-            >START A PROJECT</Link>
+            {showBalance && <CCBadge ccBalance={ccBalance} />}
+            {canCreate && (
+              <Link
+                to="/create-project"
+                style={{
+                  textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                  fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
+                  transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "#aa0000";
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "#cc0000";
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >START A PROJECT</Link>
+            )}
             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
               <Avatar userName={userName} />
               <Link
@@ -206,42 +209,34 @@ export default function Header({
 
         {/* Tablet — Logged Out */}
         {isTablet && !isLoggedIn && (
-          <>
-            <Link
-              to="/login"
-              style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap", transition: "color 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
-              onMouseLeave={e => e.currentTarget.style.color = "#444"}
-            >LOGIN</Link>
-            <Link
-              to="/create-project"
-              style={{
-                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-                fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-              onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
-            >START</Link>
-          </>
+          <Link
+            to="/login"
+            style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap", transition: "color 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+            onMouseLeave={e => e.currentTarget.style.color = "#444"}
+          >LOGIN</Link>
         )}
 
         {/* Tablet — Logged In */}
         {isTablet && isLoggedIn && (
           <>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: "#cc0000", whiteSpace: "nowrap" }}>
-              {ccBalance.toLocaleString()} CC
-            </div>
-            <Link
-              to="/create-project"
-              style={{
-                textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
-                fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-                transition: "background 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-              onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
-            >START</Link>
+            {showBalance && (
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "#cc0000", whiteSpace: "nowrap" }}>
+                {ccBalance.toLocaleString()} CC
+              </div>
+            )}
+            {canCreate && (
+              <Link
+                to="/create-project"
+                style={{
+                  textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                  fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
+                onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+              >START</Link>
+            )}
             <Avatar userName={userName} />
           </>
         )}
@@ -302,35 +297,39 @@ export default function Header({
           ))}
 
           {!isLoggedIn && (
-            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+            <div style={{ marginTop: "12px" }}>
               <Link
                 to="/login" onClick={() => setMenuOpen(false)}
                 style={{
-                  flex: 1, textAlign: "center", textDecoration: "none", background: "#fff",
-                  border: "1px solid #ddd", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 600, color: "#444",
-                  transition: "background 0.15s, border-color 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#ddd"; }}
-              >LOGIN</Link>
-              <Link
-                to="/create-project" onClick={() => setMenuOpen(false)}
-                style={{
-                  flex: 1, textAlign: "center", textDecoration: "none", background: "#cc0000",
-                  color: "#fff", borderRadius: "5px", padding: "9px", fontSize: "13px", fontWeight: 700,
+                  display: "block", textAlign: "center", textDecoration: "none", background: "#cc0000",
+                  color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
                 onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
-              >START A PROJECT</Link>
+              >LOGIN</Link>
             </div>
           )}
 
           {isLoggedIn && (
             <div style={{ marginTop: "12px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
-                Balance: {ccBalance.toLocaleString()} CC
-              </div>
+              {showBalance && (
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
+                  Balance: {ccBalance.toLocaleString()} CC
+                </div>
+              )}
+              {canCreate && (
+                <Link
+                  to="/create-project" onClick={() => setMenuOpen(false)}
+                  style={{
+                    display: "block", textAlign: "center", textDecoration: "none", background: "#cc0000",
+                    color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
+                    margin: "10px 0", transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
+                  onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+                >START A PROJECT</Link>
+              )}
               <Link
                 to="/dashboard" onClick={() => setMenuOpen(false)}
                 style={{
