@@ -5,7 +5,7 @@ function genTransactionId() {
   return `TX-${rand}-RMIT`;
 }
 
-export default function InvestmentSuccessModal({ amount, onClose, transactionId }) {
+export default function BackerInvestmentSuccessModal({ amount, onClose, transactionId }) {
   const txId = transactionId || genTransactionId();
 
   return (

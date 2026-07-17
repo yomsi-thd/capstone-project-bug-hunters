@@ -12,7 +12,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import CreateProject from "./pages/CreateProject";
 import MyProjects from "./pages/MyProjects";
 import Dashboard from "./pages/Dashboard";
-import Investments from "./pages/Investments";
+import BackerInvestments from "./pages/BackerInvestments";
 import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -49,7 +49,7 @@ function App() {
 
         <Route path="/dashboard" element={<Dashboard />} />
 
-        <Route path="/investments" element={<Investments />} />
+        <Route path="/investments" element={<BackerInvestments />} />
 
         <Route path="/admin" element={<Admin />} />
 

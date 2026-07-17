@@ -2,7 +2,7 @@ import { useState } from "react";
 
 const QUICK_AMOUNTS = [25, 50, 100];
 
-export default function InvestmentModal({ project, balance, onClose, onConfirm }) {
+export default function BackerInvestmentModal({ project, balance, onClose, onConfirm }) {
   const [amount, setAmount] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
 

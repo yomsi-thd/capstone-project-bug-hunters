@@ -181,7 +181,7 @@ function EmptyLoggedOut({ isMobile }) {
   );
 }
 
-export default function Investments() {
+export default function BackerInvestments() {
   const { isLoggedIn } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);

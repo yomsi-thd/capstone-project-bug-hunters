@@ -4,8 +4,8 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import CommentList from "../components/project/CommentList";
-import InvestmentModal from "../components/project/InvestmentModal";
-import InvestmentSuccessModal from "../components/project/InvestmentSuccessModal";
+import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
+import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
 import useWindowWidth from "../hooks/useWindowWidth";
 import { useAuth } from "../context/AuthContext";
 import { PROJECT_DETAILS, COMMENTS_BY_PROJECT } from "../mock";
@@ -314,7 +314,7 @@ export default function ProjectDetail() {
       <Footer isMobile={isMobile} />
 
       {investStep === "invest" && (
-        <InvestmentModal
+        <BackerInvestmentModal
           project={p}
           balance={balance}
           onClose={closeModals}
@@ -323,7 +323,7 @@ export default function ProjectDetail() {
       )}
 
       {investStep === "success" && (
-        <InvestmentSuccessModal
+        <BackerInvestmentSuccessModal
           amount={investedAmount}
           onClose={closeModals}
         />
