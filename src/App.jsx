@@ -24,7 +24,8 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Discover />} />
+        <Route path="/home" element={<Home />} />
 
         <Route path="/creator-dashboard" element={<CreatorDashboard />} />
         <Route path="/creator-my-projects" element={<CreatorMyProjects/>} />

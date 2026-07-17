@@ -102,10 +102,16 @@ export default function Header(props = {}) {
                   style={{
                     textDecoration: "none", fontSize: "14px", fontWeight: 400,
                     color: "#444", padding: "6px 12px", borderBottom: "2px solid transparent",
-                    transition: "color 0.15s",
+                    transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
-                  onMouseLeave={e => e.currentTarget.style.color = "#444"}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = "#cc0000";
+                    e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = "#444";
+                    e.currentTarget.style.borderBottomColor = "transparent";
+                  }}
                 >{label}</a>
               ) : (
                 <Link
@@ -118,8 +124,16 @@ export default function Header(props = {}) {
                     borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
                     transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => { if (!isActive(path)) e.currentTarget.style.color = "#cc0000"; }}
-                  onMouseLeave={e => { if (!isActive(path)) e.currentTarget.style.color = "#444"; }}
+                  onMouseEnter={e => {
+                    if (isActive(path)) return;
+                    e.currentTarget.style.color = "#cc0000";
+                    e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
+                  }}
+                  onMouseLeave={e => {
+                    if (isActive(path)) return;
+                    e.currentTarget.style.color = "#444";
+                    e.currentTarget.style.borderBottomColor = "transparent";
+                  }}
                 >{label}</Link>
               )
             ))}
