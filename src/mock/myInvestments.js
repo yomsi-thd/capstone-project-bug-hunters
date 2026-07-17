@@ -1,7 +1,7 @@
 export const MY_INVESTMENTS = [
   {
     id: 1,
-    projectId: 101,
+    projectId: 11,
     title: "Eco-Concrete RMIT",
     tag: "ENGINEERING",
     desc: "Developing sustainable construction materials using recycled waste from RMIT campus renovations.",
@@ -12,7 +12,7 @@ export const MY_INVESTMENTS = [
   },
   {
     id: 2,
-    projectId: 102,
+    projectId: 12,
     title: "Cyber-Shield AI",
     tag: "TECHNOLOGY",
     desc: "Autonomous threat detection system designed for small business cybersecurity infrastructure.",

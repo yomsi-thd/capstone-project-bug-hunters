@@ -1,11 +1,14 @@
+// Ids are unique across HERO_PROJECTS / TRENDING / FRESH — they are three
+// orderings over one project pool, not three separate entities. Ids that have
+// a mock detail page live in PROJECT_DETAILS (mock/projectDetail.js).
 export const HERO_PROJECTS = [
   {
     id: 1,
     tag: "ENGINEERING",
-    title: "Next-Gen Prosthetics: Neural Interfaces",
-    desc: "Developing affordable, neurally-controlled prosthetic limbs using advanced 3D printing and machine learning to restore natural movement and sensation.",
-    img: "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&q=80",
-    funded: 87,
+    title: "Autonomous Swarm Drones for Urban Search & Rescue",
+    desc: "Deploying a coordinated swarm of low-cost autonomous drones to rapidly map hazardous disaster zones and locate survivors.",
+    img: "https://images.unsplash.com/photo-1473968512647-3e447244af8f?w=800&q=80",
+    funded: 83,
     large: true,
   },
   {
@@ -28,7 +31,7 @@ export const HERO_PROJECTS = [
 
 export const TRENDING = [
   {
-    id: 1,
+    id: 4,
     tag: "COMPUTER SCIENCE",
     title: "Quantum Encryption protocols for IoT devices",
     desc: "Securing the next generation of smart devices against quantum computing...",
@@ -36,7 +39,7 @@ export const TRENDING = [
     img: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=300&q=80",
   },
   {
-    id: 2,
+    id: 5,
     tag: "DESIGN",
     title: "Generative Typography for Dyslexia",
     desc: "Adaptive font rendering systems that adjust in real-time to improve reading...",
@@ -44,7 +47,7 @@ export const TRENDING = [
     img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=300&q=80",
   },
   {
-    id: 3,
+    id: 6,
     tag: "MANUFACTURING",
     title: "Zero-Waste CNC Machining",
     desc: "Developing closed-loop recycling systems for metal chips in advanced manufacturing.",
@@ -52,7 +55,7 @@ export const TRENDING = [
     img: "https://images.unsplash.com/photo-1565043666747-69f6646db940?w=300&q=80",
   },
   {
-    id: 4,
+    id: 7,
     tag: "BUSINESS",
     title: "Micro-Credit AI Analysis",
     desc: "Using machine learning to assess non-traditional creditworthiness for small businesses.",
@@ -63,7 +66,7 @@ export const TRENDING = [
 
 export const FRESH = [
   {
-    id: 1,
+    id: 8,
     tag: "MICROELECTRONICS",
     title: "Biodegradable Sensors",
     desc: "Creating environmental monitoring sensors that dissolve harmlessly after their operational lifespan.",
@@ -71,7 +74,7 @@ export const FRESH = [
     img: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&q=80",
   },
   {
-    id: 2,
+    id: 9,
     tag: "FASHION TECH",
     title: "Kinetic Energy Textiles",
     desc: "Weaving piezoelectric materials into everyday clothing to harvest energy from human movement.",
@@ -79,12 +82,36 @@ export const FRESH = [
     img: "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&q=80",
   },
   {
-    id: 3,
+    id: 10,
     tag: "ACOUSTICS",
     title: "Active Noise Cancellation Windows",
     desc: "Applying metamaterials to glass to selectively block urban noise pollution while allowing airflow.",
     funded: 22,
     img: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=400&q=80",
+  },
+  {
+    id: 11,
+    tag: "ENGINEERING",
+    title: "Eco-Concrete RMIT",
+    desc: "Developing sustainable construction materials using recycled waste from RMIT campus renovations.",
+    funded: 85,
+    img: "https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=400&q=80",
+  },
+  {
+    id: 12,
+    tag: "TECHNOLOGY",
+    title: "Cyber-Shield AI",
+    desc: "Autonomous threat detection system designed for small business cybersecurity infrastructure.",
+    funded: 42,
+    img: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&q=80",
+  },
+  {
+    id: 13,
+    tag: "BIOTECH",
+    title: "Mycelium Packaging Lab",
+    desc: "Growing compostable protective packaging from fungal mycelium and agricultural waste in seven days.",
+    funded: 17,
+    img: "https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80",
   },
 ];
 
@@ -95,6 +122,16 @@ export const NAV_LINKS = [
 ];
 
 export const FILTERS = ["ALL", "TECH", "ART", "SCIENCE"];
+
+// Which tags each filter chip matches. A tag may sit under more than one
+// filter — ENGINEERING is both applied tech and science, the same way
+// MICROELECTRONICS and FASHION TECH already straddle two chips.
+// BUSINESS is deliberately absent: no chip fits it.
+export const FILTER_TAGS = {
+  TECH: ["COMPUTER SCIENCE", "TECHNOLOGY", "MICROELECTRONICS", "FASHION TECH", "ENGINEERING", "MANUFACTURING"],
+  ART: ["DESIGN", "FASHION TECH", "ARCHITECTURE"],
+  SCIENCE: ["BIOTECH", "ACOUSTICS", "MICROELECTRONICS", "ENGINEERING"],
+};
 
 export const TAG_COLORS = {
   "COMPUTER SCIENCE": { bg: "#1a3a5c", text: "#fff" },
@@ -107,4 +144,5 @@ export const TAG_COLORS = {
   ENGINEERING: { bg: "#1a3a5c", text: "#fff" },
   BIOTECH: { bg: "#1a3a2d", text: "#fff" },
   ARCHITECTURE: { bg: "#3a2d1a", text: "#fff" },
+  TECHNOLOGY: { bg: "#1a2d3a", text: "#fff" },
 };
