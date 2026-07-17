@@ -1,8 +1,13 @@
 import { useState } from "react";
 import CommentItem from "./CommentItem";
 
+const PREVIEW_COUNT = 3;
+
 export default function CommentList({ comments = [], totalComments = 0, isLoggedIn = false }) {
   const [text, setText] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  const visibleComments = expanded ? comments : comments.slice(0, PREVIEW_COUNT);
 
   const handlePost = () => {
     if (!text.trim()) return;
@@ -68,7 +73,7 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
 
       {/* Comment list */}
       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-        {comments.map(comment => (
+        {visibleComments.map(comment => (
           <div key={comment.id}>
             <CommentItem comment={comment} />
             {comment.replies?.map(reply => (
@@ -80,9 +85,10 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
       </div>
 
       {/* View all */}
-      {totalComments > comments.length && (
+      {!expanded && comments.length > PREVIEW_COUNT && (
         <div style={{ textAlign: "center", marginTop: "24px" }}>
           <button
+            onClick={() => setExpanded(true)}
             style={{
               background: "none", border: "1px solid #ddd", borderRadius: "5px",
               fontSize: "13px", fontWeight: 600, color: "#555",

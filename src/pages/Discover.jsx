@@ -6,7 +6,7 @@ import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import useWindowWidth from "../hooks/useWindowWidth";
 import { useAuth } from "../context/AuthContext";
-import { FRESH, HERO_PROJECTS, TRENDING, FILTERS } from "../mock";
+import { FRESH, HERO_PROJECTS, TRENDING, FILTERS, FILTER_TAGS } from "../mock";
 
 function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
   return (
@@ -62,11 +62,13 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
             </p>
           )}
 
+          {/* Visual CTA only — the wrapping Link handles navigation to the
+              project page, where the real investment modal lives. */}
           {showDesc && canInvest && (
-            <button
-              onClick={e => { e.preventDefault(); /* TODO: open investment modal */ }}
+            <span
               style={{
-                background: "#cc0000", color: "#fff", border: "none", borderRadius: "5px",
+                display: "inline-block",
+                background: "#cc0000", color: "#fff", borderRadius: "5px",
                 fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
                 padding: "8px 18px", cursor: "pointer",
                 transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -83,7 +85,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
               }}
             >
               INVEST IN THIS PROJECT
-            </button>
+            </span>
           )}
 
           {showFundingBar && (
@@ -100,10 +102,13 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
   );
 }
 
+const FRESH_PREVIEW_COUNT = 3;
+
 export default function Discover() {
   const { canInvest } = useAuth();
 
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [showAllFresh, setShowAllFresh] = useState(false);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -115,16 +120,21 @@ export default function Discover() {
 
   const filteredFresh = FRESH.filter(p => {
     const matchFilter =
-      activeFilter === "ALL" ||
-      (activeFilter === "TECH" && ["MICROELECTRONICS", "FASHION TECH", "COMPUTER SCIENCE"].includes(p.tag)) ||
-      (activeFilter === "ART" && ["DESIGN", "FASHION TECH"].includes(p.tag)) ||
-      (activeFilter === "SCIENCE" && ["ACOUSTICS", "BIOTECH", "MICROELECTRONICS"].includes(p.tag));
+      activeFilter === "ALL" || (FILTER_TAGS[activeFilter] || []).includes(p.tag);
     const matchSearch =
       !search ||
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       (p.desc && p.desc.toLowerCase().includes(search.toLowerCase()));
     return matchFilter && matchSearch;
   });
+
+  // Once expanded, stay expanded across filter/search changes — "show me
+  // everything" is the user's standing intent, not a per-tag setting.
+  // Only a remount (refresh, or arriving from another page) collapses it.
+  const visibleFresh = showAllFresh ? filteredFresh : filteredFresh.slice(0, FRESH_PREVIEW_COUNT);
+
+  // Matches the `!search` check above, so " " counts as searching either way.
+  const isSearching = search !== "";
 
   const pad = isMobile ? "20px 16px" : isTablet ? "24px 20px" : "32px 40px";
   const SMALL_H = 200;
@@ -252,13 +262,25 @@ export default function Discover() {
             </div>
           </div>
 
-          <div className="lp-stagger" style={{
-            display: "grid",
-            gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
-            gap: "14px",
-          }}>
-            {filteredFresh.length > 0 ? (
-              filteredFresh.map(p => <ProjectCard key={p.id} project={p} />)
+          {/* Entrance animation plays on tag switch, but never while searching —
+              live results should settle, not fade in on every keystroke.
+              The key remounts the whole grid so the stagger replays for every
+              card at once; without it, cards shared by two tags keep their DOM
+              node and sit still while only the new ones animate. Search state is
+              in the key so that clearing the box back to empty also remounts:
+              otherwise the restored cards would animate alone while the ones
+              already on screen stayed put — the same uneven effect, just moved. */}
+          <div
+            key={`${activeFilter}|${isSearching ? "search" : "browse"}`}
+            className={isSearching ? undefined : "lp-stagger"}
+            style={{
+              display: "grid",
+              gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
+              gap: "14px",
+            }}
+          >
+            {visibleFresh.length > 0 ? (
+              visibleFresh.map(p => <ProjectCard key={p.id} project={p} />)
             ) : (
               <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "48px 24px", color: "#aaa" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
@@ -268,8 +290,10 @@ export default function Discover() {
             )}
           </div>
 
+          {!showAllFresh && filteredFresh.length > FRESH_PREVIEW_COUNT && (
           <div style={{ textAlign: "center", marginTop: "28px" }}>
             <button
+              onClick={() => setShowAllFresh(true)}
               style={{
                 background: "#fff", border: "1px solid #ccc", borderRadius: "5px",
                 fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em",
@@ -293,6 +317,7 @@ export default function Discover() {
               LOAD MORE PROJECTS
             </button>
           </div>
+          )}
         </div>
       </div>
 
