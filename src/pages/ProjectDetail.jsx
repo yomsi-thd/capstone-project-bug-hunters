@@ -1,5 +1,5 @@
 import { useState } from "react";
-// import { useParams } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
@@ -8,7 +8,7 @@ import InvestmentModal from "../components/project/InvestmentModal";
 import InvestmentSuccessModal from "../components/project/InvestmentSuccessModal";
 import useWindowWidth from "../hooks/useWindowWidth";
 import { useAuth } from "../context/AuthContext";
-import { PROJECT_DETAIL, COMMENTS } from "../mock";
+import { PROJECT_DETAILS, COMMENTS_BY_PROJECT } from "../mock";
 
 function FundingBar({ percent }) {
   return (
@@ -94,6 +94,7 @@ function EndorsedBadge() {
 }
 
 export default function ProjectDetail() {
+  const { id } = useParams();
   const { isLoggedIn, canInvest, balance } = useAuth();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -104,8 +105,6 @@ export default function ProjectDetail() {
   const isMobile = w < 640;
   const isTablet = w >= 640 && w < 1024;
   const isDesktop = w >= 1024;
-
-  const p = PROJECT_DETAIL;
 
   // Invest flow: closed -> "invest" modal -> "success" modal -> closed
   const [investStep, setInvestStep] = useState(null); // null | "invest" | "success"
@@ -121,6 +120,47 @@ export default function ProjectDetail() {
     setInvestStep(null);
     setInvestedAmount(0);
   };
+
+  // TODO: replace with GET /projects/:id + GET /projects/:id/comments when backend is ready
+  const p = PROJECT_DETAILS[id];
+  const comments = COMMENTS_BY_PROJECT[id] || [];
+
+  if (!p) {
+    return (
+      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+        <Header />
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
+          <h1 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 6px" }}>Project not found</h1>
+          <p style={{ fontSize: "14px", color: "#888", margin: "0 0 24px" }}>
+            No project exists with the id “{id}”.
+          </p>
+          <Link
+            to="/discover"
+            style={{
+              display: "inline-block", background: "#cc0000", color: "#fff",
+              textDecoration: "none", borderRadius: "6px",
+              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
+              padding: "12px 28px", transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "#aa0000";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            BACK TO DISCOVER
+          </Link>
+        </div>
+        <Footer isMobile={isMobile} />
+      </div>
+    );
+  }
 
   const tabs = [
     { id: "about", label: "About" },
@@ -242,7 +282,7 @@ export default function ProjectDetail() {
 
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "32px" }}>
                   <CommentList
-                    comments={COMMENTS}
+                    comments={comments}
                     totalComments={p.totalComments}
                     isLoggedIn={isLoggedIn}
                   />
