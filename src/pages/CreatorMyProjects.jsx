@@ -221,13 +221,13 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
         <StatCard label="TOTAL PROJECTS" value={totalProjects} icon="📁" />
         <StatCard label="ACTIVE FUNDING" value={activeFunding} icon="📈" />
         <StatCard label="TOTAL RAISED" value={`$${totalRaised.toLocaleString()}`} icon="💳" />
       </div>
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-5 lp-stagger">
         {projects.map(p =>
           p.status === "Active" ? (
             <ActiveProjectCard key={p.id} project={p} onEdit={setEditTarget} />

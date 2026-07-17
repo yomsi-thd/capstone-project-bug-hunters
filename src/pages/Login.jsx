@@ -36,7 +36,14 @@ export default function Login() {
       const result = login(identifier, password);
       setIsSubmitting(false);
       if (result.ok) {
-        navigate("/discover");
+        const id = identifier.trim().toLowerCase();
+        if (id === "creator" || id === "creator1") {
+          navigate("/creator-dashboard");
+        } else if (id === "admin" || id === "admin1") {
+          navigate("/admin-dashboard");
+        } else {
+          navigate("/discover");
+        }
       } else {
         setErrors({ password: result.error });
       }

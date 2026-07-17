@@ -18,6 +18,18 @@ const ACCOUNTS = {
     roles: ["admin", "backer"],
     balance: 4500,
   },
+  creator1: {
+    password: "creator1@",
+    name: "Creator One",
+    roles: ["creator"],
+    balance: 0,
+  },
+  admin1: {
+    password: "admin1@",
+    name: "Admin One",
+    roles: ["admin"],
+    balance: 0,
+  },
 };
 
 const STORAGE_KEY = "rmit_launchpad_user";

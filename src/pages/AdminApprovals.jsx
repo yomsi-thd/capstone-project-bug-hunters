@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import DashboardHeader from "../components/layout/DashboardHeader";
+import rmitLogo from "../assets/rmit-logo.png";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_APPROVAL_PROJECTS as INITIAL_PROJECTS,
@@ -196,10 +198,13 @@ export default function AdminApprovals() {
         } md:relative md:translate-x-0`}
       >
         <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-brand flex items-center justify-center text-white font-extrabold text-base shrink-0">R</div>
+          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+            {/* Replace this src with your actual RMIT logo */}
+            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
+          </div>
           <div>
             <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-            <div className="text-[10px] text-gray-400">Academic Oversight</div>
           </div>
         </div>
         <nav className="flex-1 p-2">
@@ -228,24 +233,7 @@ export default function AdminApprovals() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 h-14 flex items-center justify-between px-4 md:px-9 shrink-0">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="md:hidden text-gray-500 hover:text-gray-900 focus:outline-none text-xl cursor-pointer"
-            >
-              ☰
-            </button>
-            <div className="text-base font-extrabold text-brand">RMIT Launchpad Admin</div>
-          </div>
-          <div className="flex items-center gap-3 md:gap-5">
-            {["Dashboard"].map(l => (
-              <button key={l} className="bg-transparent border-none text-[13px] text-gray-500 font-medium cursor-pointer hover:text-gray-900 hidden sm:inline-block">{l}</button>
-            ))}
-            <span className="text-lg cursor-pointer text-gray-400 hover:text-gray-600">🔔</span>
-            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white text-[12px] font-bold cursor-pointer">A</div>
-          </div>
-        </header>
+        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         {reviewTarget ? (
           <ProjectReview
@@ -263,7 +251,7 @@ export default function AdminApprovals() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 lp-stagger">
             {[
               { label: "Pending Review",    value: pending,  sub: `↑ 12%`, subColor: "text-green-500" },
               { label: "Approved (MoM)",    value: approved + 142, sub: null },
@@ -299,7 +287,7 @@ export default function AdminApprovals() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="lp-stagger">
                 {filtered.length > 0 ? filtered.map((p, i) => (
                   <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${i < filtered.length - 1 ? "border-b border-gray-100" : ""}`}>
                     {/* Title */}

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CreatorMyProjects from "./CreatorMyProjects";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
+import DashboardHeader from "../components/layout/DashboardHeader";
+import rmitLogo from "../assets/rmit-logo.png";
 import {
   CREATOR_DISCUSSIONS as DISCUSSIONS,
   CREATOR_TIERS as TIERS,
@@ -44,18 +46,18 @@ export default function CreatorDashboard() {
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:translate-x-0`}
         >
-          <div className="px-5 py-4 border-b border-gray-200">
-            <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+          <div className="px-5 py-5 border-b border-gray-200 flex items-center gap-2.5">
+            <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+              {/* Replace this src with your actual RMIT logo */}
+              <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+              <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
+            </div>
+            <div>
+              <div className="text-[11px] font-extrabold text-gray-900">CREATOR STUDIO</div>
+            </div>
           </div>
 
           <div className="px-4 py-4 border-b border-gray-200">
-            <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
-              <div>
-                <div className="text-[13px] font-bold text-gray-900">Project Creator</div>
-                <div className="text-[11px] text-gray-400">School of Design</div>
-              </div>
-            </div>
             <button
               onClick={() => { navigate("/create-project"); setSidebarOpen(false); }}
               className="w-full bg-brand hover:bg-red-800 text-white text-[11px] font-bold tracking-wide py-1.5 rounded mb-1.5 transition-colors cursor-pointer border-none"
@@ -85,17 +87,12 @@ export default function CreatorDashboard() {
           </nav>
 
           <div className="p-2 border-t border-gray-200">
-            {["? Help Center", "→ Logout"].map(l => (
-              <button key={l} className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">{l}</button>
-            ))}
+            <button className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">? Support</button>
           </div>
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <header className="bg-white border-b border-gray-200 h-14 flex items-center px-4 md:hidden shrink-0">
-            <button onClick={() => setSidebarOpen(true)} className="text-gray-500 hover:text-gray-900 text-xl cursor-pointer mr-3 bg-transparent border-none">☰</button>
-            <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
-          </header>
+          <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
           <CreatorMyProjects
             embedded
             onBack={() => { setShowMyProjects(false); setActive("dashboard"); }}
@@ -124,18 +121,18 @@ export default function CreatorDashboard() {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-4 border-b border-gray-200">
-          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
+        <div className="px-5 py-5 border-b border-gray-200 flex items-center gap-2.5">
+          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
+            {/* Replace this src with your actual RMIT logo */}
+            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
+            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
+          </div>
+          <div>
+            <div className="text-[11px] font-extrabold text-gray-900">CREATOR STUDIO</div>
+          </div>
         </div>
 
         <div className="px-4 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
-            <div>
-              <div className="text-[13px] font-bold text-gray-900">Project Creator</div>
-              <div className="text-[11px] text-gray-400">School of Design</div>
-            </div>
-          </div>
           <button
             onClick={() => {
               navigate("/create-project");
@@ -174,23 +171,13 @@ export default function CreatorDashboard() {
         </nav>
 
         <div className="p-2 border-t border-gray-200">
-          {["? Help Center", "→ Logout"].map(l => (
-            <button key={l} className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">{l}</button>
-          ))}
+          <button className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">? Support</button>
         </div>
       </aside>
 
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 h-14 flex items-center px-4 md:hidden shrink-0">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-500 hover:text-gray-900 focus:outline-none text-xl cursor-pointer mr-3"
-          >
-            ☰
-          </button>
-          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
-        </header>
+        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
@@ -201,7 +188,7 @@ export default function CreatorDashboard() {
           </div>
 
           {/* Top stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5 lp-stagger">
             {/* Funding card */}
             <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex justify-between items-start mb-2">
@@ -243,7 +230,7 @@ export default function CreatorDashboard() {
           </div>
 
           {/* Bottom row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lp-stagger">
             {/* Discussions */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Community Discussions</h3>
