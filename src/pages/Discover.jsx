@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import useWindowWidth from "../hooks/useWindowWidth";
 import { useAuth } from "../context/AuthContext";
-import { FRESH, HERO_PROJECTS, TRENDING, FILTERS, FILTER_TAGS } from "../mock";
+import { ALL_PROJECTS, HERO_PROJECTS, TRENDING, FILTERS, FILTER_TAGS, PROJECT_DETAILS } from "../mock";
 
-function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
+function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner, onEdit }) {
   return (
     <Link to={`/project/${project.id}`} style={{ textDecoration: "none", color: "inherit", ...style }}>
       <div
@@ -62,9 +62,37 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
             </p>
           )}
 
-          {/* Visual CTA only — the wrapping Link handles navigation to the
-              project page, where the real investment modal lives. */}
-          {showDesc && canInvest && (
+          {/* Owner's CTA: a real edit button that intercepts the click and
+              routes to project management — the image/card still navigates to
+              the detail page via the wrapping Link. Everyone else sees the
+              invest CTA, which is decoration only (the Link carries the click
+              to the detail page, where the investment modal lives). */}
+          {showDesc && isOwner ? (
+            <span
+              role="button"
+              onClick={e => { e.preventDefault(); e.stopPropagation(); onEdit(); }}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "6px",
+                background: "#cc0000", color: "#fff", borderRadius: "5px",
+                fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
+                padding: "8px 18px", cursor: "pointer",
+                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = "#aa0000";
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+              EDIT THIS PROJECT
+            </span>
+          ) : showDesc && canInvest ? (
             <span
               style={{
                 display: "inline-block",
@@ -86,7 +114,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
             >
               INVEST IN THIS PROJECT
             </span>
-          )}
+          ) : null}
 
           {showFundingBar && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
@@ -102,13 +130,19 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest }) {
   );
 }
 
-const FRESH_PREVIEW_COUNT = 3;
+const PROJECTS_PREVIEW_COUNT = 6;
 
 export default function Discover() {
-  const { canInvest } = useAuth();
+  const { canInvest, user } = useAuth();
+  const navigate = useNavigate();
+
+  // Ownership lives in PROJECT_DETAILS (single source of truth); the hero
+  // listing mirrors it by id. Owner -> "Edit" CTA instead of "Invest".
+  const ownsProject = id => !!user && PROJECT_DETAILS[id]?.ownerId === user.username;
+  const goToEdit = () => navigate("/creator-my-projects");
 
   const [activeFilter, setActiveFilter] = useState("ALL");
-  const [showAllFresh, setShowAllFresh] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -118,7 +152,9 @@ export default function Discover() {
   const isTablet = w >= 640 && w < 1024;
   const isDesktop = w >= 1024;
 
-  const filteredFresh = FRESH.filter(p => {
+  // Search and filters run over the whole catalogue, so a query reaches every
+  // project (hero + trending + fresh), not just the ones shown in this grid.
+  const filteredProjects = ALL_PROJECTS.filter(p => {
     const matchFilter =
       activeFilter === "ALL" || (FILTER_TAGS[activeFilter] || []).includes(p.tag);
     const matchSearch =
@@ -131,7 +167,7 @@ export default function Discover() {
   // Once expanded, stay expanded across filter/search changes — "show me
   // everything" is the user's standing intent, not a per-tag setting.
   // Only a remount (refresh, or arriving from another page) collapses it.
-  const visibleFresh = showAllFresh ? filteredFresh : filteredFresh.slice(0, FRESH_PREVIEW_COUNT);
+  const visibleProjects = showAll ? filteredProjects : filteredProjects.slice(0, PROJECTS_PREVIEW_COUNT);
 
   // Matches the `!search` check above, so " " counts as searching either way.
   const isSearching = search !== "";
@@ -169,7 +205,10 @@ export default function Discover() {
           <HeroCard
             project={HERO_PROJECTS[0]}
             showDesc={!isMobile}
+            showFundingBar
             canInvest={canInvest}
+            isOwner={ownsProject(HERO_PROJECTS[0].id)}
+            onEdit={goToEdit}
             style={{
               gridRow: isDesktop ? "1 / 3" : "auto",
               gridColumn: isTablet ? "1 / -1" : "auto",
@@ -186,6 +225,7 @@ export default function Discover() {
           {!isMobile && (
             <HeroCard
               project={HERO_PROJECTS[2]}
+              showFundingBar
               style={{ height: isTablet ? "180px" : `${SMALL_H}px` }}
             />
           )}
@@ -199,7 +239,7 @@ export default function Discover() {
               <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Projects gaining momentum across RMIT.</p>
             </div>
             <a
-              href="#fresh"
+              href="#all"
               style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none", display: "inline-block", transition: "opacity 0.15s, transform 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "translateX(3px)"; }}
               onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(0)"; }}
@@ -216,8 +256,8 @@ export default function Discover() {
           </div>
         </div>
 
-        {/* ── Fresh Ideas ── */}
-        <div id="fresh" style={{ marginBottom: isMobile ? "32px" : "48px" }}>
+        {/* ── All Projects ── */}
+        <div id="all" style={{ marginBottom: isMobile ? "32px" : "48px" }}>
           <div style={{
             display: "flex",
             flexDirection: isMobile ? "column" : "row",
@@ -227,8 +267,8 @@ export default function Discover() {
             marginBottom: "16px",
           }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>Fresh Ideas</h2>
-              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Recently launched campaigns seeking initial backing.</p>
+              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>All Projects</h2>
+              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Browse and search every campaign on RMIT Launchpad.</p>
             </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {FILTERS.map(f => (
@@ -279,8 +319,8 @@ export default function Discover() {
               gap: "14px",
             }}
           >
-            {visibleFresh.length > 0 ? (
-              visibleFresh.map(p => <ProjectCard key={p.id} project={p} />)
+            {visibleProjects.length > 0 ? (
+              visibleProjects.map(p => <ProjectCard key={p.id} project={p} />)
             ) : (
               <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "48px 24px", color: "#aaa" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
@@ -290,10 +330,10 @@ export default function Discover() {
             )}
           </div>
 
-          {!showAllFresh && filteredFresh.length > FRESH_PREVIEW_COUNT && (
+          {!showAll && filteredProjects.length > PROJECTS_PREVIEW_COUNT && (
           <div style={{ textAlign: "center", marginTop: "28px" }}>
             <button
-              onClick={() => setShowAllFresh(true)}
+              onClick={() => setShowAll(true)}
               style={{
                 background: "#fff", border: "1px solid #ccc", borderRadius: "5px",
                 fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em",

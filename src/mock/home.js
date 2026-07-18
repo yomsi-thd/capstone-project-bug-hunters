@@ -115,6 +115,13 @@ export const FRESH = [
   },
 ];
 
+// The full catalogue: hero + trending + fresh are three orderings over one
+// pool, so concatenating them (ids are unique) gives every project exactly
+// once. Discover's "All Projects" grid, search and filters run over this so a
+// query reaches every project, not just the Fresh subset.
+// TODO: replace with GET /projects when the backend is ready.
+export const ALL_PROJECTS = [...HERO_PROJECTS, ...TRENDING, ...FRESH];
+
 export const NAV_LINKS = [
   { label: "Discover", path: "/discover" },
   { label: "Departments", path: "#" },
