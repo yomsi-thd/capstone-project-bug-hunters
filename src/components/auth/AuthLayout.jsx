@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
+import rmitBg from "../../assets/rmit.jpg";
 
-// Subtle building background to evoke the RMIT campus, matching mockup page 2.
-const BG_IMAGE = "https://images.unsplash.com/photo-1496307653780-42ee777d4833?w=1600&q=80";
+// Real RMIT campus photo (bundled from src/assets so it works offline too).
+const BG_IMAGE = rmitBg;
 
 export default function AuthLayout({ children, isMobile }) {
   return (
@@ -18,11 +19,10 @@ export default function AuthLayout({ children, isMobile }) {
         position: "absolute", inset: 0,
         backgroundImage: `url(${BG_IMAGE})`,
         backgroundSize: "cover", backgroundPosition: "center",
-        filter: "grayscale(40%)",
       }} />
       <div style={{
         position: "absolute", inset: 0,
-        background: "linear-gradient(180deg, rgba(247,247,245,0.92) 0%, rgba(247,247,245,0.96) 100%)",
+        background: "linear-gradient(180deg, rgba(247,247,245,0.45) 0%, rgba(247,247,245,0.62) 100%)",
       }} />
 
       {/* Decorative floating shapes for a modern touch */}

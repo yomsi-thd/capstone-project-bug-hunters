@@ -14,6 +14,9 @@ export default function Register() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  // Everyone signs up as a Backer; Creator is an optional request that an
+  // admin must approve before the user can publish projects.
+  const [requestCreator, setRequestCreator] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,7 +46,8 @@ export default function Register() {
     if (!validate()) return;
 
     setIsSubmitting(true);
-    // TODO: call authService.register({ fullName, identifier, password }) when backend is ready
+    // TODO: call authService.register({ fullName, identifier, password, roles: ["backer"] })
+    // and, if requestCreator, POST /role-requests { role: "creator" } for admin approval.
     setTimeout(() => {
       setIsSubmitting(false);
       setShowSuccess(true);
@@ -94,6 +98,44 @@ export default function Register() {
           placeholder="Re-enter your password"
           error={errors.confirmPassword}
         />
+
+        {/* Account type: Backer is granted to everyone; Creator is an
+            approval-gated request. Admin is intentionally NOT self-requestable
+            here — it's provisioned by an existing admin (least privilege). */}
+        <div style={{ marginBottom: "22px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", color: "#888", marginBottom: "10px" }}>
+            ACCOUNT TYPE
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#777", cursor: "default" }}>
+              <input
+                type="checkbox"
+                checked
+                disabled
+                style={{ width: "15px", height: "15px", accentColor: "#cc0000", marginTop: "1px", flexShrink: 0 }}
+              />
+              <span>
+                <strong style={{ color: "#333" }}>Backer</strong> — support and invest in projects{" "}
+                <span style={{ color: "#aaa" }}>(default, always on)</span>
+              </span>
+            </label>
+
+            <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#555", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={requestCreator}
+                onChange={e => setRequestCreator(e.target.checked)}
+                style={{ width: "15px", height: "15px", accentColor: "#cc0000", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
+              />
+              <span>
+                <strong style={{ color: "#333" }}>Creator</strong> — publish and edit your own projects
+                <span style={{ display: "block", fontSize: "12px", color: "#999", marginTop: "2px" }}>
+                  Requires admin approval before you can publish.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
 
         <div style={{ marginBottom: "22px" }}>
           <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#555", cursor: "pointer" }}>
@@ -166,10 +208,18 @@ export default function Register() {
           borderRadius: "8px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.03em",
           padding: "13px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          transition: "background 0.15s, transform 0.12s",
+          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "#0d0d28"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "#1a1a3d"; e.currentTarget.style.transform = "translateY(0)"; }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "#0d0d28";
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = "0 6px 16px rgba(26,26,61,0.35)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "#1a1a3d";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         SIGN UP WITH RMIT SSO
@@ -190,7 +240,10 @@ export default function Register() {
     </AuthLayout>
 
     {showSuccess && (
-      <RegisterSuccessModal onGoToLogin={() => navigate("/login")} />
+      <RegisterSuccessModal
+        requestedRole={requestCreator ? "Creator" : null}
+        onGoToLogin={() => navigate("/login")}
+      />
     )}
     </>
   );

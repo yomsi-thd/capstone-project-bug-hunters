@@ -1,4 +1,4 @@
-export default function RegisterSuccessModal({ onGoToLogin }) {
+export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null }) {
   return (
     <div
       className="lp-overlay"
@@ -30,9 +30,30 @@ export default function RegisterSuccessModal({ onGoToLogin }) {
           ACCOUNT CREATED
         </h2>
 
-        <p style={{ fontSize: "14px", color: "#666", lineHeight: 1.7, margin: "0 0 28px" }}>
-          You've successfully registered with RMIT Launchpad. Please sign in to start exploring and validating ideas.
-        </p>
+        {requestedRole ? (
+          <>
+            <p style={{ fontSize: "14px", color: "#666", lineHeight: 1.7, margin: "0 0 16px" }}>
+              You've successfully registered as a <strong>Backer</strong>. You can sign in and start exploring right away.
+            </p>
+            <div style={{
+              display: "flex", gap: "10px", alignItems: "flex-start", textAlign: "left",
+              border: "1px solid #f0d000", background: "#fffbe6", borderRadius: "8px",
+              padding: "12px 14px", margin: "0 0 28px",
+            }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b58900" strokeWidth="2" style={{ flexShrink: 0, marginTop: "1px" }}>
+                <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span style={{ fontSize: "13px", color: "#7a5c00", lineHeight: 1.6 }}>
+                Your request for <strong>{requestedRole}</strong> access has been submitted and is
+                {" "}<strong>pending admin review</strong>. You'll be able to publish projects once an admin approves it.
+              </span>
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: "14px", color: "#666", lineHeight: 1.7, margin: "0 0 28px" }}>
+            You've successfully registered with RMIT Launchpad. Please sign in to start exploring and validating ideas.
+          </p>
+        )}
 
         <button
           onClick={onGoToLogin}

@@ -145,10 +145,18 @@ export default function Login() {
           borderRadius: "8px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.03em",
           padding: "13px", cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          transition: "background 0.15s, transform 0.12s",
+          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
         }}
-        onMouseEnter={e => { e.currentTarget.style.background = "#0d0d28"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = "#1a1a3d"; e.currentTarget.style.transform = "translateY(0)"; }}
+        onMouseEnter={e => {
+          e.currentTarget.style.background = "#0d0d28";
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = "0 6px 16px rgba(26,26,61,0.35)";
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = "#1a1a3d";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         SIGN IN WITH RMIT SSO
