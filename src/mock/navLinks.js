@@ -9,7 +9,7 @@ export const NAV_LINKS_LOGGED_OUT = [
 
 export const NAV_LINKS_LOGGED_IN = [
   { label: "Discover", path: "/discover" },
-  { label: "My Projects", path: "/my-projects" },
+  { label: "My Projects", path: "/creator-my-projects" },
   { label: "My Investments", path: "/investments" },
   { label: "Departments", path: "#" },
   { label: "About", path: "#" },
@@ -30,7 +30,7 @@ export function getNavLinksForUser(user) {
   const isBackerOrAdmin = roles.includes("backer") || roles.includes("admin");
 
   const links = [{ label: "Discover", path: "/discover" }];
-  if (isCreator) links.push({ label: "My Projects", path: "/my-projects" });
+  if (isCreator) links.push({ label: "My Projects", path: "/creator-my-projects" });
   if (isBackerOrAdmin) links.push({ label: "My Investments", path: "/investments" });
   links.push({ label: "Departments", path: "#" });
   links.push({ label: "About", path: "#" });

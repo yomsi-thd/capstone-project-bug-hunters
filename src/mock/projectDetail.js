@@ -5,6 +5,10 @@
 export const PROJECT_DETAILS = {
   1: {
     id: 1,
+    // Owner is the account (AuthContext username) that created this project.
+    // When that user views the page they get "EDIT THIS PROJECT" instead of invest.
+    // TODO: replace with the ownerId returned by GET /projects/:id when backend is ready.
+    ownerId: "student1",
     tag: "ENGINEERING",
     title: "Autonomous Swarm Drones for Urban Search & Rescue",
     creator: {

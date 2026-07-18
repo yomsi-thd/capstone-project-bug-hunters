@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
@@ -95,7 +95,8 @@ function EndorsedBadge() {
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const { isLoggedIn, canInvest, balance } = useAuth();
+  const { isLoggedIn, canInvest, balance, user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -162,6 +163,12 @@ export default function ProjectDetail() {
     );
   }
 
+  // The signed-in user owns this project -> they edit it instead of investing.
+  const isOwner = isLoggedIn && !!p.ownerId && user?.username === p.ownerId;
+  // TODO: deep-link to edit this exact project once a backed edit route exists;
+  // for now send the creator to their project management page.
+  const goToEdit = () => navigate("/creator-my-projects");
+
   const tabs = [
     { id: "about", label: "About" },
     { id: "rewards", label: "Rewards" },
@@ -226,7 +233,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={isMobile} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={isMobile} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -307,7 +314,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={false} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -333,7 +340,7 @@ export default function ProjectDetail() {
   );
 }
 
-function FundingSidebar({ p, canInvest, isMobile, onInvest }) {
+function FundingSidebar({ p, canInvest, isMobile, isOwner, onEdit, onInvest }) {
   return (
     <div style={{
       border: "1px solid #e5e7eb", borderRadius: "10px",
@@ -368,36 +375,72 @@ function FundingSidebar({ p, canInvest, isMobile, onInvest }) {
         </div>
       </div>
 
-      <button
-        disabled={!canInvest}
-        onClick={() => canInvest && onInvest()}
-        style={{
-          width: "100%", background: canInvest ? "#cc0000" : "#ccc",
-          color: "#fff", border: "none", borderRadius: "6px",
-          fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
-          padding: "14px", cursor: canInvest ? "pointer" : "not-allowed",
-          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-        }}
-        onMouseEnter={e => {
-          if (!canInvest) return;
-          e.currentTarget.style.background = "#aa0000";
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
-        }}
-        onMouseLeave={e => {
-          if (!canInvest) return;
-          e.currentTarget.style.background = "#cc0000";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        INVEST IN THIS PROJECT
-      </button>
+      {isOwner ? (
+        <>
+          <button
+            onClick={onEdit}
+            style={{
+              width: "100%", background: "#cc0000",
+              color: "#fff", border: "none", borderRadius: "6px",
+              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
+              padding: "14px", cursor: "pointer",
+              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "#aa0000";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+            EDIT THIS PROJECT
+          </button>
 
-      <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-        All or nothing funding model.
-      </p>
+          <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+            You are the creator of this project.
+          </p>
+        </>
+      ) : (
+        <>
+          <button
+            disabled={!canInvest}
+            onClick={() => canInvest && onInvest()}
+            style={{
+              width: "100%", background: canInvest ? "#cc0000" : "#ccc",
+              color: "#fff", border: "none", borderRadius: "6px",
+              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
+              padding: "14px", cursor: canInvest ? "pointer" : "not-allowed",
+              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+            }}
+            onMouseEnter={e => {
+              if (!canInvest) return;
+              e.currentTarget.style.background = "#aa0000";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
+            }}
+            onMouseLeave={e => {
+              if (!canInvest) return;
+              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            INVEST IN THIS PROJECT
+          </button>
+
+          <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+            All or nothing funding model.
+          </p>
+        </>
+      )}
 
       {p.endorsed && <EndorsedBadge />}
     </div>
