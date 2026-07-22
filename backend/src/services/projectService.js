@@ -11,7 +11,8 @@ async function createProject(userId, data) {
         goal_amount: data.goal_amount,
         current_amount: 0,
         image_url: data.image_url,
-        status: "PENDING"
+        status: "PENDING",
+        team_members: data.team_members || []
     };
 
     return await projectRepository.createProject(project);
@@ -46,6 +47,15 @@ async function updateProject(projectId, userId, data) {
     if (project.creator_id !== userId) {
         throw new Error("Unauthorized");
     }
+
+    const updatedProject = {
+        title: data.title ?? project.title,
+        description: data.description ?? project.description,
+        category: data.category ?? project.category,
+        goal_amount: data.goal_amount ?? project.goal_amount,
+        image_url: data.image_url ?? project.image_url,
+        team_members: data.team_members ?? project.team_members
+    };
 
     return await projectRepository.updateProject(projectId, data);
 }

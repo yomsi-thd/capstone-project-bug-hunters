@@ -13,9 +13,10 @@ async function createProject(project) {
             goal_amount,
             current_amount,
             image_url,
-            status
+            status,
+            team_members
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
         RETURNING *
         `,
         [
@@ -26,7 +27,8 @@ async function createProject(project) {
             project.goal_amount,
             project.current_amount,
             project.image_url,
-            project.status
+            project.status,
+            JSON.stringify(project.team_members)
         ]
     );
 
@@ -63,8 +65,9 @@ async function updateProject(id, project) {
             category=$3,
             goal_amount=$4,
             image_url=$5,
+            team_members=$6,
             updated_at=CURRENT_TIMESTAMP
-        WHERE id=$6
+        WHERE id=$7
         RETURNING *
         `,
         [
@@ -73,6 +76,7 @@ async function updateProject(id, project) {
             project.category,
             project.goal_amount,
             project.image_url,
+            project.team_members,
             id
         ]
     );
