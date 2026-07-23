@@ -4,7 +4,9 @@ import { createContext, useContext, useEffect, useMemo, useState } from "react";
 // Mock accounts for testing until a real backend is wired in.
 // A user can hold multiple roles; these two personas cover the app's cases.
 //   student  = Backer + Creator  -> sees everything
-//   lecturer = Admin  + Backer   -> everything except My Projects / Start a Project
+//   lecturer = Admin  + Backer   -> Admin is a superuser, so this sees everything too
+// Admins can access every function, so admin implies both creator (create/manage
+// projects) and backer (invest) capabilities in the derived permissions below.
 const ACCOUNTS = {
   student1: {
     password: "student1@",
@@ -82,6 +84,8 @@ export function AuthProvider({ children }) {
       isCreator,
       isAdmin,
       isBacker,
+      // Who can create/manage projects: Creators, plus Admins (superuser).
+      canCreate: isCreator || isAdmin,
       // Creators alone cannot invest; Backers and Admins can.
       canInvest: isBacker || isAdmin,
       balance: user?.balance ?? 0,
