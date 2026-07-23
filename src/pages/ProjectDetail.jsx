@@ -99,8 +99,6 @@ export default function ProjectDetail() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState("");
 
   const w = useWindowWidth();
   const isMobile = w < 640;
@@ -180,12 +178,9 @@ export default function ProjectDetail() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        search={search}
-        setSearch={setSearch}
+        showSearch={false}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-        searchOpen={searchOpen}
-        setSearchOpen={setSearchOpen}
         isMobile={isMobile}
         isTablet={isTablet}
         isDesktop={isDesktop}
@@ -233,7 +228,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={isMobile} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -314,7 +309,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} isMobile={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -340,13 +335,14 @@ export default function ProjectDetail() {
   );
 }
 
-function FundingSidebar({ p, canInvest, isMobile, isOwner, onEdit, onInvest }) {
+function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
   return (
     <div style={{
       border: "1px solid #e5e7eb", borderRadius: "10px",
       background: "#fff", padding: "22px",
-      position: "sticky", top: "72px",
-      marginBottom: isMobile ? "28px" : "0",
+      position: sticky ? "sticky" : "static",
+      top: sticky ? "72px" : undefined,
+      marginBottom: sticky ? "0" : "28px",
     }}>
       <FundingBar percent={p.stats.funded} />
 

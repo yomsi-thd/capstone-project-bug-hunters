@@ -48,9 +48,16 @@ export default function Header(props = {}) {
 
   const pick = (value, fallback) => (value !== undefined ? value : fallback);
 
-  const isMobile = pick(props.isMobile, w < 640);
-  const isTablet = pick(props.isTablet, w >= 640 && w < 1024);
-  const isDesktop = pick(props.isDesktop, w >= 1024);
+  // The header owns its OWN breakpoints (it ignores any isMobile/isTablet/
+  // isDesktop passed in) because its layout has a tighter constraint than the
+  // pages': the full desktop nav — links + balance + CTA + account + logout,
+  // plus search on Discover — needs ~1180px and overflows below that. So the
+  // desktop threshold is 1200, not the pages' 1024. This collapses the header
+  // to the hamburger layout on 1024–1199 widths (e.g. iPad Pro 12.9" portrait)
+  // even though the page content there still lays out as desktop and fits.
+  const isMobile = w < 640;
+  const isTablet = w >= 640 && w < 1200;
+  const isDesktop = w >= 1200;
 
   const isLoggedIn = pick(props.isLoggedIn, auth.isLoggedIn);
   const ccBalance = pick(props.ccBalance, auth.balance);
@@ -60,8 +67,12 @@ export default function Header(props = {}) {
 
   // Role-derived visibility: only Creators start projects; only Backers/Admins
   // hold a Class Coin balance.
-  const canCreate = pick(props.isCreator, auth.isCreator);
+  const canCreate = pick(props.canCreate, auth.canCreate);
   const showBalance = pick(props.showBalance, auth.canInvest);
+  // Search only belongs on pages with a project catalogue to search (Discover).
+  // Defaults to true for backward compatibility; pages without a searchable
+  // collection pass showSearch={false} to hide the box, toggle, and dropdown.
+  const showSearch = pick(props.showSearch, true);
 
   const search = pick(props.search, searchState);
   const setSearch = pick(props.setSearch, setSearchState);
@@ -79,11 +90,15 @@ export default function Header(props = {}) {
 
   return (
     <>
+      {/* Sticky header stack: the bar + the mobile/tablet search dropdown. The
+          search dropdown lives in-flow here so it PUSHES page content down
+          instead of covering the results it just filtered. */}
+      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
       <nav style={{
         background: "#fff", borderBottom: "1px solid #ececec",
         padding: isMobile ? "0 16px" : "0 40px",
         display: "flex", alignItems: "center", gap: isMobile ? "8px" : "16px",
-        height: "56px", position: "sticky", top: 0, zIndex: 100,
+        height: "56px",
       }}>
         {/* Logo */}
         <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
@@ -92,8 +107,8 @@ export default function Header(props = {}) {
           </div>
         </Link>
 
-        {/* Desktop nav links */}
-        {!isMobile && (
+        {/* Desktop nav links (tablet folds these into the hamburger to avoid overflow) */}
+        {isDesktop && (
           <div style={{ display: "flex", gap: "4px", flex: 1 }}>
             {navLinks.map(({ label, path }) => (
               path.startsWith("#") ? (
@@ -140,10 +155,10 @@ export default function Header(props = {}) {
           </div>
         )}
 
-        {isMobile && <div style={{ flex: 1 }} />}
+        {!isDesktop && <div style={{ flex: 1 }} />}
 
         {/* Desktop search */}
-        {isDesktop && (
+        {isDesktop && showSearch && (
           <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "6px 12px", width: "200px" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ border: "none", background: "none", outline: "none", fontSize: "13px", color: "#333", width: "100%" }} />
@@ -151,7 +166,7 @@ export default function Header(props = {}) {
         )}
 
         {/* Mobile/tablet search toggle */}
-        {(isTablet || isMobile) && (
+        {(isTablet || isMobile) && showSearch && (
           <button
             onClick={() => setSearchOpen(v => !v)}
             style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px", borderRadius: "4px", transition: "background 0.15s" }}
@@ -249,14 +264,14 @@ export default function Header(props = {}) {
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
                 onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
-              >START</Link>
+              >START A PROJECT</Link>
             )}
             <Avatar userName={userName} />
           </>
         )}
 
-        {/* Mobile hamburger */}
-        {isMobile && (
+        {/* Hamburger (mobile + tablet) */}
+        {!isDesktop && (
           <button
             onClick={() => setMenuOpen(v => !v)}
             style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444", borderRadius: "4px", transition: "background 0.15s" }}
@@ -269,19 +284,32 @@ export default function Header(props = {}) {
         )}
       </nav>
 
-      {/* Search dropdown (mobile/tablet) */}
-      {(isMobile || isTablet) && searchOpen && (
-        <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px" }}>
+      {/* Search dropdown (mobile/tablet) — in-flow inside the sticky header so it
+          pushes content down (never covers results) and rides with the nav. */}
+      {(isMobile || isTablet) && showSearch && searchOpen && (
+        <div style={{
+          background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px",
+          boxShadow: "0 8px 16px rgba(0,0,0,0.08)",
+        }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "8px 12px" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." autoFocus style={{ border: "none", background: "none", outline: "none", fontSize: "14px", color: "#333", width: "100%" }} />
           </div>
         </div>
       )}
+      </div>
 
-      {/* Mobile menu */}
-      {isMobile && menuOpen && (
-        <div style={{ background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px" }}>
+      {/* Dropdown menu (mobile + tablet). Tablet only lists nav links — its
+          balance/create/login controls already sit on the bar, so those blocks
+          below are gated to mobile-only. Fixed overlay under the sticky nav so it
+          shows at the current scroll position instead of the top of the page. */}
+      {!isDesktop && menuOpen && (
+        <div style={{
+          background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px",
+          position: "fixed", top: "56px", left: 0, right: 0, zIndex: 99,
+          maxHeight: "calc(100vh - 56px)", overflowY: "auto",
+          boxShadow: "0 8px 16px rgba(0,0,0,0.08)",
+        }}>
           {navLinks.map(({ label, path }) => (
             path.startsWith("#") ? (
               <a
@@ -310,7 +338,7 @@ export default function Header(props = {}) {
             )
           ))}
 
-          {!isLoggedIn && (
+          {isMobile && !isLoggedIn && (
             <div style={{ marginTop: "12px" }}>
               <Link
                 to="/login" onClick={() => setMenuOpen(false)}
@@ -327,12 +355,14 @@ export default function Header(props = {}) {
 
           {isLoggedIn && (
             <div style={{ marginTop: "12px" }}>
-              {showBalance && (
+              {/* Balance + Start already sit on the tablet bar, so show them in
+                  the menu on mobile only; Account + Logout show on both. */}
+              {isMobile && showBalance && (
                 <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
                   Balance: {ccBalance.toLocaleString()} CC
                 </div>
               )}
-              {canCreate && (
+              {isMobile && canCreate && (
                 <Link
                   to="/create-project" onClick={() => setMenuOpen(false)}
                   style={{
