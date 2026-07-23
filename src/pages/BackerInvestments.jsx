@@ -185,8 +185,7 @@ export default function BackerInvestments() {
   const { isLoggedIn } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
 
   const w = useWindowWidth();
   const isMobile = w < 640;
@@ -195,17 +194,23 @@ export default function BackerInvestments() {
 
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 
+  // Local filter over the user's own investments (title / tag / description).
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? MY_INVESTMENTS.filter(inv =>
+        inv.title.toLowerCase().includes(q) ||
+        (inv.tag && inv.tag.toLowerCase().includes(q)) ||
+        (inv.desc && inv.desc.toLowerCase().includes(q)))
+    : MY_INVESTMENTS;
+
   return (
     <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header
-        search={search}
-        setSearch={setSearch}
+        showSearch={false}
         menuOpen={menuOpen}
         setMenuOpen={setMenuOpen}
-        searchOpen={searchOpen}
-        setSearchOpen={setSearchOpen}
         isMobile={isMobile}
         isTablet={isTablet}
         isDesktop={isDesktop}
@@ -221,9 +226,42 @@ export default function BackerInvestments() {
 
         {isLoggedIn ? (
           MY_INVESTMENTS.length > 0 ? (
-            MY_INVESTMENTS.map(inv => (
-              <InvestmentCard key={inv.id} investment={inv} isMobile={isMobile} />
-            ))
+            <>
+              {/* Local filter — sits right above the list it filters. */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: "8px",
+                background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px",
+                padding: "10px 14px", marginBottom: "24px",
+                maxWidth: isMobile ? "100%" : "380px",
+              }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search my investments..."
+                  style={{ border: "none", background: "none", outline: "none", fontSize: "14px", color: "#333", width: "100%" }}
+                />
+                {query && (
+                  <button
+                    onClick={() => setQuery("")}
+                    aria-label="Clear search"
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: "14px", lineHeight: 1, padding: 0 }}
+                  >✕</button>
+                )}
+              </div>
+
+              {filtered.length > 0 ? (
+                filtered.map(inv => (
+                  <InvestmentCard key={inv.id} investment={inv} isMobile={isMobile} />
+                ))
+              ) : (
+                <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600 }}>No investments match “{query}”</div>
+                  <div style={{ fontSize: "13px", marginTop: "4px" }}>Try a different search term</div>
+                </div>
+              )}
+            </>
           ) : (
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
               <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>

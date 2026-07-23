@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
@@ -172,6 +172,35 @@ export default function Discover() {
   // Matches the `!search` check above, so " " counts as searching either way.
   const isSearching = search !== "";
 
+  // Entering search mode moves the results to the top of the page; scroll there
+  // once so a user who searched from mid/bottom of the page sees the feedback.
+  // Guarded on the isSearching transition, so it fires when a query begins (not
+  // on every keystroke) and never when clearing the box back to browse mode.
+  useEffect(() => {
+    if (!isSearching) return;
+    // Scroll to the top so the results header is visible. We animate manually
+    // with rAF instead of `behavior:"smooth"` — native smooth scroll is
+    // unreliable right after hiding Hero/Trending (the layout shift drops the
+    // animation and strands the page mid-list). This always lands at the top,
+    // and respects reduced-motion by jumping instead.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      window.scrollTo(0, 0);
+      return;
+    }
+    let raf, startTime = null, start = null;
+    const duration = 380;
+    const step = t => {
+      if (start === null) { start = window.scrollY; startTime = t; }
+      if (start <= 0) return;
+      const p = Math.min((t - startTime) / duration, 1);
+      const ease = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      window.scrollTo(0, Math.round(start * (1 - ease)));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => { if (raf) cancelAnimationFrame(raf); };
+  }, [isSearching]);
+
   const pad = isMobile ? "20px 16px" : isTablet ? "24px 20px" : "32px 40px";
   const SMALL_H = 200;
   const GAP = 12;
@@ -192,8 +221,14 @@ export default function Discover() {
         isDesktop={isDesktop}
       />
 
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: pad }}>
+      {/* overflowAnchor:none — hiding Hero/Trending on search must not trigger
+          the browser's scroll-anchoring, which would fight our scroll-to-top. */}
+      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: pad, overflowAnchor: "none" }}>
 
+        {/* Hero + Trending are browse-only. Hide them while searching so the
+            results grid rises to the top and the query's feedback is visible. */}
+        {!isSearching && (
+        <>
         {/* ── Hero Grid ── */}
         <div className="lp-stagger" style={{
           display: "grid",
@@ -255,6 +290,8 @@ export default function Discover() {
             {TRENDING.map(p => <ProjectCard key={p.id} project={p} />)}
           </div>
         </div>
+        </>
+        )}
 
         {/* ── All Projects ── */}
         <div id="all" style={{ marginBottom: isMobile ? "32px" : "48px" }}>
@@ -267,8 +304,14 @@ export default function Discover() {
             marginBottom: "16px",
           }}>
             <div>
-              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>All Projects</h2>
-              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Browse and search every campaign on RMIT Launchpad.</p>
+              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>
+                {isSearching ? "Search results" : "All Projects"}
+              </h2>
+              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>
+                {isSearching
+                  ? `${filteredProjects.length} ${filteredProjects.length === 1 ? "project" : "projects"} found for “${search}”`
+                  : "Browse and search every campaign on RMIT Launchpad."}
+              </p>
             </div>
             <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
               {FILTERS.map(f => (
@@ -299,6 +342,28 @@ export default function Discover() {
                   {f}
                 </button>
               ))}
+              {isSearching && (
+                <button
+                  onClick={() => setSearch("")}
+                  style={{
+                    background: "#fff", color: "#cc0000",
+                    border: "1px solid #cc0000", borderRadius: "5px",
+                    fontSize: "12px", fontWeight: 700,
+                    padding: "5px 14px", cursor: "pointer",
+                    letterSpacing: "0.04em", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "#cc0000";
+                    e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "#fff";
+                    e.currentTarget.style.color = "#cc0000";
+                  }}
+                >
+                  ✕ CLEAR
+                </button>
+              )}
             </div>
           </div>
 
