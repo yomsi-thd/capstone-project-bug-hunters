@@ -1,7 +1,12 @@
 const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
 
 const userRepository = require("../repositories/userRepository");
+const refreshTokenRepository = require("../repositories/refreshTokenRepository");
+
+const {
+    generateAccessToken,
+    generateRefreshToken,
+} = require("../utils/jwt");
 
 async function register(fullName, email, password) {
 
@@ -38,19 +43,22 @@ async function login(email, password) {
         throw new Error("Invalid email or password");
     }
 
-    const token = jwt.sign(
-        {
-            id: user.id,
-            role: user.role
-        },
-        process.env.JWT_SECRET,
-        {
-            expiresIn: "1d"
-        }
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+
+    // expires in 7 days
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
+    await refreshTokenRepository.createToken(
+        user.id,
+        refreshToken,
+        expiresAt
     );
 
     return {
-        token,
+        accessToken,
+        refreshToken,
         user: {
             id: user.id,
             fullName: user.full_name,
@@ -60,7 +68,54 @@ async function login(email, password) {
     };
 }
 
+async function refreshToken(token) {
+
+    if (!token) {
+        throw new Error("Refresh token is required");
+    }
+
+    // Check if token exists in database
+    const storedToken =
+        await refreshTokenRepository.findByToken(token);
+
+    if (!storedToken) {
+        throw new Error("Invalid refresh token");
+    }
+
+    //Check Expiration in database
+    if (new Date() > storedToken.expires_at) {
+        await refreshTokenRepository.deleteToken(token);
+        throw new Error("Refresh token expired");
+    }
+    // Verify JWT
+    const payload = verifyRefreshToken(token);
+
+    const user = await userRepository.findById(payload.id);
+
+    if (!user) {
+        throw new Error("User not found");
+    }
+
+    // Create a new access token
+    const accessToken = generateAccessToken(user);
+
+    return {
+        accessToken
+    };
+}
+
+async function logout(token) {
+
+    if (!token) {
+        throw new Error("Refresh token is required");
+    }
+
+    await refreshTokenRepository.deleteToken(token);
+}
+
 module.exports = {
     register,
-    login
+    login,
+    refreshToken,
+    logout
 };
