@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
 import { CREATOR_MY_PROJECTS, CREATOR_SIDEBAR_LINKS } from "../mock";
+import DashboardHeader from "../components/layout/DashboardHeader";
 
 const DEPT_STYLE = {
   Engineering: "bg-blue-900 text-white",
@@ -101,7 +102,7 @@ function SimpleProjectCard({ project, onEdit }) {
               ✎ EDIT PROJECT
             </button>
             <button className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors">
-              VIEW ANALYTICS
+              PROJECT DETAILS
             </button>
           </div>
         </div>
@@ -262,15 +263,7 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white border-b border-gray-200 h-14 flex items-center px-4 md:hidden shrink-0">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-gray-500 hover:text-gray-900 focus:outline-none text-xl cursor-pointer mr-3"
-          >
-            ☰
-          </button>
-          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
-        </header>
+        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {projectContent}

@@ -17,7 +17,7 @@ const ACCOUNTS = {
   lecturer1: {
     password: "lecturer1@",
     name: "Lecturer One",
-    roles: ["admin", "backer"],
+    roles: ["backer"],
     balance: 4500,
   },
   creator1: {
@@ -66,8 +66,9 @@ export function AuthProvider({ children }) {
     if (!account || account.password !== password) {
       return { ok: false, error: "Invalid username or password" };
     }
-    setUser({ username: key, name: account.name, roles: account.roles, balance: account.balance });
-    return { ok: true };
+    const userObj = { username: key, name: account.name, roles: account.roles, balance: account.balance };
+    setUser(userObj);
+    return { ok: true, user: userObj };
   };
 
   const logout = () => setUser(null);

@@ -31,7 +31,8 @@ export function getNavLinksForUser(user) {
   const isBackerOrAdmin = roles.includes("backer") || isAdmin;
 
   const links = [{ label: "Discover", path: "/discover" }];
-  if (isCreator || isAdmin) links.push({ label: "My Projects", path: "/creator-my-projects" });
+  if (isAdmin) links.push({ label: "Admin Dashboard", path: "/admin-dashboard" });
+  if (isCreator) links.push({ label: "My Projects", path: "/creator-my-projects" });
   if (isBackerOrAdmin) links.push({ label: "My Investments", path: "/investments" });
   links.push({ label: "Departments", path: "#" });
   links.push({ label: "About", path: "#" });

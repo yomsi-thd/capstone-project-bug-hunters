@@ -36,10 +36,10 @@ export default function Login() {
       const result = login(identifier, password);
       setIsSubmitting(false);
       if (result.ok) {
-        const id = identifier.trim().toLowerCase();
-        if (id === "creator" || id === "creator1") {
+        const roles = result.user?.roles || [];
+        if (roles.includes("creator")) {
           navigate("/creator-dashboard");
-        } else if (id === "admin" || id === "admin1") {
+        } else if (roles.includes("admin")) {
           navigate("/admin-dashboard");
         } else {
           navigate("/discover");
