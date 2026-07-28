@@ -22,11 +22,26 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function createFileItem(file) {
+function isObjectUrl(value) {
+  return typeof value === "string" && value.startsWith("blob:");
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(reader.error || new Error("Failed to read file preview."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function createFileItem(file, dataUrl = "") {
   return {
     id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
     file,
     preview: URL.createObjectURL(file),
+    dataUrl,
   };
 }
 
@@ -46,6 +61,7 @@ function serializeMedia(media) {
           id: media.coverImage.id,
           fileName: media.coverImage.file?.name ?? media.coverImage.fileName,
           fileSize: media.coverImage.file?.size ?? media.coverImage.fileSize,
+          previewDataUrl: media.coverImage.dataUrl || (media.coverImage.preview && !isObjectUrl(media.coverImage.preview) ? media.coverImage.preview : ""),
         }
       : null,
     videoUrl: media.videoUrl || "",
@@ -59,6 +75,7 @@ function serializeMedia(media) {
       id: image.id,
       fileName: image.file?.name ?? image.fileName,
       fileSize: image.file?.size ?? image.fileSize,
+      previewDataUrl: image.dataUrl || (image.preview && !isObjectUrl(image.preview) ? image.preview : ""),
     })),
   };
 }
@@ -72,7 +89,8 @@ function restoreMedia(mediaDraft) {
             name: mediaDraft.coverImage.fileName || "Uploaded image",
             size: mediaDraft.coverImage.fileSize || 0,
           },
-          preview: null,
+          preview: mediaDraft.coverImage.previewDataUrl || null,
+          dataUrl: mediaDraft.coverImage.previewDataUrl || "",
         }
       : null,
     videoUrl: mediaDraft?.videoUrl || "",
@@ -90,7 +108,8 @@ function restoreMedia(mediaDraft) {
         name: image.fileName || "Uploaded image",
         size: image.fileSize || 0,
       },
-      preview: null,
+      preview: image.previewDataUrl || null,
+      dataUrl: image.previewDataUrl || "",
     })),
   };
 }
@@ -181,12 +200,13 @@ function Step2({ media, setMedia }) {
   const videoInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
-  const uploadCover = event => {
+  const uploadCover = async event => {
     const file = event.target.files?.[0];
     if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
     setMedia(prev => {
-      if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
-      return { ...prev, coverImage: createFileItem(file) };
+      if (prev.coverImage?.preview && isObjectUrl(prev.coverImage.preview)) URL.revokeObjectURL(prev.coverImage.preview);
+      return { ...prev, coverImage: createFileItem(file, dataUrl) };
     });
     event.target.value = "";
   };
@@ -198,12 +218,13 @@ function Step2({ media, setMedia }) {
     event.target.value = "";
   };
 
-  const uploadGallery = event => {
+  const uploadGallery = async event => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
+    const dataUrls = await Promise.all(files.map(file => readFileAsDataUrl(file)));
     setMedia(prev => {
       const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
-      const nextGallery = files.slice(0, remainingSlots).map(createFileItem);
+      const nextGallery = files.slice(0, remainingSlots).map((file, index) => createFileItem(file, dataUrls[index]));
       return { ...prev, galleryImages: [...prev.galleryImages, ...nextGallery] };
     });
     event.target.value = "";
@@ -211,7 +232,7 @@ function Step2({ media, setMedia }) {
 
   const removeCover = () => {
     setMedia(prev => {
-      if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
+      if (prev.coverImage?.preview && isObjectUrl(prev.coverImage.preview)) URL.revokeObjectURL(prev.coverImage.preview);
       return { ...prev, coverImage: null };
     });
   };
@@ -219,28 +240,30 @@ function Step2({ media, setMedia }) {
   const removeGalleryImage = id => {
     setMedia(prev => {
       const target = prev.galleryImages.find(image => image.id === id);
-      if (target?.preview) URL.revokeObjectURL(target.preview);
+      if (target?.preview && isObjectUrl(target.preview)) URL.revokeObjectURL(target.preview);
       return { ...prev, galleryImages: prev.galleryImages.filter(image => image.id !== id) };
     });
   };
 
-  const handleDrop = (event, kind) => {
+  const handleDrop = async (event, kind) => {
     event.preventDefault();
     const files = Array.from(event.dataTransfer.files || []);
     if (!files.length) return;
 
     if (kind === "cover") {
+      const dataUrl = await readFileAsDataUrl(files[0]);
       setMedia(prev => {
-        if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
-        return { ...prev, coverImage: createFileItem(files[0]) };
+        if (prev.coverImage?.preview && isObjectUrl(prev.coverImage.preview)) URL.revokeObjectURL(prev.coverImage.preview);
+        return { ...prev, coverImage: createFileItem(files[0], dataUrl) };
       });
       return;
     }
 
     if (kind === "gallery") {
+      const dataUrls = await Promise.all(files.map(file => readFileAsDataUrl(file)));
       setMedia(prev => {
         const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
-        const nextGallery = files.slice(0, remainingSlots).map(createFileItem);
+        const nextGallery = files.slice(0, remainingSlots).map((file, index) => createFileItem(file, dataUrls[index]));
         return { ...prev, galleryImages: [...prev.galleryImages, ...nextGallery] };
       });
     }
@@ -391,9 +414,33 @@ function Step3({ team, setTeam }) {
 
 function Step4({ tiers, setTiers }) {
   const [newTier, setNewTier] = useState({ name: "", amount: "", privileges: [""] });
+  const [editingTierId, setEditingTierId] = useState(null);
 
   const updatePrivilege = (i, val) => { const u = [...newTier.privileges]; u[i] = val; setNewTier({ ...newTier, privileges: u }); };
-  const saveTier = () => { if (newTier.name && newTier.amount) { setTiers([...tiers, { ...newTier, id: Date.now() }]); setNewTier({ name: "", amount: "", privileges: [""] }); }};
+  const resetTierForm = () => { setEditingTierId(null); setNewTier({ name: "", amount: "", privileges: [""] }); };
+  const saveTier = () => {
+    if (!newTier.name || !newTier.amount) return;
+
+    const nextTier = { ...newTier, id: editingTierId ?? Date.now() };
+    setTiers(prev => (
+      editingTierId
+        ? prev.map(tier => (tier.id === editingTierId ? nextTier : tier))
+        : [...prev, nextTier]
+    ));
+    resetTierForm();
+  };
+  const editTier = tier => {
+    setEditingTierId(tier.id);
+    setNewTier({
+      name: tier.name,
+      amount: tier.amount,
+      privileges: tier.privileges.length > 0 ? [...tier.privileges] : [""]
+    });
+  };
+  const deleteTier = tierId => {
+    setTiers(prev => prev.filter(tier => tier.id !== tierId));
+    if (editingTierId === tierId) resetTierForm();
+  };
 
   return (
     <div>
@@ -401,7 +448,10 @@ function Step4({ tiers, setTiers }) {
       <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Define structured backing tiers using Class Coins (CC).</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
-          <div className="text-[14px] font-bold text-gray-900 mb-4">Create New Tier</div>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div className="text-[14px] font-bold text-gray-900">{editingTierId ? "Edit Tier" : "Create New Tier"}</div>
+            {editingTierId && <div className="text-[11px] font-bold text-brand uppercase tracking-widest">Editing saved tier</div>}
+          </div>
           <div className="mb-3.5">
             <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">TIER NAME</label>
             <input value={newTier.name} onChange={e => setNewTier({ ...newTier, name: e.target.value })} placeholder="e.g., VIP Lab Access" className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
@@ -425,8 +475,8 @@ function Step4({ tiers, setTiers }) {
             <button onClick={() => setNewTier({ ...newTier, privileges: [...newTier.privileges, ""] })} className="bg-transparent border-none text-[12px] text-brand font-bold cursor-pointer hover:underline">+ ADD ANOTHER PRIVILEGE</button>
           </div>
           <div className="flex justify-end gap-2.5">
-            <button onClick={() => setNewTier({ name: "", amount: "", privileges: [""] })} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50">CLEAR</button>
-            <button onClick={saveTier} className="bg-[#1a1a5c] hover:bg-blue-900 text-white border-none rounded-md px-5 py-2 text-[12px] font-bold cursor-pointer transition-colors">SAVE TIER</button>
+            <button onClick={resetTierForm} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50">CLEAR</button>
+            <button onClick={saveTier} className="bg-[#1a1a5c] hover:bg-blue-900 text-white border-none rounded-md px-5 py-2 text-[12px] font-bold cursor-pointer transition-colors">{editingTierId ? "UPDATE TIER" : "SAVE TIER"}</button>
           </div>
         </div>
         <div>
@@ -439,7 +489,22 @@ function Step4({ tiers, setTiers }) {
               {t.privileges.filter(Boolean).map((p, pi) => (
                 <div key={pi} className="flex gap-2 text-[12px] text-gray-600 mb-1"><span className="text-brand">✓</span>{p}</div>
               ))}
-              <button className="mt-3 w-full bg-brand hover:bg-red-800 text-white border-none rounded-md py-2 text-[12px] font-bold cursor-pointer transition-colors">BACK THIS PROJECT</button>
+              <div className="mt-3 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => editTier(t)}
+                  className="rounded-md bg-[#1a1a5c] px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-blue-900"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteTier(t.id)}
+                  className="rounded-md bg-brand px-4 py-2 text-[12px] font-bold text-white transition-colors hover:bg-red-800"
+                >
+                  Delete
+                </button>
+              </div>
             </div>
           )) : (
             <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-7 text-center">
@@ -587,8 +652,10 @@ export default function CreateProject() {
 
   useEffect(() => {
     return () => {
-      if (media.coverImage?.preview) URL.revokeObjectURL(media.coverImage.preview);
-      media.galleryImages.forEach(image => URL.revokeObjectURL(image.preview));
+      if (media.coverImage?.preview && isObjectUrl(media.coverImage.preview)) URL.revokeObjectURL(media.coverImage.preview);
+      media.galleryImages.forEach(image => {
+        if (image.preview && isObjectUrl(image.preview)) URL.revokeObjectURL(image.preview);
+      });
     };
   }, [media.coverImage, media.galleryImages]);
 
