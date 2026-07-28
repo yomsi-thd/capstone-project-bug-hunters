@@ -48,7 +48,7 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
             onClick={handlePost}
             disabled={!isLoggedIn || !text.trim()}
             style={{
-              background: isLoggedIn && text.trim() ? "#cc0000" : "#ccc",
+              background: isLoggedIn && text.trim() ? "var(--color-brand)" : "#ccc",
               color: "#fff", border: "none", borderRadius: "5px",
               fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em",
               padding: "8px 20px", cursor: isLoggedIn && text.trim() ? "pointer" : "not-allowed",
@@ -61,7 +61,7 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
               e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = isLoggedIn && text.trim() ? "#cc0000" : "#ccc";
+              e.currentTarget.style.background = isLoggedIn && text.trim() ? "var(--color-brand)" : "#ccc";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
@@ -94,7 +94,7 @@ export default function CommentList({ comments = [], totalComments = 0, isLogged
               fontSize: "13px", fontWeight: 600, color: "#555",
               padding: "10px 24px", cursor: "pointer", transition: "all 0.15s",
             }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = "#cc0000"}
+            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--color-brand)"}
             onMouseLeave={e => e.currentTarget.style.borderColor = "#ddd"}
           >
             VIEW ALL {totalComments} COMMENTS

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import useWindowWidth from "../../hooks/useWindowWidth";
+import useBreakpoint, { BREAKPOINTS } from "../../hooks/useBreakpoint";
 import { useAuth } from "../../context/AuthContext";
 import { getNavLinksForUser } from "../../mock/navLinks";
 
@@ -11,13 +11,13 @@ function CCBadge({ ccBalance }) {
       border: "1px solid #ddd", borderRadius: "6px",
       padding: "5px 10px", background: "#fff", flexShrink: 0,
     }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cc0000" strokeWidth="2.5">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--color-brand)" }} strokeWidth="2.5">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
       </svg>
       <span style={{ fontSize: "12px", fontWeight: 700, color: "#111", whiteSpace: "nowrap" }}>
         BALANCE&nbsp;
-        <span style={{ color: "#cc0000" }}>{ccBalance.toLocaleString()} CC</span>
+        <span style={{ color: "var(--color-brand)" }}>{ccBalance.toLocaleString()} CC</span>
       </span>
     </div>
   );
@@ -41,7 +41,6 @@ export default function Header(props = {}) {
   // manages its own menu/search state. Any prop passed in still overrides the
   // internal default, so older call sites keep working unchanged.
   const auth = useAuth();
-  const w = useWindowWidth();
   const [menuOpenState, setMenuOpenState] = useState(false);
   const [searchOpenState, setSearchOpenState] = useState(false);
   const [searchState, setSearchState] = useState("");
@@ -49,15 +48,11 @@ export default function Header(props = {}) {
   const pick = (value, fallback) => (value !== undefined ? value : fallback);
 
   // The header owns its OWN breakpoints (it ignores any isMobile/isTablet/
-  // isDesktop passed in) because its layout has a tighter constraint than the
-  // pages': the full desktop nav — links + balance + CTA + account + logout,
-  // plus search on Discover — needs ~1180px and overflows below that. So the
-  // desktop threshold is 1200, not the pages' 1024. This collapses the header
-  // to the hamburger layout on 1024–1199 widths (e.g. iPad Pro 12.9" portrait)
-  // even though the page content there still lays out as desktop and fits.
-  const isMobile = w < 640;
-  const isTablet = w >= 640 && w < 1200;
-  const isDesktop = w >= 1200;
+  // isDesktop passed in) and deliberately uses a tighter desktop threshold than
+  // pages (HEADER_DESKTOP_MIN = 1200 vs the page default 1024) — see useBreakpoint
+  // for the full reasoning. So on 1024–1199 widths (e.g. iPad Pro 12.9" portrait)
+  // it uses the hamburger layout while the page content still lays out as desktop.
+  const { isMobile, isTablet, isDesktop } = useBreakpoint(BREAKPOINTS.HEADER_DESKTOP_MIN);
 
   const isLoggedIn = pick(props.isLoggedIn, auth.isLoggedIn);
   const ccBalance = pick(props.ccBalance, auth.balance);
@@ -102,7 +97,7 @@ export default function Header(props = {}) {
       }}>
         {/* Logo */}
         <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
-          <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "#cc0000", lineHeight: 1.1 }}>
+          <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "var(--color-brand)", lineHeight: 1.1 }}>
             RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
           </div>
         </Link>
@@ -114,40 +109,16 @@ export default function Header(props = {}) {
               path.startsWith("#") ? (
                 <a
                   key={label} href={path}
-                  style={{
-                    textDecoration: "none", fontSize: "14px", fontWeight: 400,
-                    color: "#444", padding: "6px 12px", borderBottom: "2px solid transparent",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.color = "#cc0000";
-                    e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.color = "#444";
-                    e.currentTarget.style.borderBottomColor = "transparent";
-                  }}
+                  className="lp-navlink"
+                  style={{ fontSize: "14px", fontWeight: 400, padding: "6px 12px" }}
                 >{label}</a>
               ) : (
                 <Link
                   key={label} to={path}
+                  className={isActive(path) ? "lp-navlink is-active" : "lp-navlink"}
                   style={{
-                    textDecoration: "none", fontSize: "14px",
-                    fontWeight: isActive(path) ? 600 : 400,
-                    color: isActive(path) ? "#cc0000" : "#444",
+                    fontSize: "14px", fontWeight: isActive(path) ? 600 : 400,
                     padding: "6px 12px",
-                    borderBottom: isActive(path) ? "2px solid #cc0000" : "2px solid transparent",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => {
-                    if (isActive(path)) return;
-                    e.currentTarget.style.color = "#cc0000";
-                    e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
-                  }}
-                  onMouseLeave={e => {
-                    if (isActive(path)) return;
-                    e.currentTarget.style.color = "#444";
-                    e.currentTarget.style.borderBottomColor = "transparent";
                   }}
                 >{label}</Link>
               )
@@ -181,7 +152,7 @@ export default function Header(props = {}) {
           <Link
             to="/login"
             style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0, transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
             onMouseLeave={e => e.currentTarget.style.color = "#444"}
           >LOGIN</Link>
         )}
@@ -194,7 +165,7 @@ export default function Header(props = {}) {
               <Link
                 to="/create-project"
                 style={{
-                  textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                  textDecoration: "none", background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
                   fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
                   transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
                 }}
@@ -204,7 +175,7 @@ export default function Header(props = {}) {
                   e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
                 }}
                 onMouseLeave={e => {
-                  e.currentTarget.style.background = "#cc0000";
+                  e.currentTarget.style.background = "var(--color-brand)";
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
@@ -215,7 +186,7 @@ export default function Header(props = {}) {
               <Link
                 to="/dashboard"
                 style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500, transition: "color 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+                onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
                 onMouseLeave={e => e.currentTarget.style.color = "#333"}
               >Account</Link>
             </div>
@@ -227,7 +198,7 @@ export default function Header(props = {}) {
                 fontSize: "13px", color: "#666", fontWeight: 500, padding: 0, flexShrink: 0,
                 transition: "color 0.15s",
               }}
-              onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+              onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
               onMouseLeave={e => e.currentTarget.style.color = "#666"}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
@@ -241,7 +212,7 @@ export default function Header(props = {}) {
           <Link
             to="/login"
             style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap", transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "#cc0000"}
+            onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
             onMouseLeave={e => e.currentTarget.style.color = "#444"}
           >LOGIN</Link>
         )}
@@ -250,7 +221,7 @@ export default function Header(props = {}) {
         {isTablet && isLoggedIn && (
           <>
             {showBalance && (
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "#cc0000", whiteSpace: "nowrap" }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-brand)", whiteSpace: "nowrap" }}>
                 {ccBalance.toLocaleString()} CC
               </div>
             )}
@@ -258,12 +229,12 @@ export default function Header(props = {}) {
               <Link
                 to="/create-project"
                 style={{
-                  textDecoration: "none", background: "#cc0000", color: "#fff", borderRadius: "5px",
+                  textDecoration: "none", background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
                   fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+                onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
               >START A PROJECT</Link>
             )}
             <Avatar userName={userName} />
@@ -328,7 +299,7 @@ export default function Header(props = {}) {
                 style={{
                   display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
                   fontWeight: isActive(path) ? 700 : 400,
-                  color: isActive(path) ? "#cc0000" : "#444",
+                  color: isActive(path) ? "var(--color-brand)" : "#444",
                   borderBottom: "1px solid #f5f5f5",
                   transition: "background 0.15s, padding-left 0.15s",
                 }}
@@ -343,12 +314,12 @@ export default function Header(props = {}) {
               <Link
                 to="/login" onClick={() => setMenuOpen(false)}
                 style={{
-                  display: "block", textAlign: "center", textDecoration: "none", background: "#cc0000",
+                  display: "block", textAlign: "center", textDecoration: "none", background: "var(--color-brand)",
                   color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
                   transition: "background 0.15s",
                 }}
                 onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+                onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
               >LOGIN</Link>
             </div>
           )}
@@ -358,7 +329,7 @@ export default function Header(props = {}) {
               {/* Balance + Start already sit on the tablet bar, so show them in
                   the menu on mobile only; Account + Logout show on both. */}
               {isMobile && showBalance && (
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "#cc0000", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-brand)", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
                   Balance: {ccBalance.toLocaleString()} CC
                 </div>
               )}
@@ -366,12 +337,12 @@ export default function Header(props = {}) {
                 <Link
                   to="/create-project" onClick={() => setMenuOpen(false)}
                   style={{
-                    display: "block", textAlign: "center", textDecoration: "none", background: "#cc0000",
+                    display: "block", textAlign: "center", textDecoration: "none", background: "var(--color-brand)",
                     color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
                     margin: "10px 0", transition: "background 0.15s",
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                  onMouseLeave={e => e.currentTarget.style.background = "#cc0000"}
+                  onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
                 >START A PROJECT</Link>
               )}
               <Link
@@ -388,7 +359,7 @@ export default function Header(props = {}) {
                 onClick={() => { setMenuOpen(false); onLogout?.(); }}
                 style={{
                   display: "block", width: "100%", textAlign: "left", background: "none",
-                  border: "none", padding: "10px 4px", fontSize: "14px", color: "#cc0000",
+                  border: "none", padding: "10px 4px", fontSize: "14px", color: "var(--color-brand)",
                   cursor: "pointer", fontWeight: 600,
                   transition: "background 0.15s, padding-left 0.15s",
                 }}

@@ -25,7 +25,7 @@ export default function AuthInput({
           placeholder={placeholder}
           style={{
             width: "100%", boxSizing: "border-box",
-            border: `1px solid ${error ? "#cc0000" : "#ddd"}`,
+            border: `1px solid ${error ? "var(--color-brand)" : "#ddd"}`,
             borderRadius: "7px", padding: isPassword ? "12px 42px 12px 14px" : "12px 14px",
             fontSize: "14px", color: "#222", outline: "none",
             transition: "border-color 0.15s, box-shadow 0.15s",
@@ -57,7 +57,7 @@ export default function AuthInput({
       </div>
 
       {error && (
-        <div style={{ fontSize: "12px", color: "#cc0000", marginTop: "5px" }}>{error}</div>
+        <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "5px" }}>{error}</div>
       )}
     </div>
   );

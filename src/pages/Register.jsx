@@ -3,12 +3,11 @@ import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
 import RegisterSuccessModal from "../components/auth/RegisterSuccessModal";
-import useWindowWidth from "../hooks/useWindowWidth";
+import useBreakpoint from "../hooks/useBreakpoint";
 
 export default function Register() {
   const navigate = useNavigate();
-  const w = useWindowWidth();
-  const isMobile = w < 640;
+  const { isMobile } = useBreakpoint();
 
   const [fullName, setFullName] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -112,7 +111,7 @@ export default function Register() {
                 type="checkbox"
                 checked
                 disabled
-                style={{ width: "15px", height: "15px", accentColor: "#cc0000", marginTop: "1px", flexShrink: 0 }}
+                style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", marginTop: "1px", flexShrink: 0 }}
               />
               <span>
                 <strong style={{ color: "#333" }}>Backer</strong> — support and invest in projects{" "}
@@ -125,7 +124,7 @@ export default function Register() {
                 type="checkbox"
                 checked={requestCreator}
                 onChange={e => setRequestCreator(e.target.checked)}
-                style={{ width: "15px", height: "15px", accentColor: "#cc0000", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
+                style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
               />
               <span>
                 <strong style={{ color: "#333" }}>Creator</strong> — publish and edit your own projects
@@ -143,17 +142,17 @@ export default function Register() {
               type="checkbox"
               checked={agreeTerms}
               onChange={e => { setAgreeTerms(e.target.checked); setErrors(p => ({ ...p, agreeTerms: null })); }}
-              style={{ width: "15px", height: "15px", accentColor: "#cc0000", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
+              style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
             />
             <span>
               I agree to the{" "}
-              <Link to="#" style={{ color: "#cc0000", fontWeight: 600, textDecoration: "none" }}>Terms of Service</Link>
+              <Link to="#" style={{ color: "var(--color-brand)", fontWeight: 600, textDecoration: "none" }}>Terms of Service</Link>
               {" "}and{" "}
-              <Link to="#" style={{ color: "#cc0000", fontWeight: 600, textDecoration: "none" }}>Privacy Policy</Link>
+              <Link to="#" style={{ color: "var(--color-brand)", fontWeight: 600, textDecoration: "none" }}>Privacy Policy</Link>
             </span>
           </label>
           {errors.agreeTerms && (
-            <div style={{ fontSize: "12px", color: "#cc0000", marginTop: "5px" }}>{errors.agreeTerms}</div>
+            <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "5px" }}>{errors.agreeTerms}</div>
           )}
         </div>
 
@@ -161,7 +160,7 @@ export default function Register() {
           type="submit"
           disabled={isSubmitting}
           style={{
-            width: "100%", background: isSubmitting ? "#e88a8a" : "#cc0000",
+            width: "100%", background: isSubmitting ? "#e88a8a" : "var(--color-brand)",
             color: "#fff", border: "none", borderRadius: "8px",
             fontSize: "14px", fontWeight: 700, letterSpacing: "0.04em",
             padding: "14px", cursor: isSubmitting ? "default" : "pointer",
@@ -175,7 +174,7 @@ export default function Register() {
             e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "#cc0000";
+            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "var(--color-brand)";
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}
@@ -230,7 +229,7 @@ export default function Register() {
         Already have an account?{" "}
         <Link
           to="/login"
-          style={{ color: "#cc0000", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
+          style={{ color: "var(--color-brand)", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
           onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
         >

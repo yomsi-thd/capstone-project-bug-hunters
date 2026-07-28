@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
-import useWindowWidth from "../hooks/useWindowWidth";
+import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const w = useWindowWidth();
-  const isMobile = w < 640;
+  const { isMobile } = useBreakpoint();
 
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -75,7 +74,7 @@ export default function Login() {
           rightSlot={
             <Link
               to="#"
-              style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, textDecoration: "none", transition: "opacity 0.15s" }}
+              style={{ fontSize: "12px", color: "var(--color-brand)", fontWeight: 600, textDecoration: "none", transition: "opacity 0.15s" }}
               onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
               onMouseLeave={e => e.currentTarget.style.opacity = "1"}
             >
@@ -89,7 +88,7 @@ export default function Login() {
             type="checkbox"
             checked={rememberMe}
             onChange={e => setRememberMe(e.target.checked)}
-            style={{ width: "15px", height: "15px", accentColor: "#cc0000", cursor: "pointer" }}
+            style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer" }}
           />
           Remember me
         </label>
@@ -98,7 +97,7 @@ export default function Login() {
           type="submit"
           disabled={isSubmitting}
           style={{
-            width: "100%", background: isSubmitting ? "#e88a8a" : "#cc0000",
+            width: "100%", background: isSubmitting ? "#e88a8a" : "var(--color-brand)",
             color: "#fff", border: "none", borderRadius: "8px",
             fontSize: "14px", fontWeight: 700, letterSpacing: "0.04em",
             padding: "14px", cursor: isSubmitting ? "default" : "pointer",
@@ -112,7 +111,7 @@ export default function Login() {
             e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "#cc0000";
+            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "var(--color-brand)";
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}
@@ -167,7 +166,7 @@ export default function Login() {
         Don't have an account?{" "}
         <Link
           to="/register"
-          style={{ color: "#cc0000", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
+          style={{ color: "var(--color-brand)", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
           onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
           onMouseLeave={e => e.currentTarget.style.opacity = "1"}
         >

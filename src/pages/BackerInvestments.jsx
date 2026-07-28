@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
-import useWindowWidth from "../hooks/useWindowWidth";
+import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import { MY_INVESTMENTS } from "../mock";
 
@@ -67,7 +67,7 @@ function InvestmentCard({ investment, isMobile }) {
               INVESTED AMOUNT
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "15px", fontWeight: 700, color: "#111" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cc0000" strokeWidth="2.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--color-brand)" }} strokeWidth="2.5">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
               </svg>
@@ -92,7 +92,7 @@ function InvestmentCard({ investment, isMobile }) {
               <div style={{
                 height: "100%",
                 width: `${Math.min(investment.fundingProgress, 100)}%`,
-                background: "#cc0000",
+                background: "var(--color-brand)",
                 borderRadius: "3px",
               }} />
             </div>
@@ -107,7 +107,7 @@ function InvestmentCard({ investment, isMobile }) {
               padding: "9px 18px", cursor: "pointer", color: "#444",
               transition: "background 0.15s, border-color 0.15s",
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }}
+            onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }}
             onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#ddd"; }}
           >
             VIEW UPDATES
@@ -115,7 +115,7 @@ function InvestmentCard({ investment, isMobile }) {
           <Link
             to={`/project/${investment.projectId}`}
             style={{
-              textDecoration: "none", background: "#cc0000", color: "#fff",
+              textDecoration: "none", background: "var(--color-brand)", color: "#fff",
               border: "none", borderRadius: "5px",
               fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em",
               padding: "9px 18px", cursor: "pointer", display: "inline-block",
@@ -127,7 +127,7 @@ function InvestmentCard({ investment, isMobile }) {
               e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.background = "var(--color-brand)";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
@@ -159,7 +159,7 @@ function EmptyLoggedOut({ isMobile }) {
       <Link
         to="/login"
         style={{
-          textDecoration: "none", background: "#cc0000", color: "#fff",
+          textDecoration: "none", background: "var(--color-brand)", color: "#fff",
           borderRadius: "6px", fontSize: "13px", fontWeight: 700,
           letterSpacing: "0.04em", padding: "12px 28px", display: "inline-block",
           transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -170,7 +170,7 @@ function EmptyLoggedOut({ isMobile }) {
           e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.background = "#cc0000";
+          e.currentTarget.style.background = "var(--color-brand)";
           e.currentTarget.style.transform = "translateY(0)";
           e.currentTarget.style.boxShadow = "none";
         }}
@@ -187,10 +187,7 @@ export default function BackerInvestments() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const w = useWindowWidth();
-  const isMobile = w < 640;
-  const isTablet = w >= 640 && w < 1024;
-  const isDesktop = w >= 1024;
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 

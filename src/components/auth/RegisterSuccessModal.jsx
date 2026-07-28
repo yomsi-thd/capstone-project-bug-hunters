@@ -12,13 +12,13 @@ export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null
         className="lp-modal"
         style={{
           background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "420px",
-          borderTop: "5px solid #cc0000", padding: "40px 32px 28px",
+          borderTop: "5px solid var(--color-brand)", padding: "40px 32px 28px",
           textAlign: "center",
         }}
       >
         <div style={{
           width: "60px", height: "60px", borderRadius: "50%",
-          background: "#cc0000", display: "flex", alignItems: "center",
+          background: "var(--color-brand)", display: "flex", alignItems: "center",
           justifyContent: "center", margin: "0 auto 20px",
         }}>
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
@@ -58,7 +58,7 @@ export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null
         <button
           onClick={onGoToLogin}
           style={{
-            width: "100%", background: "#cc0000", color: "#fff", border: "none",
+            width: "100%", background: "var(--color-brand)", color: "#fff", border: "none",
             borderRadius: "6px", fontSize: "13px", fontWeight: 700,
             letterSpacing: "0.04em", padding: "13px", cursor: "pointer",
             transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -69,7 +69,7 @@ export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null
             e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = "#cc0000";
+            e.currentTarget.style.background = "var(--color-brand)";
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}
