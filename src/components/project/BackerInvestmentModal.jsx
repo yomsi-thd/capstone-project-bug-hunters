@@ -33,7 +33,7 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
         style={{
           background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "550px",
           maxHeight: "90vh", overflowY: "auto",
-          borderTop: "5px solid #cc0000",
+          borderTop: "5px solid var(--color-brand)",
         }}
       >
         {/* Header */}
@@ -80,18 +80,18 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
               INVESTMENT AMOUNT (CC)
             </span>
             <span style={{ fontSize: "14px", color: "#888" }}>
-              Balance: <strong style={{ color: "#cc0000" }}>{balance.toLocaleString()} CC</strong>
+              Balance: <strong style={{ color: "var(--color-brand)" }}>{balance.toLocaleString()} CC</strong>
             </span>
           </div>
 
           <div style={{
             display: "flex", alignItems: "center",
-            border: `1px solid ${inputFocused ? "#cc0000" : "#ddd"}`,
+            border: `1px solid ${inputFocused ? "var(--color-brand)" : "#ddd"}`,
             boxShadow: inputFocused ? "0 0 0 3px rgba(204,0,0,0.1)" : "none",
             borderRadius: "6px", padding: "15px 20px", marginBottom: "18px",
             transition: "border-color 0.15s, box-shadow 0.15s",
           }}>
-            <span style={{ fontSize: "27px", fontWeight: 800, color: "#cc0000", marginRight: "10px" }}>CC</span>
+            <span style={{ fontSize: "27px", fontWeight: 800, color: "var(--color-brand)", marginRight: "10px" }}>CC</span>
             <input
               value={amount === 0 ? "" : amount}
               onChange={handleInputChange}
@@ -116,10 +116,10 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
                 disabled={val > balance}
                 style={{
                   flex: 1,
-                  background: amount === val ? "#cc0000" : "#fff",
+                  background: amount === val ? "var(--color-brand)" : "#fff",
                   color: amount === val ? "#fff" : "#444",
                   border: "1px solid",
-                  borderColor: amount === val ? "#cc0000" : "#ddd",
+                  borderColor: amount === val ? "var(--color-brand)" : "#ddd",
                   opacity: val > balance ? 0.4 : 1,
                   borderRadius: "6px",
                   fontSize: "14px", fontWeight: 700, padding: "14px 8px",
@@ -130,13 +130,13 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
                   if (val > balance) return;
                   e.currentTarget.style.transform = "translateY(-2px)";
                   e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.12)";
-                  if (amount !== val) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }
+                  if (amount !== val) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.background = amount === val ? "#cc0000" : "#fff";
-                  e.currentTarget.style.borderColor = amount === val ? "#cc0000" : "#ddd";
+                  e.currentTarget.style.background = amount === val ? "var(--color-brand)" : "#fff";
+                  e.currentTarget.style.borderColor = amount === val ? "var(--color-brand)" : "#ddd";
                 }}
                 onMouseDown={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(0) scale(0.97)"; }}
                 onMouseUp={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(-2px) scale(1)"; }}
@@ -149,17 +149,17 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
           <button
             onClick={handleMax}
             style={{
-              width: "100%", background: amount === balance ? "#cc0000" : "#fff",
+              width: "100%", background: amount === balance ? "var(--color-brand)" : "#fff",
               color: amount === balance ? "#fff" : "#444",
               border: "1px solid #ddd", borderRadius: "6px",
               fontSize: "13px", fontWeight: 700, padding: "12px", cursor: "pointer",
               marginBottom: "24px", transition: "background 0.15s, border-color 0.15s",
             }}
             onMouseEnter={e => {
-              if (amount !== balance) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#cc0000"; }
+              if (amount !== balance) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = amount === balance ? "#cc0000" : "#fff";
+              e.currentTarget.style.background = amount === balance ? "var(--color-brand)" : "#fff";
               e.currentTarget.style.borderColor = "#ddd";
             }}
           >
@@ -173,7 +173,7 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
             fontSize: "14px", color: "#666", lineHeight: 1.7,
           }}>
             By confirming this investment, you agree to the{" "}
-            <span style={{ color: "#cc0000", fontWeight: 600 }}>Terms of Catalyst Funding</span>.
+            <span style={{ color: "var(--color-brand)", fontWeight: 600 }}>Terms of Catalyst Funding</span>.
             Class Coins represent academic backing and hold no real-world financial value outside the RMIT ecosystem.
           </div>
 
@@ -196,7 +196,7 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
               onClick={() => isValid && onConfirm(amount)}
               disabled={!isValid}
               style={{
-                flex: 1, background: isValid ? "#cc0000" : "#ccc",
+                flex: 1, background: isValid ? "var(--color-brand)" : "#ccc",
                 color: "#fff", border: "none", borderRadius: "6px",
                 fontSize: "15px", fontWeight: 700, padding: "15px",
                 cursor: isValid ? "pointer" : "not-allowed",
@@ -210,7 +210,7 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
                 e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = isValid ? "#cc0000" : "#ccc";
+                e.currentTarget.style.background = isValid ? "var(--color-brand)" : "#ccc";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}

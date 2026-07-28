@@ -32,7 +32,8 @@ export function getNavLinksForUser(user) {
 
   const links = [{ label: "Discover", path: "/discover" }];
   if (isAdmin) links.push({ label: "Admin Dashboard", path: "/admin-dashboard" });
-  if (isCreator) links.push({ label: "My Projects", path: "/creator-my-projects" });
+  // Admin is a superuser (canCreate = creator||admin), so it manages projects too.
+  if (isCreator || isAdmin) links.push({ label: "My Projects", path: "/creator-my-projects" });
   if (isBackerOrAdmin) links.push({ label: "My Investments", path: "/investments" });
   links.push({ label: "Departments", path: "#" });
   links.push({ label: "About", path: "#" });

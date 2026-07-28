@@ -6,16 +6,19 @@ import Tag from "../components/project/Tag";
 import CommentList from "../components/project/CommentList";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
 import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
-import useWindowWidth from "../hooks/useWindowWidth";
+import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import { PROJECT_DETAILS, COMMENTS_BY_PROJECT } from "../mock";
 
-function FundingBar({ percent }) {
+// Plain progress track for the detail-page sidebar (no % label — the sidebar
+// renders its own big % + "FUNDED" below). Distinct from the labelled card
+// FundingBar in components/project/FundingBar.jsx; kept separate on purpose.
+function ProgressTrack({ percent }) {
   return (
     <div style={{ height: "6px", background: "#f0f0f0", borderRadius: "3px", overflow: "hidden", margin: "10px 0" }}>
       <div style={{
         height: "100%", width: `${Math.min(percent, 100)}%`,
-        background: "#cc0000", borderRadius: "3px", transition: "width 0.4s ease",
+        background: "var(--color-brand)", borderRadius: "3px", transition: "width 0.4s ease",
       }} />
     </div>
   );
@@ -28,31 +31,19 @@ function TabNav({ tabs, active, onChange }) {
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
+          className={active === tab.id ? "lp-navlink is-active" : "lp-navlink"}
           style={{
-            background: "none", border: "none", cursor: "pointer",
+            "--nav-base": "#666",
+            background: "none", cursor: "pointer",
             padding: "10px 20px", fontSize: "14px", fontWeight: active === tab.id ? 700 : 400,
-            color: active === tab.id ? "#cc0000" : "#666",
-            borderBottom: active === tab.id ? "2px solid #cc0000" : "2px solid transparent",
-            marginBottom: "-2px", transition: "all 0.15s", position: "relative",
+            marginBottom: "-2px", position: "relative",
             display: "flex", alignItems: "center", gap: "6px",
-          }}
-          onMouseEnter={e => {
-            if (active !== tab.id) {
-              e.currentTarget.style.color = "#cc0000";
-              e.currentTarget.style.borderBottomColor = "rgba(204,0,0,0.3)";
-            }
-          }}
-          onMouseLeave={e => {
-            if (active !== tab.id) {
-              e.currentTarget.style.color = "#666";
-              e.currentTarget.style.borderBottomColor = "transparent";
-            }
           }}
         >
           {tab.label}
           {tab.count != null && (
             <span style={{
-              background: active === tab.id ? "#cc0000" : "#e5e7eb",
+              background: active === tab.id ? "var(--color-brand)" : "#e5e7eb",
               color: active === tab.id ? "#fff" : "#666",
               fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "10px",
             }}>
@@ -74,7 +65,7 @@ function EndorsedBadge() {
     }}>
       <div style={{
         width: "22px", height: "22px", borderRadius: "50%",
-        background: "#cc0000", display: "flex", alignItems: "center",
+        background: "var(--color-brand)", display: "flex", alignItems: "center",
         justifyContent: "center", flexShrink: 0, marginTop: "1px",
       }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
@@ -100,10 +91,7 @@ export default function ProjectDetail() {
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const w = useWindowWidth();
-  const isMobile = w < 640;
-  const isTablet = w >= 640 && w < 1024;
-  const isDesktop = w >= 1024;
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   // Invest flow: closed -> "invest" modal -> "success" modal -> closed
   const [investStep, setInvestStep] = useState(null); // null | "invest" | "success"
@@ -137,7 +125,7 @@ export default function ProjectDetail() {
           <Link
             to="/discover"
             style={{
-              display: "inline-block", background: "#cc0000", color: "#fff",
+              display: "inline-block", background: "var(--color-brand)", color: "#fff",
               textDecoration: "none", borderRadius: "6px",
               fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
               padding: "12px 28px", transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -148,7 +136,7 @@ export default function ProjectDetail() {
               e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.background = "var(--color-brand)";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
@@ -267,7 +255,7 @@ export default function ProjectDetail() {
                 <ul style={{ margin: "0 0 28px", padding: "0", listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
                   {p.solution.bullets.map((b, i) => (
                     <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                      <span style={{ color: "#cc0000", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
+                      <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
                       <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
                         <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
                       </span>
@@ -344,9 +332,9 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
       top: sticky ? "72px" : undefined,
       marginBottom: sticky ? "0" : "28px",
     }}>
-      <FundingBar percent={p.stats.funded} />
+      <ProgressTrack percent={p.stats.funded} />
 
-      <div style={{ fontSize: "28px", fontWeight: 800, color: "#cc0000", marginBottom: "2px" }}>
+      <div style={{ fontSize: "28px", fontWeight: 800, color: "var(--color-brand)", marginBottom: "2px" }}>
         {p.stats.funded}%
       </div>
       <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", color: "#888", marginBottom: "14px" }}>
@@ -376,7 +364,7 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
           <button
             onClick={onEdit}
             style={{
-              width: "100%", background: "#cc0000",
+              width: "100%", background: "var(--color-brand)",
               color: "#fff", border: "none", borderRadius: "6px",
               fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
               padding: "14px", cursor: "pointer",
@@ -389,7 +377,7 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
               e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.background = "var(--color-brand)";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
@@ -409,7 +397,7 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
             disabled={!canInvest}
             onClick={() => canInvest && onInvest()}
             style={{
-              width: "100%", background: canInvest ? "#cc0000" : "#ccc",
+              width: "100%", background: canInvest ? "var(--color-brand)" : "#ccc",
               color: "#fff", border: "none", borderRadius: "6px",
               fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
               padding: "14px", cursor: canInvest ? "pointer" : "not-allowed",
@@ -423,7 +411,7 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
             }}
             onMouseLeave={e => {
               if (!canInvest) return;
-              e.currentTarget.style.background = "#cc0000";
+              e.currentTarget.style.background = "var(--color-brand)";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}

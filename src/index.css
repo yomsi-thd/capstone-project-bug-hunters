@@ -239,6 +239,21 @@ code {
 .lp-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .lp-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10); }
 
+/* Shared 3-state nav underline (default -> hover -> active). Single source for
+   Header nav links AND ProjectDetail's TabNav so the two stay in step (see
+   conventions #3/#7). Base text colour comes from --nav-base so each context
+   can differ (Header #444, TabNav #666); active/hover accent is always red. */
+.lp-navlink {
+  color: var(--nav-base, #444);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  text-decoration: none;
+  transition: color 0.15s, border-color 0.15s;
+}
+.lp-navlink:hover { color: var(--color-brand); border-bottom-color: rgba(204, 0, 0, 0.3); }
+.lp-navlink.is-active { color: var(--color-brand); border-bottom-color: var(--color-brand); }
+.lp-navlink.is-active:hover { border-bottom-color: var(--color-brand); } /* active wins over hover */
+
 /* Respect users who prefer reduced motion. */
 @media (prefers-reduced-motion: reduce) {
   .lp-reveal,
@@ -247,6 +262,7 @@ code {
   .lp-modal { animation: none !important; }
   .lp-card { transition: none; }
   .lp-card:hover { transform: none; }
+  .lp-navlink { transition: none; }
 }
 
 @media (max-width: 640px) {

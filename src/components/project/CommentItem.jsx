@@ -1,6 +1,6 @@
 const ROLE_STYLES = {
   BACKER: { background: "#eef2ff", color: "#4f46e5" },
-  CREATOR: { background: "#fff1f1", color: "#cc0000" },
+  CREATOR: { background: "#fff1f1", color: "var(--color-brand)" },
 };
 
 function RoleBadge({ role }) {

@@ -56,7 +56,7 @@ export default function AuthLayout({ children, isMobile }) {
           animation: authCardIn 0.4s ease-out;
         }
         .auth-input:focus {
-          border-color: #cc0000 !important;
+          border-color: var(--color-brand) !important;
           box-shadow: 0 0 0 3px rgba(204,0,0,0.1) !important;
         }
       `}</style>
@@ -74,7 +74,7 @@ export default function AuthLayout({ children, isMobile }) {
       >
         {/* Logo */}
         <Link to="/discover" style={{ textDecoration: "none", display: "block", textAlign: "center", marginBottom: "28px" }}>
-          <div style={{ fontWeight: 800, fontSize: "24px", color: "#cc0000", lineHeight: 1.15 }}>
+          <div style={{ fontWeight: 800, fontSize: "24px", color: "var(--color-brand)", lineHeight: 1.15 }}>
             RMIT<br /><span style={{ fontWeight: 400, fontSize: "18px", color: "#111" }}>Launchpad</span>
           </div>
         </Link>

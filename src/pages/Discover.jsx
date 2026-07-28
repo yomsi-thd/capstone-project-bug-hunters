@@ -4,7 +4,7 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
-import useWindowWidth from "../hooks/useWindowWidth";
+import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import { ALL_PROJECTS, HERO_PROJECTS, TRENDING, FILTERS, FILTER_TAGS, PROJECT_DETAILS } from "../mock";
 
@@ -73,7 +73,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
               onClick={e => { e.preventDefault(); e.stopPropagation(); onEdit(); }}
               style={{
                 display: "inline-flex", alignItems: "center", gap: "6px",
-                background: "#cc0000", color: "#fff", borderRadius: "5px",
+                background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
                 fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
                 padding: "8px 18px", cursor: "pointer",
                 transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -84,7 +84,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
                 e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.background = "var(--color-brand)";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}
@@ -96,7 +96,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
             <span
               style={{
                 display: "inline-block",
-                background: "#cc0000", color: "#fff", borderRadius: "5px",
+                background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
                 fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
                 padding: "8px 18px", cursor: "pointer",
                 transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
@@ -107,7 +107,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
                 e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = "#cc0000";
+                e.currentTarget.style.background = "var(--color-brand)";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}
@@ -119,7 +119,7 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
           {showFundingBar && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
               <div style={{ flex: 1, height: "3px", background: "rgba(255,255,255,0.3)", borderRadius: "2px" }}>
-                <div style={{ width: `${Math.min(project.funded, 100)}%`, height: "100%", background: "#cc0000", borderRadius: "2px" }} />
+                <div style={{ width: `${Math.min(project.funded, 100)}%`, height: "100%", background: "var(--color-brand)", borderRadius: "2px" }} />
               </div>
               <span style={{ fontSize: "11px", color: "#fff", fontWeight: 600 }}>{project.funded}%</span>
             </div>
@@ -147,10 +147,7 @@ export default function Discover() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const w = useWindowWidth();
-  const isMobile = w < 640;
-  const isTablet = w >= 640 && w < 1024;
-  const isDesktop = w >= 1024;
+  const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   // Search and filters run over the whole catalogue, so a query reaches every
   // project (hero + trending + fresh), not just the ones shown in this grid.
@@ -275,7 +272,7 @@ export default function Discover() {
             </div>
             <a
               href="#all"
-              style={{ fontSize: "12px", color: "#cc0000", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none", display: "inline-block", transition: "opacity 0.15s, transform 0.15s" }}
+              style={{ fontSize: "12px", color: "var(--color-brand)", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none", display: "inline-block", transition: "opacity 0.15s, transform 0.15s" }}
               onMouseEnter={e => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "translateX(3px)"; }}
               onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(0)"; }}
             >
@@ -319,10 +316,10 @@ export default function Discover() {
                   key={f}
                   onClick={() => setActiveFilter(f)}
                   style={{
-                    background: activeFilter === f ? "#cc0000" : "#fff",
+                    background: activeFilter === f ? "var(--color-brand)" : "#fff",
                     color: activeFilter === f ? "#fff" : "#444",
                     border: "1px solid",
-                    borderColor: activeFilter === f ? "#cc0000" : "#ddd",
+                    borderColor: activeFilter === f ? "var(--color-brand)" : "#ddd",
                     borderRadius: "5px",
                     fontSize: "12px", fontWeight: 600,
                     padding: "5px 14px", cursor: "pointer",
@@ -331,12 +328,12 @@ export default function Discover() {
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.10)";
-                    if (activeFilter !== f) e.currentTarget.style.borderColor = "#cc0000";
+                    if (activeFilter !== f) e.currentTarget.style.borderColor = "var(--color-brand)";
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = "translateY(0)";
                     e.currentTarget.style.boxShadow = "none";
-                    e.currentTarget.style.borderColor = activeFilter === f ? "#cc0000" : "#ddd";
+                    e.currentTarget.style.borderColor = activeFilter === f ? "var(--color-brand)" : "#ddd";
                   }}
                 >
                   {f}
@@ -346,19 +343,19 @@ export default function Discover() {
                 <button
                   onClick={() => setSearch("")}
                   style={{
-                    background: "#fff", color: "#cc0000",
-                    border: "1px solid #cc0000", borderRadius: "5px",
+                    background: "#fff", color: "var(--color-brand)",
+                    border: "1px solid var(--color-brand)", borderRadius: "5px",
                     fontSize: "12px", fontWeight: 700,
                     padding: "5px 14px", cursor: "pointer",
                     letterSpacing: "0.04em", transition: "all 0.15s",
                   }}
                   onMouseEnter={e => {
-                    e.currentTarget.style.background = "#cc0000";
+                    e.currentTarget.style.background = "var(--color-brand)";
                     e.currentTarget.style.color = "#fff";
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.background = "#fff";
-                    e.currentTarget.style.color = "#cc0000";
+                    e.currentTarget.style.color = "var(--color-brand)";
                   }}
                 >
                   ✕ CLEAR
@@ -408,7 +405,7 @@ export default function Discover() {
               }}
               onMouseEnter={e => {
                 e.currentTarget.style.background = "#f5f5f5";
-                e.currentTarget.style.borderColor = "#cc0000";
+                e.currentTarget.style.borderColor = "var(--color-brand)";
                 e.currentTarget.style.transform = "translateY(-2px)";
                 e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.10)";
               }}
