@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   CREATE_PROJECT_STEPS as STEPS,
@@ -7,6 +7,36 @@ import {
   ROLE_BADGE,
   CREATE_PROJECT_TIERS
 } from "../mock";
+
+const MAX_GALLERY_IMAGES = 6;
+
+function formatCurrency(value) {
+  const numericValue = Number(String(value).replace(/[^\d.]/g, ""));
+  if (Number.isNaN(numericValue) || numericValue <= 0) return "—";
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(numericValue);
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 102.4) / 10)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function createFileItem(file) {
+  return {
+    id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2, 8)}`,
+    file,
+    preview: URL.createObjectURL(file),
+  };
+}
+
+function fileLabel(fileItem) {
+  if (!fileItem) return "Not uploaded";
+  return `${fileItem.file.name} · ${formatFileSize(fileItem.file.size)}`;
+}
+
+function hasText(value) {
+  return String(value || "").trim().length > 0;
+}
 
 function StepIndicator({ steps, current }) {
   return (
@@ -36,7 +66,7 @@ function StepIndicator({ steps, current }) {
 function Step1({ data, setData }) {
   return (
     <div>
-      <h1 className="text-[32px] font-extrabold text-gray-900 mb-2">Basic Information</h1>
+      <h1 className="text-[32px] font-extrabold text-black mb-2">Basic Information</h1>
       <p className="text-[14px] text-gray-500 mb-7 leading-relaxed">Establish the core identity of your initiative. These details help potential backers understand the academic context and primary goal of your project.</p>
       <div className="flex flex-col gap-5">
         <div>
@@ -68,7 +98,76 @@ function Step1({ data, setData }) {
   );
 }
 
-function Step2() {
+function Step2({ media, setMedia }) {
+  const coverInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
+  const uploadCover = event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMedia(prev => {
+      if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
+      return { ...prev, coverImage: createFileItem(file) };
+    });
+    event.target.value = "";
+  };
+
+  const uploadVideo = event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setMedia(prev => ({ ...prev, videoFile: { file } }));
+    event.target.value = "";
+  };
+
+  const uploadGallery = event => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setMedia(prev => {
+      const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
+      const nextGallery = files.slice(0, remainingSlots).map(createFileItem);
+      return { ...prev, galleryImages: [...prev.galleryImages, ...nextGallery] };
+    });
+    event.target.value = "";
+  };
+
+  const removeCover = () => {
+    setMedia(prev => {
+      if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
+      return { ...prev, coverImage: null };
+    });
+  };
+
+  const removeGalleryImage = id => {
+    setMedia(prev => {
+      const target = prev.galleryImages.find(image => image.id === id);
+      if (target?.preview) URL.revokeObjectURL(target.preview);
+      return { ...prev, galleryImages: prev.galleryImages.filter(image => image.id !== id) };
+    });
+  };
+
+  const handleDrop = (event, kind) => {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files || []);
+    if (!files.length) return;
+
+    if (kind === "cover") {
+      setMedia(prev => {
+        if (prev.coverImage?.preview) URL.revokeObjectURL(prev.coverImage.preview);
+        return { ...prev, coverImage: createFileItem(files[0]) };
+      });
+      return;
+    }
+
+    if (kind === "gallery") {
+      setMedia(prev => {
+        const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
+        const nextGallery = files.slice(0, remainingSlots).map(createFileItem);
+        return { ...prev, galleryImages: [...prev.galleryImages, ...nextGallery] };
+      });
+    }
+  };
+
   return (
     <div>
       <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Media Uploads</h2>
@@ -77,39 +176,74 @@ function Step2() {
         <div>
           <div className="text-[14px] font-bold text-gray-900 mb-1">Cover Image</div>
           <p className="text-[12px] text-gray-400 mb-2.5">Minimum resolution: 1920×1080px (16:9 ratio). Max size: 5MB.</p>
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-10 text-center cursor-pointer hover:border-brand transition-colors">
-            <div className="text-3xl text-gray-200 mb-2">⬆</div>
-            <div className="text-[13px] text-brand font-semibold">Upload a file</div>
-            <div className="text-[12px] text-gray-400">or drag and drop</div>
-            <div className="text-[11px] text-gray-300 mt-1">PNG, JPG, WEBP UP TO 5MB</div>
-          </div>
+          {media.coverImage ? (
+            <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+              <img src={media.coverImage.preview} alt="Project cover preview" className="w-full h-56 object-cover" />
+              <div className="p-4 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[13px] font-bold text-gray-900">{media.coverImage.file.name}</div>
+                  <div className="text-[11px] text-gray-400">{formatFileSize(media.coverImage.file.size)}</div>
+                </div>
+                <button onClick={removeCover} className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">Remove</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={uploadCover} />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                onDragOver={event => event.preventDefault()}
+                onDrop={event => handleDrop(event, "cover")}
+                className="w-full border-2 border-dashed border-gray-200 rounded-lg p-10 text-center cursor-pointer hover:border-brand transition-colors bg-white"
+              >
+                <div className="text-3xl text-gray-200 mb-2">⬆</div>
+                <div className="text-[13px] text-brand font-semibold">Upload a file</div>
+                <div className="text-[12px] text-gray-400">or drag and drop</div>
+                <div className="text-[11px] text-gray-300 mt-1">PNG, JPG, WEBP UP TO 5MB</div>
+              </button>
+            </>
+          )}
         </div>
         <div>
           <div className="text-[14px] font-bold text-gray-900 mb-1">Project Video</div>
           <p className="text-[12px] text-gray-400 mb-3">Provide a YouTube/Vimeo URL or upload directly.</p>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Video URL (Recommended)</label>
-          <input placeholder="https://youtube.com/watch?v=..." className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors mb-2" />
+          <input value={media.videoUrl} onChange={e => setMedia(prev => ({ ...prev, videoUrl: e.target.value }))} placeholder="https://youtube.com/watch?v=..." className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors mb-2" />
+          {media.videoFile ? (
+            <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2">
+              <div>
+                <div className="text-[13px] font-bold text-gray-900">{media.videoFile.file.name}</div>
+                <div className="text-[11px] text-gray-400">Uploaded video file</div>
+              </div>
+            </div>
+          ) : null}
           <div className="text-center text-[12px] text-gray-300 my-2">OR UPLOAD</div>
           <div className="flex items-center gap-3">
-            <button className="bg-white border border-brand text-brand rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer hover:bg-red-50 transition-colors">↑ SELECT VIDEO FILE</button>
+            <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={uploadVideo} />
+            <button type="button" onClick={() => videoInputRef.current?.click()} className="bg-white border border-brand text-brand rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer hover:bg-red-50 transition-colors">↑ SELECT VIDEO FILE</button>
             <span className="text-[11px] text-gray-300">MP4, MOV UP TO 50MB</span>
           </div>
         </div>
         <div>
           <div className="text-[14px] font-bold text-gray-900 mb-1">Prototype Gallery</div>
           <p className="text-[12px] text-gray-400 mb-3">Upload up to 6 additional photos.</p>
-          <div className="grid grid-cols-3 gap-2.5">
-            {[1, 2].map(i => (
-              <div key={i} className="aspect-square rounded-lg overflow-hidden bg-gray-900">
-                <img src={`https://images.unsplash.com/photo-156504${3660 + i * 1000}-4636190af475?w=200&q=70`} alt="" className="w-full h-full object-cover opacity-85" />
+          <input ref={galleryInputRef} type="file" accept="image/*" multiple className="hidden" onChange={uploadGallery} />
+          <div onDragOver={event => event.preventDefault()} onDrop={event => handleDrop(event, "gallery")} className="grid grid-cols-3 gap-2.5">
+            {media.galleryImages.map(image => (
+              <div key={image.id} className="relative aspect-square rounded-lg overflow-hidden bg-gray-900 group">
+                <img src={image.preview} alt={image.file.name} className="w-full h-full object-cover opacity-90" />
+                <button type="button" onClick={() => removeGalleryImage(image.id)} className="absolute top-2 right-2 bg-black/60 text-white rounded-full w-7 h-7 text-sm opacity-0 group-hover:opacity-100 transition-opacity">×</button>
               </div>
             ))}
-            <div className="aspect-square border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-brand transition-colors gap-1">
-              <span className="text-xl text-gray-300">+</span>
-              <span className="text-[11px] text-gray-300">ADD PHOTO</span>
-            </div>
+            {media.galleryImages.length < MAX_GALLERY_IMAGES && (
+              <button type="button" onClick={() => galleryInputRef.current?.click()} className="aspect-square border-2 border-dashed border-gray-200 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-brand transition-colors gap-1 bg-white">
+                <span className="text-xl text-gray-300">+</span>
+                <span className="text-[11px] text-gray-300">ADD PHOTO</span>
+              </button>
+            )}
           </div>
-          <p className="text-[11px] text-gray-300 mt-2">2 of 6 photos uploaded.</p>
+          <p className="text-[11px] text-gray-300 mt-2">{media.galleryImages.length} of {MAX_GALLERY_IMAGES} photos uploaded.</p>
         </div>
       </div>
     </div>
@@ -240,19 +374,226 @@ function Step4({ tiers, setTiers }) {
   );
 }
 
+function Step5({ basicData, media, team, tiers, onEdit }) {
+  return (
+    <div>
+      <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Review & Submit</h2>
+      <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Confirm everything is ready before sending your project for approval.</p>
+      <div className="grid grid-cols-1 gap-4">
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">BASIC INFORMATION</div>
+              <div className="text-lg font-extrabold text-gray-900">{basicData.title || "Untitled project"}</div>
+            </div>
+            <button type="button" onClick={() => onEdit(1)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[13px] text-gray-600">
+            <div><span className="text-gray-400">School:</span> {basicData.school || "—"}</div>
+            <div><span className="text-gray-400">Funding goal:</span> {formatCurrency(basicData.goal)}</div>
+          </div>
+          <div className="mt-4 text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">{basicData.proposition || "No value proposition added yet."}</div>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">MEDIA</div>
+              <div className="text-lg font-extrabold text-gray-900">Uploads ready for review</div>
+            </div>
+            <button type="button" onClick={() => onEdit(2)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[13px] text-gray-600">
+            <div>
+              <div className="text-gray-400 text-[11px] font-bold tracking-widest mb-1">Cover image</div>
+              <div>{fileLabel(media.coverImage)}</div>
+            </div>
+            <div>
+              <div className="text-gray-400 text-[11px] font-bold tracking-widest mb-1">Project video</div>
+              <div>{media.videoUrl || fileLabel(media.videoFile) || "Not uploaded"}</div>
+            </div>
+          </div>
+          <div className="mt-4">
+            <div className="text-gray-400 text-[11px] font-bold tracking-widest mb-2">Gallery</div>
+            <div className="flex flex-wrap gap-2">
+              {media.galleryImages.length > 0 ? media.galleryImages.map(image => (
+                <span key={image.id} className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-[12px] text-gray-600">
+                  <span className="w-2 h-2 rounded-full bg-brand" />
+                  {image.file.name}
+                </span>
+              )) : <span className="text-[13px] text-gray-400">No gallery images uploaded.</span>}
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">TEAM</div>
+              <div className="text-lg font-extrabold text-gray-900">{team.length} contributors</div>
+            </div>
+            <button type="button" onClick={() => onEdit(3)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
+          </div>
+          <div className="flex flex-col gap-3">
+            {team.map(member => (
+              <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 rounded-lg bg-gray-50 border border-gray-100 p-3">
+                <div>
+                  <div className="text-[13px] font-bold text-gray-900">{member.name}</div>
+                  <div className="text-[11px] text-gray-400">RMIT ID: {member.rmitId || "—"}</div>
+                </div>
+                <span className={`self-start sm:self-auto text-[10px] font-bold px-2 py-0.5 rounded-sm ${ROLE_BADGE[member.role] || "bg-gray-100 text-gray-600"}`}>{member.role}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">FUNDING TIERS</div>
+              <div className="text-lg font-extrabold text-gray-900">{tiers.length > 0 ? `${tiers.length} tier${tiers.length > 1 ? "s" : ""}` : "No tiers added"}</div>
+            </div>
+            <button type="button" onClick={() => onEdit(4)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
+          </div>
+          {tiers.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {tiers.map(tier => (
+                <div key={tier.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <div className="text-[13px] font-bold text-gray-900">{tier.name}</div>
+                  <div className="text-[12px] text-gray-500 mb-2">{tier.amount} CC minimum contribution</div>
+                  <div className="flex flex-wrap gap-2">
+                    {tier.privileges.filter(Boolean).map(privilege => (
+                      <span key={privilege} className="rounded-full bg-white border border-gray-200 px-2.5 py-1 text-[12px] text-gray-600">{privilege}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[13px] text-gray-400">You can submit without reward tiers, but you should add them before publishing.</div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 export default function CreateProject() {
   const [step, setStep] = useState(1);
   const [basicData, setBasicData] = useState({ title: "", school: "", goal: "", proposition: "" });
+  const [media, setMedia] = useState({ coverImage: null, videoUrl: "", videoFile: null, galleryImages: [] });
   const [team, setTeam] = useState(MOCK_TEAM);
   const [tiers, setTiers] = useState(CREATE_PROJECT_TIERS);
+  const [message, setMessage] = useState("");
+  const [isSubmitted, setIsSubmitted] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    return () => {
+      if (media.coverImage?.preview) URL.revokeObjectURL(media.coverImage.preview);
+      media.galleryImages.forEach(image => URL.revokeObjectURL(image.preview));
+    };
+  }, [media.coverImage, media.galleryImages]);
+
+  const validateStep = targetStep => {
+    if (targetStep === 1) {
+      if (!hasText(basicData.title)) return "Add a project title before continuing.";
+      if (!hasText(basicData.school)) return "Choose a school or department before continuing.";
+      const goalValue = Number(String(basicData.goal).replace(/[^\d.]/g, ""));
+      if (!hasText(basicData.goal) || Number.isNaN(goalValue) || goalValue < 500) return "Enter a funding goal of at least $500.";
+      if (!hasText(basicData.proposition)) return "Add your value proposition before continuing.";
+    }
+
+    if (targetStep === 2) {
+      if (!media.coverImage) return "Upload a cover image before continuing.";
+      if (!hasText(media.videoUrl) && !media.videoFile) return "Add a project video URL or upload a video file before continuing.";
+      if (media.galleryImages.length === 0) return "Upload at least one prototype gallery image before continuing.";
+    }
+
+    if (targetStep === 3) {
+      if (team.length === 0) return "Add at least one team member before continuing.";
+    }
+
+    if (targetStep === 4) {
+      if (tiers.some(tier => !hasText(tier.name) || !hasText(tier.amount))) return "Complete or remove any partially filled reward tiers before continuing.";
+    }
+
+    return "";
+  };
+
+  const goToStep = targetStep => {
+    setIsSubmitted(false);
+
+    if (targetStep < step) {
+      setMessage("");
+      setStep(targetStep);
+      return;
+    }
+
+    for (let current = step; current < targetStep; current += 1) {
+      const validation = validateStep(current);
+      if (validation) {
+        setMessage(validation);
+        return;
+      }
+    }
+
+    setMessage("");
+    setStep(targetStep);
+  };
+
+  const advanceStep = () => {
+    setIsSubmitted(false);
+
+    const validation = validateStep(step);
+    if (validation) {
+      setMessage(validation);
+      return;
+    }
+
+    setMessage("");
+    setStep(current => Math.min(STEPS.length, current + 1));
+  };
+
+  const handlePrimaryFooterAction = () => {
+    if (step === STEPS.length) {
+      setMessage("");
+      setIsSubmitted(false);
+      setStep(STEPS.length - 1);
+      return;
+    }
+
+    setMessage("Draft saved locally. Continue when you're ready.");
+  };
+
+  const handleSubmit = () => {
+    const requiredStepError = [1, 2, 3, 4].map(validateStep).find(Boolean);
+    if (requiredStepError) {
+      setMessage(requiredStepError);
+      return;
+    }
+
+    setMessage("");
+    setIsSubmitted(true);
+  };
+
   const renderStep = () => {
+    if (isSubmitted) {
+      return (
+        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+          <div className="inline-flex items-center gap-2 rounded-full bg-green-50 text-green-700 border border-green-200 px-3 py-1 text-[11px] font-bold tracking-widest mb-4">SUBMISSION RECEIVED</div>
+          <h2 className="text-[24px] font-extrabold text-gray-900 mb-2">Your project is ready for review</h2>
+          <p className="text-[14px] text-gray-500 leading-relaxed">The submission has been prepared for admin review. You can return to the summary if you need to make a last edit.</p>
+        </div>
+      );
+    }
+
     switch (step) {
       case 1: return <Step1 data={basicData} setData={setBasicData} />;
-      case 2: return <Step2 />;
+      case 2: return <Step2 media={media} setMedia={setMedia} />;
       case 3: return <Step3 team={team} setTeam={setTeam} />;
       case 4: return <Step4 tiers={tiers} setTiers={setTiers} />;
+      case 5: return <Step5 basicData={basicData} media={media} team={team} tiers={tiers} onEdit={goToStep} />;
       default: return <div className="text-gray-400 text-sm">Step {step} — coming soon.</div>;
     }
   };
@@ -269,11 +610,12 @@ export default function CreateProject() {
           <div className="text-[14px] font-bold text-gray-900 mb-1">Create Project</div>
           <div className="text-[12px] text-gray-400 mb-4 md:mb-6">Submit your proposal for review.</div>
           <StepIndicator steps={STEPS} current={step} />
+          {message && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{message}</div>}
         </div>
         <div className="min-w-0">
           {renderStep()}
           <div className="flex flex-col sm:flex-row gap-3 justify-between mt-9 pt-5 border-t border-gray-100">
-            <button className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
+            <button onClick={handlePrimaryFooterAction} className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
               {step === STEPS.length ? "← BACK" : "SAVE DRAFT"}
             </button>
             <div className="flex flex-col-reverse sm:flex-row gap-2.5 w-full sm:w-auto">
@@ -281,9 +623,9 @@ export default function CreateProject() {
                 <button onClick={() => setStep(s => s - 1)} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">← Back</button>
               )}
               {step < STEPS.length ? (
-                <button onClick={() => setStep(s => Math.min(STEPS.length, s + 1))} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">NEXT STEP →</button>
+                <button onClick={advanceStep} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">NEXT STEP →</button>
               ) : (
-                <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SUBMIT PROJECT FOR APPROVAL ▶</button>
+                <button onClick={handleSubmit} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SUBMIT PROJECT FOR APPROVAL ▶</button>
               )}
             </div>
           </div>
