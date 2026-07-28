@@ -9,6 +9,7 @@ import {
 } from "../mock";
 
 const MAX_GALLERY_IMAGES = 6;
+const DRAFT_STORAGE_KEY = "rmit-launchpad-create-project-draft";
 
 function formatCurrency(value) {
   const numericValue = Number(String(value).replace(/[^\d.]/g, ""));
@@ -36,6 +37,83 @@ function fileLabel(fileItem) {
 
 function hasText(value) {
   return String(value || "").trim().length > 0;
+}
+
+function serializeMedia(media) {
+  return {
+    coverImage: media.coverImage
+      ? {
+          id: media.coverImage.id,
+          fileName: media.coverImage.file?.name ?? media.coverImage.fileName,
+          fileSize: media.coverImage.file?.size ?? media.coverImage.fileSize,
+        }
+      : null,
+    videoUrl: media.videoUrl || "",
+    videoFile: media.videoFile
+      ? {
+          fileName: media.videoFile.file?.name ?? media.videoFile.fileName,
+          fileSize: media.videoFile.file?.size ?? media.videoFile.fileSize,
+        }
+      : null,
+    galleryImages: (media.galleryImages || []).map(image => ({
+      id: image.id,
+      fileName: image.file?.name ?? image.fileName,
+      fileSize: image.file?.size ?? image.fileSize,
+    })),
+  };
+}
+
+function restoreMedia(mediaDraft) {
+  return {
+    coverImage: mediaDraft?.coverImage
+      ? {
+          id: mediaDraft.coverImage.id,
+          file: {
+            name: mediaDraft.coverImage.fileName || "Uploaded image",
+            size: mediaDraft.coverImage.fileSize || 0,
+          },
+          preview: null,
+        }
+      : null,
+    videoUrl: mediaDraft?.videoUrl || "",
+    videoFile: mediaDraft?.videoFile
+      ? {
+          file: {
+            name: mediaDraft.videoFile.fileName || "Uploaded video",
+            size: mediaDraft.videoFile.fileSize || 0,
+          },
+        }
+      : null,
+    galleryImages: (mediaDraft?.galleryImages || []).map(image => ({
+      id: image.id,
+      file: {
+        name: image.fileName || "Uploaded image",
+        size: image.fileSize || 0,
+      },
+      preview: null,
+    })),
+  };
+}
+
+function getStoredDraft() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const storedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    return storedDraft ? JSON.parse(storedDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraftToStorage(draft) {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Ignore storage errors so the form still works if storage is unavailable.
+  }
 }
 
 function StepIndicator({ steps, current }) {
@@ -479,14 +557,33 @@ function Step5({ basicData, media, team, tiers, onEdit }) {
 }
 
 export default function CreateProject() {
-  const [step, setStep] = useState(1);
-  const [basicData, setBasicData] = useState({ title: "", school: "", goal: "", proposition: "" });
-  const [media, setMedia] = useState({ coverImage: null, videoUrl: "", videoFile: null, galleryImages: [] });
-  const [team, setTeam] = useState(MOCK_TEAM);
-  const [tiers, setTiers] = useState(CREATE_PROJECT_TIERS);
+  const storedDraft = getStoredDraft();
+  const [step, setStep] = useState(storedDraft?.step ?? 1);
+  const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", goal: "", proposition: "" });
+  const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", videoFile: null, galleryImages: [] });
+  const [team, setTeam] = useState(storedDraft?.team ?? MOCK_TEAM);
+  const [tiers, setTiers] = useState(storedDraft?.tiers ?? CREATE_PROJECT_TIERS);
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(Boolean(storedDraft));
   const navigate = useNavigate();
+
+  useEffect(() => {
+    saveDraftToStorage({
+      step,
+      basicData,
+      media: serializeMedia(media),
+      team,
+      tiers,
+    });
+  }, [basicData, media, step, team, tiers]);
+
+  useEffect(() => {
+    if (!hasRestoredDraft) return;
+
+    const timer = window.setTimeout(() => setHasRestoredDraft(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, [hasRestoredDraft]);
 
   useEffect(() => {
     return () => {
@@ -563,6 +660,14 @@ export default function CreateProject() {
       return;
     }
 
+    saveDraftToStorage({
+      step,
+      basicData,
+      media: serializeMedia(media),
+      team,
+      tiers,
+    });
+
     setMessage("Draft saved locally. Continue when you're ready.");
   };
 
@@ -610,6 +715,11 @@ export default function CreateProject() {
           <div className="text-[14px] font-bold text-gray-900 mb-1">Create Project</div>
           <div className="text-[12px] text-gray-400 mb-4 md:mb-6">Submit your proposal for review.</div>
           <StepIndicator steps={STEPS} current={step} />
+          {hasRestoredDraft && (
+            <div className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-[13px] text-green-700">
+              Draft restored from your previous session.
+            </div>
+          )}
           {message && <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">{message}</div>}
         </div>
         <div className="min-w-0">
