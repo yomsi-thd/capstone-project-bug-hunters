@@ -76,10 +76,36 @@ async function deleteProject(projectId, userId) {
     await projectRepository.deleteProject(projectId);
 }
 
+async function approveProject(id) {
+
+    const project =
+        await projectRepository.approveProject(id);
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    return project;
+}
+
+async function rejectProject(id) {
+
+    const project =
+        await projectRepository.rejectProject(id);
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    return project;
+}
+
 module.exports = {
     createProject,
     getAllProjects,
     getProjectById,
     updateProject,
-    deleteProject
+    deleteProject,
+    approveProject,
+    rejectProject
 };

@@ -84,6 +84,36 @@ async function updateProject(id, project) {
     return result.rows[0];
 }
 
+async function approveProject(id) {
+
+    const result = await pool.query(
+        `
+        UPDATE projects
+        SET status = 'APPROVED'
+        WHERE id = $1
+        RETURNING *;
+        `,
+        [id]
+    );
+
+    return result.rows[0];
+}
+
+async function rejectProject(id) {
+
+    const result = await pool.query(
+        `
+        UPDATE projects
+        SET status = 'REJECTED'
+        WHERE id = $1
+        RETURNING *;
+        `,
+        [id]
+    );
+
+    return result.rows[0];
+}
+
 // Delete project
 async function deleteProject(id) {
     await pool.query(
@@ -97,5 +127,7 @@ module.exports = {
     findAll,
     findById,
     updateProject,
-    deleteProject
+    deleteProject,
+    approveProject,
+    rejectProject
 };

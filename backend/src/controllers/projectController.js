@@ -87,10 +87,52 @@ const deleteProject = async (req, res) => {
     }
 };
 
+async function approveProject(req, res) {
+
+    try {
+
+        const project =
+            await projectService.approveProject(
+                req.params.id
+            );
+
+        res.json(project);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function rejectProject(req, res) {
+
+    try {
+
+        const project =
+            await projectService.rejectProject(
+                req.params.id
+            );
+
+        res.json(project);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
 module.exports = {
     createProject,
     getAllProjects,
     getProjectById,
     updateProject,
-    deleteProject
+    deleteProject,
+    approveProject,
+    rejectProject
 };
