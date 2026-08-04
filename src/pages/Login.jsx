@@ -5,6 +5,8 @@ import AuthInput from "../components/auth/AuthInput";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 
+import { login as loginApi } from "../api/authApi";//backend api
+
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
@@ -48,6 +50,35 @@ export default function Login() {
       }
     }, 600);
   };
+
+  const handleBackendLogin = async () => {
+  try {
+    const result = await loginApi(email, password);
+
+    console.log(result);
+
+    localStorage.setItem("accessToken", result.accessToken);
+    localStorage.setItem("refreshToken", result.refreshToken);
+
+    switch (result.user.role) {
+      case "ADMIN":
+        navigate("/admin-dashboard");
+        break;
+
+      case "USER":
+        navigate("/creator-dashboard");
+        break;
+
+      default:
+        navigate("/discover");
+    }
+  } catch (err) {
+    setErrors({
+      password:
+        err.response?.data?.message || "Login failed",
+    });
+  }
+};
 
   return (
     <AuthLayout isMobile={isMobile}>
