@@ -127,6 +127,28 @@ async function rejectProject(req, res) {
     }
 }
 
+async function investProject(req, res) {
+    try {
+        const userId = req.user.id;
+        const projectId = req.params.id;
+        const { amount } = req.body;
+
+        const result = await projectService.investProject(
+            userId,
+            projectId,
+            amount
+        );
+
+        res.status(200).json(result);
+
+    } catch (error) {
+        res.status(400).json({
+            message: error.message
+        });
+    }
+}
+
+
 module.exports = {
     createProject,
     getAllProjects,
@@ -134,5 +156,6 @@ module.exports = {
     updateProject,
     deleteProject,
     approveProject,
-    rejectProject
+    rejectProject,
+    investProject
 };

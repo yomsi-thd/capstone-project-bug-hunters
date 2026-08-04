@@ -122,6 +122,22 @@ async function deleteProject(id) {
     );
 }
 
+async function increaseCurrentAmount(projectId, amount) {
+    const result = await pool.query(
+        `
+        UPDATE campaigns
+        SET
+            current_amount = current_amount + $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = $2
+        RETURNING *;
+        `,
+        [amount, projectId]
+    );
+
+    return result.rows[0];
+}
+
 module.exports = {
     createProject,
     findAll,
@@ -129,5 +145,6 @@ module.exports = {
     updateProject,
     deleteProject,
     approveProject,
-    rejectProject
+    rejectProject,
+    increaseCurrentAmount
 };

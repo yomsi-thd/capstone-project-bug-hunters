@@ -14,8 +14,8 @@ async function createClassCoin(userId) {
     return result.rows[0];
 }
 
-// Find by user id
-async function findByUserId(userId) {
+// Get Balance
+async function getBalance(userId) {
     const result = await pool.query(
         `
         SELECT *
@@ -29,17 +29,33 @@ async function findByUserId(userId) {
 }
 
 // Update balance
-async function updateBalance(id, balance) {
+async function deductBalance(userId, amount) {
     const result = await pool.query(
         `
         UPDATE classcoins
         SET
-            balance = $1,
+            balance = balance - $1,
             updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
+        WHERE user_id = $2
         RETURNING *;
         `,
-        [balance, id]
+        [amount, userId]
+    );
+
+    return result.rows[0];
+}
+
+async function addBalance(userId, amount) {
+    const result = await pool.query(
+        `
+        UPDATE classcoins
+        SET
+            balance = balance + $1,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE user_id = $2
+        RETURNING *;
+        `,
+        [amount, userId]
     );
 
     return result.rows[0];
@@ -89,8 +105,9 @@ async function getTransactions(classcoinId) {
 
 module.exports = {
     createClassCoin,
-    findByUserId,
-    updateBalance,
+    getBalance,
+    deductBalance,
+    addBalance,
     createTransaction,
     getTransactions
 };

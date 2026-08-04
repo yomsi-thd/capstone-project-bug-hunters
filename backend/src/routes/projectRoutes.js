@@ -29,4 +29,10 @@ router.patch(
     projectController.rejectProject
 );
 
+router.post(
+    "/:id/invest",
+    authenticate,
+    projectController.investProject
+);
+
 module.exports = router;

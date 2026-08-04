@@ -1,4 +1,5 @@
 const projectRepository = require("../repositories/projectRepository");
+const classCoinRepository = require("../repositories/classCoinRepository");
 
 // Create project
 async function createProject(userId, data) {
@@ -100,6 +101,57 @@ async function rejectProject(id) {
     return project;
 }
 
+async function investProject(userId, projectId, amount) {
+
+    // Validate amount
+    if (!amount || amount <= 0) {
+        throw new Error("Investment amount must be greater than 0.");
+    }
+
+    // Get user's ClassCoin wallet
+    const wallet = await classCoinRepository.getBalance(userId);
+
+    if (!wallet) {
+        throw new Error("ClassCoin wallet not found.");
+    }
+
+    // Check balance
+    if (wallet.balance < amount) {
+        throw new Error("Insufficient ClassCoins.");
+    }
+
+    // Find project
+    const project = await projectRepository.findById(projectId);
+
+    if (!project) {
+        throw new Error("Project not found.");
+    }
+
+    // Only approved projects can receive investments
+    if (project.status !== "APPROVED") {
+        throw new Error("Only approved projects can receive investments.");
+    }
+
+    // Deduct user's ClassCoins
+    await classCoinRepository.deductBalance(userId, amount);
+
+    // Increase project's current amount
+    await projectRepository.increaseCurrentAmount(projectId, amount);
+
+    // Save transaction history
+    const transaction =
+        await classCoinTransactionRepository.createTransaction(
+            userId,
+            projectId,
+            amount
+        );
+
+    return {
+        message: "Investment successful.",
+        transaction
+    };
+}
+
 module.exports = {
     createProject,
     getAllProjects,
@@ -107,5 +159,6 @@ module.exports = {
     updateProject,
     deleteProject,
     approveProject,
-    rejectProject
+    rejectProject,
+    investProject
 };
