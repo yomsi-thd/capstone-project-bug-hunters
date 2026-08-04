@@ -7,6 +7,7 @@ const classCoinRepository = require("../repositories/classCoinRepository");
 const {
     generateAccessToken,
     generateRefreshToken,
+    verifyRefreshToken
 } = require("../utils/jwt");
 
 async function register(fullName, email, password) {
@@ -27,6 +28,8 @@ async function register(fullName, email, password) {
             email,
             hashedPassword
         );
+
+    await userRepository.assignRole(user.id, "BACKER");
 
     await classCoinRepository.createClassCoin(user.id);
 
@@ -49,8 +52,10 @@ async function login(email, password) {
         throw new Error("Invalid email or password");
     }
 
-    const accessToken = generateAccessToken(user);
-    const refreshToken = generateRefreshToken(user);
+    const roles = await userRepository.getUserRoles(user.id);
+
+    const accessToken = generateAccessToken(user, roles);
+    const refreshToken = generateRefreshToken(user, roles);
 
     // expires in 7 days
     const expiresAt = new Date();
@@ -69,7 +74,7 @@ async function login(email, password) {
             id: user.id,
             fullName: user.full_name,
             email: user.email,
-            role: user.role
+            roles
         }
     };
 }
@@ -102,8 +107,10 @@ async function refreshToken(token) {
         throw new Error("User not found");
     }
 
+    const roles = await userRepository.getUserRoles(user.id);
+
     // Create a new access token
-    const accessToken = generateAccessToken(user);
+    const accessToken = generateAccessToken(user, roles);
 
     return {
         accessToken

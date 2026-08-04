@@ -65,11 +65,60 @@ async function deleteUser(id) {
     return result.rows[0];
 }
 
+async function getUserRoles(userId) {
+    const result = await pool.query(
+        `
+        SELECT r.name
+        FROM user_roles ur
+        JOIN roles r
+            ON ur.role_id = r.id
+        WHERE ur.user_id = $1;
+        `,
+        [userId]
+    );
+
+    return result.rows.map(role => role.name);
+}
+
+async function assignRole(userId, roleName) {
+    const result = await pool.query(
+        `
+        INSERT INTO user_roles (user_id, role_id)
+        SELECT $1, id
+        FROM roles
+        WHERE name = $2
+        ON CONFLICT DO NOTHING
+        RETURNING *;
+        `,
+        [userId, roleName]
+    );
+
+    return result.rows[0];
+}
+
+async function removeRole(userId, roleName) {
+    await pool.query(
+        `
+        DELETE FROM user_roles
+        WHERE user_id = $1
+        AND role_id = (
+            SELECT id
+            FROM roles
+            WHERE name = $2
+        );
+        `,
+        [userId, roleName]
+    );
+}
+
 module.exports = {
     createUser,
     findById,
     findByEmail,
     updateProfile,
     updatePassword,
-    deleteUser
+    deleteUser,
+    getUserRoles,
+    assignRole,
+    removeRole
 };

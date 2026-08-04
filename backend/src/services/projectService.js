@@ -1,5 +1,6 @@
 const projectRepository = require("../repositories/projectRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
+const userRepository = require("../repositories/userRepository");
 
 // Create project
 async function createProject(userId, data) {
@@ -16,7 +17,12 @@ async function createProject(userId, data) {
         team_members: data.team_members || []
     };
 
-    return await projectRepository.createProject(project);
+    const createdProject =
+        await projectRepository.createProject(project);
+
+    await userRepository.assignRole(userId, "CREATOR");
+
+    return createdProject;
 }
 
 // Get all projects
