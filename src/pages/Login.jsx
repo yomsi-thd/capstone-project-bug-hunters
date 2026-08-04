@@ -51,34 +51,40 @@ export default function Login() {
     }, 600);
   };
 
+  // Hiếu's real-backend login. Deliberately NOT wired to the form yet — it is kept here
+  // as the reference for the call shape while the auth contract is being agreed on.
+  //
+  // TODO: move this into AuthContext.login() rather than calling it from this page.
+  // The whole app reads the signed-in user from AuthContext (Header, nav links, balance,
+  // canInvest), so writing only to localStorage would leave the UI looking logged out.
+  // Blocked on the role model: the backend returns a single uppercase `role` while the
+  // context expects a lowercase `roles` array — see BACKEND-REVIEW-FOR-HIEU.md §1.1.
+  // eslint-disable-next-line no-unused-vars -- intentionally unused until the wiring above lands
   const handleBackendLogin = async () => {
-  try {
-    const result = await loginApi(email, password);
+    try {
+      const result = await loginApi(identifier, password);
 
-    console.log(result);
+      localStorage.setItem("accessToken", result.accessToken);
+      localStorage.setItem("refreshToken", result.refreshToken);
 
-    localStorage.setItem("accessToken", result.accessToken);
-    localStorage.setItem("refreshToken", result.refreshToken);
+      switch (result.user.role) {
+        case "ADMIN":
+          navigate("/admin-dashboard");
+          break;
 
-    switch (result.user.role) {
-      case "ADMIN":
-        navigate("/admin-dashboard");
-        break;
+        case "USER":
+          navigate("/creator-dashboard");
+          break;
 
-      case "USER":
-        navigate("/creator-dashboard");
-        break;
-
-      default:
-        navigate("/discover");
+        default:
+          navigate("/discover");
+      }
+    } catch (err) {
+      setErrors({
+        password: err.response?.data?.message || "Login failed",
+      });
     }
-  } catch (err) {
-    setErrors({
-      password:
-        err.response?.data?.message || "Login failed",
-    });
-  }
-};
+  };
 
   return (
     <AuthLayout isMobile={isMobile}>

@@ -5,7 +5,9 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // backend/ is CommonJS on Node (require/module/process) — this config targets browser
+  // ESM, so linting it here produces only false `no-undef` noise. It has its own scope.
+  globalIgnores(['dist', 'backend']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
