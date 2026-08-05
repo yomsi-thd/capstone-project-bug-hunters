@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
+import RequireAccess from "./components/auth/RequireAccess";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import CreatorMyProjects from "./pages/CreatorMyProjects";
 
@@ -9,10 +10,8 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProjectDetail from "./pages/ProjectDetail";
 import CreateProject from "./pages/CreateProject";
-import MyProjects from "./pages/MyProjects";
 import Dashboard from "./pages/Dashboard";
 import BackerInvestments from "./pages/BackerInvestments";
-import Admin from "./pages/Admin";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import AdminUserManagement from "./pages/AdminUserManagement";
@@ -23,33 +22,44 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
+        {/* ── Public ── */}
         <Route path="/" element={<Discover />} />
-
-        <Route path="/creator-dashboard" element={<CreatorDashboard />} />
-        <Route path="/creator-my-projects" element={<CreatorMyProjects/>} />
-
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
-        
-        <Route path="/admin-user-management" element={<AdminUserManagement />} />
-        <Route path="/admin-approvals" element={<AdminApprovals />} />
-
         <Route path="/discover" element={<Discover />} />
-
+        <Route path="/project/:id" element={<ProjectDetail />} />
         <Route path="/login" element={<Login />} />
-
         <Route path="/register" element={<Register />} />
 
-        <Route path="/project/:id" element={<ProjectDetail />} />
-
-        <Route path="/create-project" element={<CreateProject />} />
-
-        <Route path="/my-projects" element={<MyProjects />} />
-
-        <Route path="/dashboard" element={<Dashboard />} />
-
+        {/* /investments stays public on purpose: signed out it shows its own empty
+            state with a login call to action, which reads better than a redirect. */}
         <Route path="/investments" element={<BackerInvestments />} />
 
-        <Route path="/admin" element={<Admin />} />
+        {/* ── Creators (and admins, who are superusers) ── */}
+        <Route path="/creator-dashboard" element={
+          <RequireAccess permission="canCreate"><CreatorDashboard /></RequireAccess>
+        } />
+        <Route path="/creator-my-projects" element={
+          <RequireAccess permission="canCreate"><CreatorMyProjects /></RequireAccess>
+        } />
+        <Route path="/create-project" element={
+          <RequireAccess permission="canCreate"><CreateProject /></RequireAccess>
+        } />
+
+        {/* ── Admins only ── */}
+        <Route path="/admin-dashboard" element={
+          <RequireAccess permission="isAdmin"><AdminDashboard /></RequireAccess>
+        } />
+        <Route path="/admin-user-management" element={
+          <RequireAccess permission="isAdmin"><AdminUserManagement /></RequireAccess>
+        } />
+        <Route path="/admin-approvals" element={
+          <RequireAccess permission="isAdmin"><AdminApprovals /></RequireAccess>
+        } />
+
+        {/* Target of the "Account" link in both headers. Still a placeholder page.
+            TODO: build it on GET/PUT /api/users/profile + PUT /api/users/change-password. */}
+        <Route path="/dashboard" element={
+          <RequireAccess><Dashboard /></RequireAccess>
+        } />
 
         <Route path="*" element={<NotFound />} />
         </Routes>
