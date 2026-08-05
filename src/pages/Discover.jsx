@@ -6,7 +6,10 @@ import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
-import { ALL_PROJECTS, HERO_PROJECTS, TRENDING, FILTERS, FILTER_TAGS, PROJECT_DETAILS } from "../mock";
+// FILTERS / FILTER_TAGS are UI config, not data — they still come from the mock.
+import { FILTERS, FILTER_TAGS } from "../mock";
+import * as projectApi from "../api/projectApi";
+import { toCard } from "../api/mappers";
 
 function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner, onEdit }) {
   return (
@@ -132,14 +135,60 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
 
 const PROJECTS_PREVIEW_COUNT = 6;
 
+// Shared notice block for the loading / error / empty states.
+function StatusBlock({ title, detail, actionLabel, onAction }) {
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid #eee", borderRadius: "10px",
+      padding: "40px 24px", textAlign: "center", marginBottom: "32px",
+    }}>
+      <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#111" }}>{title}</h2>
+      {detail && (
+        <p style={{ margin: "8px auto 0", fontSize: "13px", color: "#888", maxWidth: "460px", lineHeight: 1.6 }}>
+          {detail}
+        </p>
+      )}
+      {actionLabel && (
+        <button
+          type="button"
+          onClick={onAction}
+          style={{
+            marginTop: "18px", background: "var(--color-brand)", color: "#fff",
+            border: "none", borderRadius: "5px", fontSize: "11px", fontWeight: 700,
+            letterSpacing: "0.08em", padding: "10px 22px", cursor: "pointer",
+            transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = "#aa0000";
+            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = "var(--color-brand)";
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function Discover() {
   const { canInvest, user } = useAuth();
   const navigate = useNavigate();
 
-  // Ownership lives in PROJECT_DETAILS (single source of truth); the hero
-  // listing mirrors it by id. Owner -> "Edit" CTA instead of "Invest".
-  const ownsProject = id => !!user && PROJECT_DETAILS[id]?.ownerId === user.username;
+  // Ownership compares the real user id against projects.creator_id.
+  // (The old mock compared user.username — the backend has no username column.)
+  const ownsProject = p => !!user && user.id != null && p?.ownerId === user.id;
   const goToEdit = () => navigate("/creator-my-projects");
+
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [showAll, setShowAll] = useState(false);
@@ -149,9 +198,42 @@ export default function Discover() {
 
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const rows = await projectApi.getAllProjects();
+        if (cancelled) return;
+        // GET /projects returns every status, including PENDING and REJECTED, so
+        // filter client-side. TODO: ask for a public route that only returns APPROVED.
+        setProjects(rows.filter(r => r.status === "APPROVED").map(toCard));
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err.response?.data?.message || err.message || "Could not load projects"
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [reloadKey]);
+
+  // The backend has no notion of hero/trending, so derive both from the data:
+  // Hero = the 3 newest projects, Trending = the 4 with the highest funded percentage.
+  // The two groups may overlap — as in the old mock, hero/trending projects also
+  // appear again in the "All Projects" grid below.
+  const hero = [...projects]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, 3);
+  const trending = [...projects].sort((a, b) => b.funded - a.funded).slice(0, 4);
+
   // Search and filters run over the whole catalogue, so a query reaches every
   // project (hero + trending + fresh), not just the ones shown in this grid.
-  const filteredProjects = ALL_PROJECTS.filter(p => {
+  const filteredProjects = projects.filter(p => {
     const matchFilter =
       activeFilter === "ALL" || (FILTER_TAGS[activeFilter] || []).includes(p.tag);
     const matchSearch =
@@ -222,9 +304,27 @@ export default function Discover() {
           the browser's scroll-anchoring, which would fight our scroll-to-top. */}
       <div style={{ maxWidth: "1100px", margin: "0 auto", padding: pad, overflowAnchor: "none" }}>
 
+        {loading && <StatusBlock title="Loading projects…" />}
+
+        {!loading && loadError && (
+          <StatusBlock
+            title="Could not load projects"
+            detail={loadError}
+            actionLabel="TRY AGAIN"
+            onAction={() => setReloadKey(k => k + 1)}
+          />
+        )}
+
+        {!loading && !loadError && projects.length === 0 && (
+          <StatusBlock
+            title="No projects yet"
+            detail="No approved projects have been published yet. Once a creator submits a project and an admin approves it, it will show up here."
+          />
+        )}
+
         {/* Hero + Trending are browse-only. Hide them while searching so the
             results grid rises to the top and the query's feedback is visible. */}
-        {!isSearching && (
+        {!isSearching && hero.length > 0 && (
         <>
         {/* ── Hero Grid ── */}
         <div className="lp-stagger" style={{
@@ -235,11 +335,11 @@ export default function Discover() {
           marginBottom: isMobile ? "32px" : "48px",
         }}>
           <HeroCard
-            project={HERO_PROJECTS[0]}
+            project={hero[0]}
             showDesc={!isMobile}
             showFundingBar
             canInvest={canInvest}
-            isOwner={ownsProject(HERO_PROJECTS[0].id)}
+            isOwner={ownsProject(hero[0])}
             onEdit={goToEdit}
             style={{
               gridRow: isDesktop ? "1 / 3" : "auto",
@@ -247,16 +347,17 @@ export default function Discover() {
               height: isMobile ? "260px" : isTablet ? "320px" : `${SMALL_H * 2 + GAP}px`,
             }}
           />
-          {!isMobile && (
+          {/* Only render when the project exists — the DB may hold fewer than 3 approved projects. */}
+          {!isMobile && hero[1] && (
             <HeroCard
-              project={HERO_PROJECTS[1]}
+              project={hero[1]}
               showFundingBar
               style={{ height: isTablet ? "180px" : `${SMALL_H}px` }}
             />
           )}
-          {!isMobile && (
+          {!isMobile && hero[2] && (
             <HeroCard
-              project={HERO_PROJECTS[2]}
+              project={hero[2]}
               showFundingBar
               style={{ height: isTablet ? "180px" : `${SMALL_H}px` }}
             />
@@ -284,13 +385,15 @@ export default function Discover() {
             gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
             gap: "14px",
           }}>
-            {TRENDING.map(p => <ProjectCard key={p.id} project={p} />)}
+            {trending.map(p => <ProjectCard key={p.id} project={p} />)}
           </div>
         </div>
         </>
         )}
 
         {/* ── All Projects ── */}
+        {/* Hidden while loading / on error / when empty — the StatusBlock above already says so. */}
+        {!loading && !loadError && projects.length > 0 && (
         <div id="all" style={{ marginBottom: isMobile ? "32px" : "48px" }}>
           <div style={{
             display: "flex",
@@ -421,6 +524,7 @@ export default function Discover() {
           </div>
           )}
         </div>
+        )}
       </div>
 
       <Footer isMobile={isMobile} />

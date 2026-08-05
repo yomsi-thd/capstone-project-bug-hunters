@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
-import { MY_INVESTMENTS } from "../mock";
+import * as classCoinApi from "../api/classCoinApi";
+import * as projectApi from "../api/projectApi";
+import { toInvestment } from "../api/mappers";
 
 function InvestmentCard({ investment, isMobile }) {
   return (
@@ -187,18 +189,58 @@ export default function BackerInvestments() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  const [investments, setInvestments] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 
+  // There is no GET /investments/my yet, so assemble it by hand: read the ClassCoin
+  // transaction history, keep the INVEST entries, then call GET /projects/:id for each
+  // one to get its title / image / progress.
+  // TODO: ask for a GET /investments/my that joins the project, to drop this N+1.
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const txs = await classCoinApi.getTransactions();
+        const invests = (txs || []).filter(t => t.type === "INVEST" && t.project_id != null);
+
+        const projectIds = [...new Set(invests.map(t => t.project_id))];
+        const projects = await Promise.all(
+          projectIds.map(pid => projectApi.getProjectById(pid).catch(() => null))
+        );
+        const byId = new Map(projectIds.map((pid, i) => [pid, projects[i]]));
+
+        if (!cancelled) {
+          setInvestments(invests.map(t => toInvestment(t, byId.get(t.project_id))));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(
+            err.response?.data?.message || err.message || "Could not load your investments"
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isLoggedIn]);
+
   // Local filter over the user's own investments (title / tag / description).
   const q = query.trim().toLowerCase();
   const filtered = q
-    ? MY_INVESTMENTS.filter(inv =>
+    ? investments.filter(inv =>
         inv.title.toLowerCase().includes(q) ||
         (inv.tag && inv.tag.toLowerCase().includes(q)) ||
         (inv.desc && inv.desc.toLowerCase().includes(q)))
-    : MY_INVESTMENTS;
+    : investments;
 
   return (
     <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
@@ -222,7 +264,17 @@ export default function BackerInvestments() {
         </p>
 
         {isLoggedIn ? (
-          MY_INVESTMENTS.length > 0 ? (
+          loading ? (
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "#888", fontSize: "14px" }}>
+              Loading your investments…
+            </div>
+          ) : loadError ? (
+            <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
+              <div style={{ fontSize: "32px", marginBottom: "8px" }}>⚠️</div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "#a11" }}>Could not load your investments</div>
+              <div style={{ fontSize: "13px", marginTop: "4px" }}>{loadError}</div>
+            </div>
+          ) : investments.length > 0 ? (
             <>
               {/* Local filter — sits right above the list it filters. */}
               <div style={{
@@ -263,6 +315,9 @@ export default function BackerInvestments() {
             <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
               <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
               <div style={{ fontSize: "14px", fontWeight: 600 }}>You haven't backed any projects yet</div>
+              <div style={{ fontSize: "13px", marginTop: "4px" }}>
+                Invest ClassCoins in a project and it will show up here.
+              </div>
             </div>
           )
         ) : (

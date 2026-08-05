@@ -4,6 +4,7 @@ import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
 import RegisterSuccessModal from "../components/auth/RegisterSuccessModal";
 import useBreakpoint from "../hooks/useBreakpoint";
+import * as authApi from "../api/authApi";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -40,17 +41,34 @@ export default function Register() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
+    const email = identifier.trim();
+    // The backend only accepts an email — the users table has no rmit_id / username.
+    // TODO: drop this guard once the backend supports signing up with an RMIT ID.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setErrors({
+        identifier: "The API only accepts an email address for now — RMIT ID sign-up needs a backend change",
+      });
+      return;
+    }
+
     setIsSubmitting(true);
-    // TODO: call authService.register({ fullName, identifier, password, roles: ["backer"] })
-    // and, if requestCreator, POST /role-requests { role: "creator" } for admin approval.
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      // The backend assigns the BACKER role and creates a ClassCoin wallet (4500 CC).
+      // TODO: the Creator role request is still mock — there is no POST /role-requests
+      // and no admin approval queue behind it.
+      await authApi.register({ fullName: fullName.trim(), email, password });
       setShowSuccess(true);
-    }, 600);
+    } catch (err) {
+      setErrors({
+        identifier: err.response?.data?.message || err.message || "Registration failed",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (

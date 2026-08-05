@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
@@ -8,7 +8,8 @@ import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
 import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
-import { PROJECT_DETAILS, COMMENTS_BY_PROJECT } from "../mock";
+import * as projectApi from "../api/projectApi";
+import { toDetail } from "../api/mappers";
 
 // Plain progress track for the detail-page sidebar (no % label — the sidebar
 // renders its own big % + "FUNDED" below). Distinct from the labelled card
@@ -86,7 +87,7 @@ function EndorsedBadge() {
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const { isLoggedIn, canInvest, balance, user } = useAuth();
+  const { isLoggedIn, canInvest, balance, user, refreshBalance } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,10 +98,48 @@ export default function ProjectDetail() {
   const [investStep, setInvestStep] = useState(null); // null | "invest" | "success"
   const [investedAmount, setInvestedAmount] = useState(0);
 
-  const handleConfirmInvestment = (amount) => {
-    // TODO: call investmentService.invest(p.id, amount) when backend is ready
-    setInvestedAmount(amount);
-    setInvestStep("success");
+  const [p, setP] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [investError, setInvestError] = useState(null);
+
+  // TODO: there is no comments API — the database has no comments table.
+  const comments = [];
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const row = await projectApi.getProjectById(id);
+        if (!cancelled) setP(toDetail(row));
+      } catch (err) {
+        if (cancelled) return;
+        // 404 -> the project does not exist, fall through to "Project not found" below.
+        if (err.response?.status === 404) setP(null);
+        else setLoadError(err.response?.data?.message || err.message || "Could not load this project");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  const handleConfirmInvestment = async (amount) => {
+    setInvestError(null);
+    try {
+      await projectApi.investProject(id, amount);
+      setInvestedAmount(amount);
+      setInvestStep("success");
+      // Both the Header balance and the funding progress change after investing.
+      refreshBalance();
+      const row = await projectApi.getProjectById(id);
+      setP(toDetail(row));
+    } catch (err) {
+      setInvestStep(null);
+      setInvestError(err.response?.data?.message || err.message || "Investment failed");
+    }
   };
 
   const closeModals = () => {
@@ -108,9 +147,31 @@ export default function ProjectDetail() {
     setInvestedAmount(0);
   };
 
-  // TODO: replace with GET /projects/:id + GET /projects/:id/comments when backend is ready
-  const p = PROJECT_DETAILS[id];
-  const comments = COMMENTS_BY_PROJECT[id] || [];
+  if (loading) {
+    return (
+      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+        <Header showSearch={false} />
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center", color: "#888" }}>
+          Loading project…
+        </div>
+        <Footer isMobile={isMobile} />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+        <Header showSearch={false} />
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
+          <h1 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 6px" }}>Could not load this project</h1>
+          <p style={{ fontSize: "14px", color: "#888", margin: "0 0 24px" }}>{loadError}</p>
+          <Link to="/discover" style={{ color: "var(--color-brand)", fontWeight: 700 }}>Back to Discover</Link>
+        </div>
+        <Footer isMobile={isMobile} />
+      </div>
+    );
+  }
 
   if (!p) {
     return (
@@ -150,7 +211,8 @@ export default function ProjectDetail() {
   }
 
   // The signed-in user owns this project -> they edit it instead of investing.
-  const isOwner = isLoggedIn && !!p.ownerId && user?.username === p.ownerId;
+  // Compares the real id (projects.creator_id), not the username as the old mock did.
+  const isOwner = isLoggedIn && p.ownerId != null && user?.id === p.ownerId;
   // TODO: deep-link to edit this exact project once a backed edit route exists;
   // for now send the creator to their project management page.
   const goToEdit = () => navigate("/creator-my-projects");
@@ -176,15 +238,37 @@ export default function ProjectDetail() {
 
       {/* Hero image */}
       <div style={{ width: "100%", height: isMobile ? "220px" : isTablet ? "300px" : "380px", overflow: "hidden", background: "#111" }}>
-        <img
-          src={p.img}
-          alt={p.title}
-          style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }}
-        />
+        {/* image_url may be empty — projects created via the API do not require one. */}
+        {p.img && (
+          <img
+            src={p.img}
+            alt={p.title}
+            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }}
+          />
+        )}
       </div>
 
       {/* Main content */}
       <div className="lp-reveal" style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "24px 16px" : "32px 40px" }}>
+
+        {investError && (
+          <div style={{
+            background: "#fdecec", border: "1px solid #f5c2c2", borderRadius: "8px",
+            padding: "12px 16px", marginBottom: "20px",
+            fontSize: "13px", color: "#a11", display: "flex",
+            justifyContent: "space-between", alignItems: "center", gap: "12px",
+          }}>
+            <span><strong>Investment failed.</strong> {investError}</span>
+            <button
+              type="button"
+              onClick={() => setInvestError(null)}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "#a11", fontSize: "16px", lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div style={{
           display: "grid",
           gridTemplateColumns: isDesktop ? "1fr 300px" : "1fr",
@@ -207,11 +291,16 @@ export default function ProjectDetail() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "13px", fontWeight: 700, color: "#666", flexShrink: 0,
               }}>
-                {p.creator.name.charAt(0)}
+                {p.creator?.name?.charAt(0) ?? "?"}
               </div>
               <div>
-                <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>{p.creator.name}</div>
-                <div style={{ fontSize: "12px", color: "#888" }}>{p.creator.role}</div>
+                {/* TODO: no join to users — GET /projects/:id only returns creator_id. */}
+                <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
+                  {p.creator?.name ?? `Creator #${p.ownerId ?? "?"}`}
+                </div>
+                <div style={{ fontSize: "12px", color: "#888" }}>
+                  {p.creator?.role ?? "Creator details not provided by the API yet"}
+                </div>
               </div>
             </div>
 
@@ -228,12 +317,19 @@ export default function ProjectDetail() {
                   {p.about}
                 </p>
 
-                <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
-                  The Challenge
-                </h2>
-                <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 28px" }}>
-                  {p.challenge}
-                </p>
+                {/* The backend has a single `description` column. The three sections below
+                    (Challenge / Solution / Funding) have nowhere to be stored, so they
+                    only render when data is actually present. */}
+                {p.challenge && (
+                  <>
+                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                      The Challenge
+                    </h2>
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 28px" }}>
+                      {p.challenge}
+                    </p>
+                  </>
+                )}
 
                 {/* Gallery image */}
                 {p.gallery[0] && (
@@ -246,31 +342,70 @@ export default function ProjectDetail() {
                   </div>
                 )}
 
-                <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
-                  Our Solution
-                </h2>
-                <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 16px" }}>
-                  {p.solution.intro}
-                </p>
-                <ul style={{ margin: "0 0 28px", padding: "0", listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
-                  {p.solution.bullets.map((b, i) => (
-                    <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                      <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
-                      <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
-                        <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                {p.solution && (
+                  <>
+                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                      Our Solution
+                    </h2>
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 16px" }}>
+                      {p.solution.intro}
+                    </p>
+                    <ul style={{ margin: "0 0 28px", padding: "0", listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+                      {p.solution.bullets.map((b, i) => (
+                        <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                          <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
+                          <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
+                            <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
-                <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
-                  How Your Funding Helps
-                </h2>
-                <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 40px" }}>
-                  {p.funding}
-                </p>
+                {p.funding && (
+                  <>
+                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                      How Your Funding Helps
+                    </h2>
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 40px" }}>
+                      {p.funding}
+                    </p>
+                  </>
+                )}
+
+                {!p.challenge && !p.solution && !p.funding && (
+                  <div style={{
+                    background: "#fafafa", border: "1px dashed #ddd", borderRadius: "8px",
+                    padding: "18px 20px", marginBottom: "40px",
+                    fontSize: "13px", color: "#999", lineHeight: 1.7,
+                  }}>
+                    The API stores a single description per project, so “The Challenge”,
+                    “Our Solution” and “How Your Funding Helps” have nowhere to come from yet.
+                  </div>
+                )}
+
+                {/* Team members come from projects.team_members (jsonb). */}
+                {p.teamMembers.length > 0 && (
+                  <>
+                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                      Team
+                    </h2>
+                    <ul style={{ margin: "0 0 40px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {p.teamMembers.map((m, i) => (
+                        <li key={i} style={{ fontSize: "14px", color: "#555" }}>
+                          <strong style={{ color: "#111" }}>{m.name ?? m}</strong>
+                          {m.role ? ` — ${m.role}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "32px" }}>
+                  <div style={{ fontSize: "12px", color: "#aaa", marginBottom: "12px" }}>
+                    Comments are not stored by the API yet — there is no comments table in the database.
+                  </div>
                   <CommentList
                     comments={comments}
                     totalComments={p.totalComments}
@@ -290,8 +425,8 @@ export default function ProjectDetail() {
             {activeTab === "updates" && (
               <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>{p.updates} updates posted</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>Connect to backend to load updates</div>
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>No updates yet</div>
+                <div style={{ fontSize: "13px", marginTop: "4px" }}>The API has no project-updates endpoint yet</div>
               </div>
             )}
           </div>
@@ -350,11 +485,13 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
 
       <div style={{ display: "flex", gap: "24px", marginBottom: "22px" }}>
         <div>
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.daysLeft}</div>
+          {/* end_date exists in the DB but createProject never writes it -> usually null. */}
+          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.daysLeft ?? "—"}</div>
           <div style={{ fontSize: "12px", color: "#888" }}>days to go</div>
         </div>
         <div>
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.backers}</div>
+          {/* TODO: the backend does not count investors per project. */}
+          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.backers ?? "—"}</div>
           <div style={{ fontSize: "12px", color: "#888" }}>backers</div>
         </div>
       </div>
