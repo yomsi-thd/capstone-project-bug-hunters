@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
 import { CREATOR_MY_PROJECTS, CREATOR_SIDEBAR_LINKS } from "../mock";
-import DashboardHeader from "../components/layout/DashboardHeader";
+import Header from "../components/layout/Header";
+import { useAuth } from "../context/AuthContext";
 
 const DEPT_STYLE = {
   Engineering: "bg-blue-900 text-white",
@@ -119,22 +120,12 @@ function SidebarShell({ active, sidebarOpen, onClose, onNavigate, onNewProject, 
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:translate-x-0`}
+        } min-[1200px]:relative min-[1200px]:top-0 min-[1200px]:translate-x-0`}
       >
-        <div className="px-5 py-4 border-b border-gray-200">
-          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
-        </div>
 
         <div className="px-4 py-4 border-b border-gray-200">
-          <div className="flex items-center gap-2.5 mb-3">
-            <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
-            <div>
-              <div className="text-[13px] font-bold text-gray-900">Project Creator</div>
-              <div className="text-[11px] text-gray-400">School of Design</div>
-            </div>
-          </div>
           <button
             onClick={() => {
               onNewProject();
@@ -173,9 +164,7 @@ function SidebarShell({ active, sidebarOpen, onClose, onNavigate, onNewProject, 
         </nav>
 
         <div className="p-2 border-t border-gray-200">
-          {["? Help Center", "→ Logout"].map(l => (
-            <button key={l} className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">{l}</button>
-          ))}
+          <button className="w-full bg-transparent border-none text-left px-3 py-2 text-[12px] text-gray-400 hover:text-gray-600 cursor-pointer">? Support</button>
         </div>
       </aside>
     </>
@@ -189,6 +178,7 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
   const [active, setActive] = useState("myprojects");
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const navigate = useNavigate();
+  const auth = useAuth();
 
   const totalProjects = projects.length;
   const activeFunding = projects.filter(p => p.status === "Active").length;
@@ -206,6 +196,11 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
     if (id === "dashboard") {
       navigate("/creator-dashboard");
     }
+  };
+
+  const handleLogout = () => {
+    auth.logout();
+    navigate("/");
   };
 
   const projectContent = (
@@ -250,9 +245,10 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <div className="flex flex-col h-screen bg-gray-100 font-sans relative overflow-hidden">
+      <Header onToggleSidebar={() => setSidebarOpen(true)} showSearch={false} onLogout={handleLogout} />
 
+      <div className="flex flex-1 min-h-0 relative">
       <SidebarShell
         active={active}
         sidebarOpen={sidebarOpen}
@@ -262,8 +258,7 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
         onNewUpdate={() => setShowUpdateModal(true)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {projectContent}
@@ -273,6 +268,7 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
       {editTarget && <EditProject project={editTarget} onClose={() => setEditTarget(null)} />}
 
       <PostUpdateModal open={showUpdateModal} onClose={() => setShowUpdateModal(false)} />
+      </div>
     </div>
   );
 }

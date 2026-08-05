@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
+import Header from "../components/layout/Header";
+import { useAuth } from "../context/AuthContext";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_APPROVAL_PROJECTS as INITIAL_PROJECTS,
@@ -144,6 +144,7 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
 // ── Main Approvals Page ──
 export default function AdminApprovals() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [activeNav, setActiveNav] = useState("approvals");
   const [projects, setProjects] = useState(INITIAL_PROJECTS);
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -165,6 +166,11 @@ export default function AdminApprovals() {
     setReviewTarget(null);
   };
 
+  const handleLogout = () => {
+    auth.logout();
+    navigate("/");
+  };
+
   const handleNavClick = (itemId) => {
     setActiveNav(itemId);
 
@@ -181,32 +187,24 @@ export default function AdminApprovals() {
   const approved  = projects.filter(p => p.status === "Approved").length;
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
+      <Header onToggleSidebar={() => setSidebarOpen(true)} showSearch={false} onLogout={handleLogout} />
 
+      <div className="flex flex-1 min-h-0 relative">
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          className="fixed inset-0 bg-black/40 z-30 min-[1200px]:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:translate-x-0`}
+        } min-[1200px]:relative min-[1200px]:top-0 min-[1200px]:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            {/* Replace this src with your actual RMIT logo */}
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-          </div>
-        </div>
+
         <nav className="flex-1 p-2">
           {NAV_ITEMS.map(item => (
             <button
@@ -232,8 +230,7 @@ export default function AdminApprovals() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         {reviewTarget ? (
           <ProjectReview
@@ -352,6 +349,7 @@ export default function AdminApprovals() {
           </div>
           </main>
         )}
+      </div>
       </div>
     </div>
   );

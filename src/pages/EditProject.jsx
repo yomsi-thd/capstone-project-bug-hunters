@@ -208,7 +208,7 @@ export default function EditProject({ project, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-sans p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] font-sans p-4">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
       <div className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[660px]" style={{ maxHeight: "90vh" }}>
 

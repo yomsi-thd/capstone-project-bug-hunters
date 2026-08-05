@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
+import Header from "../components/layout/Header";
+import { useAuth } from "../context/AuthContext";
 import {
   ADMIN_INITIAL_USERS as INITIAL_USERS,
   ADMIN_PROJECT_GROUPS as PROJECT_GROUPS,
@@ -53,7 +53,7 @@ function AddUserModal({ onClose, onAdd }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] p-6 md:p-7 overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-[20px] font-bold text-gray-900">Add New User</h2>
@@ -146,7 +146,7 @@ function EditUserModal({ user, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-[520px] overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-center px-7 py-5 border-b border-gray-100">
@@ -255,6 +255,7 @@ function EditUserModal({ user, onClose, onSave }) {
 // ── Main Page ──
 export default function AdminUserManagement() {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [activeNav, setActiveNav] = useState("users");
   const [users, setUsers] = useState(INITIAL_USERS);
   const [search, setSearch] = useState("");
@@ -287,34 +288,31 @@ export default function AdminUserManagement() {
     setRemoveTarget(null);
   };
 
-  return (
-    <div className="flex min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  const handleLogout = () => {
+    auth.logout();
+    navigate("/");
+  };
 
+  return (
+    <div className="flex flex-col h-screen bg-gray-50 font-sans relative overflow-hidden">
+      <Header onToggleSidebar={() => setSidebarOpen(true)} showSearch={false} onLogout={handleLogout} />
+
+      <div className="flex flex-1 min-h-0 relative">
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+          className="fixed inset-0 bg-black/40 z-30 min-[1200px]:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:relative md:translate-x-0`}
+        } min-[1200px]:relative min-[1200px]:top-0 min-[1200px]:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            {/* Replace this src with your actual RMIT logo */}
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-          </div>
-        </div>
+
         <nav className="flex-1 p-2">
           {NAV_ITEMS.map(item => (
             <button
@@ -339,9 +337,7 @@ export default function AdminUserManagement() {
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top nav */}
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
           {/* Page header */}
@@ -490,7 +486,7 @@ export default function AdminUserManagement() {
 
       {/* Remove Confirmation Modal */}
       {removeTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setRemoveTarget(null)}>
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4" onClick={() => setRemoveTarget(null)}>
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-[400px] p-6" onClick={e => e.stopPropagation()}>
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Remove User</h2>
             <p className="text-[14px] text-gray-500 leading-relaxed mb-6">
@@ -505,6 +501,7 @@ export default function AdminUserManagement() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }

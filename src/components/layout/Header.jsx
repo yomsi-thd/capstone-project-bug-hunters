@@ -47,11 +47,6 @@ export default function Header(props = {}) {
 
   const pick = (value, fallback) => (value !== undefined ? value : fallback);
 
-  // The header owns its OWN breakpoints (it ignores any isMobile/isTablet/
-  // isDesktop passed in) and deliberately uses a tighter desktop threshold than
-  // pages (HEADER_DESKTOP_MIN = 1200 vs the page default 1024) — see useBreakpoint
-  // for the full reasoning. So on 1024–1199 widths (e.g. iPad Pro 12.9" portrait)
-  // it uses the hamburger layout while the page content still lays out as desktop.
   const { isMobile, isTablet, isDesktop } = useBreakpoint(BREAKPOINTS.HEADER_DESKTOP_MIN);
 
   const isLoggedIn = pick(props.isLoggedIn, auth.isLoggedIn);
@@ -64,10 +59,8 @@ export default function Header(props = {}) {
   // hold a Class Coin balance.
   const canCreate = pick(props.canCreate, auth.canCreate);
   const showBalance = pick(props.showBalance, auth.canInvest);
-  // Search only belongs on pages with a project catalogue to search (Discover).
-  // Defaults to true for backward compatibility; pages without a searchable
-  // collection pass showSearch={false} to hide the box, toggle, and dropdown.
   const showSearch = pick(props.showSearch, true);
+  const onToggleSidebar = props.onToggleSidebar;
 
   const search = pick(props.search, searchState);
   const setSearch = pick(props.setSearch, setSearchState);
@@ -85,9 +78,6 @@ export default function Header(props = {}) {
 
   return (
     <>
-      {/* Sticky header stack: the bar + the mobile/tablet search dropdown. The
-          search dropdown lives in-flow here so it PUSHES page content down
-          instead of covering the results it just filtered. */}
       <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
       <nav style={{
         background: "#fff", borderBottom: "1px solid #ececec",
@@ -95,6 +85,16 @@ export default function Header(props = {}) {
         display: "flex", alignItems: "center", gap: isMobile ? "8px" : "16px",
         height: "56px",
       }}>
+        {onToggleSidebar && !isDesktop && (
+          <button
+            onClick={onToggleSidebar}
+            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "20px", color: "#444", borderRadius: "4px", flexShrink: 0, transition: "background 0.15s" }}
+            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            aria-label="Toggle sidebar"
+          >☰</button>
+        )}
+
         {/* Logo */}
         <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
           <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "var(--color-brand)", lineHeight: 1.1 }}>
@@ -108,10 +108,13 @@ export default function Header(props = {}) {
             {navLinks.map(({ label, path }) => (
               path.startsWith("#") ? (
                 <a
-                  key={label} href={path}
+                  key={label}
+                  href={path}
                   className="lp-navlink"
                   style={{ fontSize: "14px", fontWeight: 400, padding: "6px 12px" }}
-                >{label}</a>
+                >
+                  {label}
+                </a>
               ) : (
                 <Link
                   key={label} to={path}
@@ -240,8 +243,6 @@ export default function Header(props = {}) {
             <Avatar userName={userName} />
           </>
         )}
-
-        {/* Hamburger (mobile + tablet) */}
         {!isDesktop && (
           <button
             onClick={() => setMenuOpen(v => !v)}
@@ -250,13 +251,11 @@ export default function Header(props = {}) {
             onMouseLeave={e => e.currentTarget.style.background = "none"}
             aria-label="Toggle menu"
           >
-            {menuOpen ? "✕" : "☰"}
+            {menuOpen ? "✕" : "⋮"}
           </button>
         )}
       </nav>
 
-      {/* Search dropdown (mobile/tablet) — in-flow inside the sticky header so it
-          pushes content down (never covers results) and rides with the nav. */}
       {(isMobile || isTablet) && showSearch && searchOpen && (
         <div style={{
           background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px",
@@ -270,10 +269,6 @@ export default function Header(props = {}) {
       )}
       </div>
 
-      {/* Dropdown menu (mobile + tablet). Tablet only lists nav links — its
-          balance/create/login controls already sit on the bar, so those blocks
-          below are gated to mobile-only. Fixed overlay under the sticky nav so it
-          shows at the current scroll position instead of the top of the page. */}
       {!isDesktop && menuOpen && (
         <div style={{
           background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px",
@@ -284,7 +279,9 @@ export default function Header(props = {}) {
           {navLinks.map(({ label, path }) => (
             path.startsWith("#") ? (
               <a
-                key={label} href={path} onClick={() => setMenuOpen(false)}
+                key={label}
+                href={path}
+                onClick={() => setMenuOpen(false)}
                 style={{
                   display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
                   fontWeight: 400, color: "#444", borderBottom: "1px solid #f5f5f5",
@@ -292,7 +289,9 @@ export default function Header(props = {}) {
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
-              >{label}</a>
+              >
+                {label}
+              </a>
             ) : (
               <Link
                 key={label} to={path} onClick={() => setMenuOpen(false)}

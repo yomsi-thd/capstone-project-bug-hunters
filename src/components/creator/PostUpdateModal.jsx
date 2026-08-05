@@ -2,7 +2,7 @@ export default function PostUpdateModal({ open, onClose }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[200] p-4">
       <div className="bg-white rounded-xl w-full max-w-[500px] p-6 relative shadow-2xl overflow-y-auto max-h-full">
         <button onClick={onClose} className="absolute top-4 right-4 bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer">×</button>
         <h2 className="text-lg font-extrabold text-gray-900 mb-4">Post Project Update</h2>
