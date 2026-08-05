@@ -1,14 +1,13 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 
-import { login as loginApi } from "../api/authApi";//backend api
-
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const { isMobile } = useBreakpoint();
 
@@ -26,63 +25,38 @@ export default function Login() {
     return Object.keys(next).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  // AuthContext.login() calls POST /api/auth/login and only falls back to a mock
+  // account when the backend is unreachable. Hiếu's old handleBackendLogin was folded
+  // into it — the whole app reads the session from the context, so that is the right
+  // place for the API call.
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
     setIsSubmitting(true);
-    // TODO: call authService.login() when backend is ready. For now this checks
-    // the mock accounts in AuthContext (student1 / lecturer1).
-    setTimeout(() => {
-      const result = login(identifier, password);
-      setIsSubmitting(false);
-      if (result.ok) {
-        const roles = result.user?.roles || [];
-        if (roles.includes("creator")) {
-          navigate("/creator-dashboard");
-        } else if (roles.includes("admin")) {
-          navigate("/admin-dashboard");
-        } else {
-          navigate("/discover");
-        }
-      } else {
-        setErrors({ password: result.error });
-      }
-    }, 600);
-  };
+    const result = await login(identifier, password);
+    setIsSubmitting(false);
 
-  // Hiếu's real-backend login. Deliberately NOT wired to the form yet — it is kept here
-  // as the reference for the call shape while the auth contract is being agreed on.
-  //
-  // TODO: move this into AuthContext.login() rather than calling it from this page.
-  // The whole app reads the signed-in user from AuthContext (Header, nav links, balance,
-  // canInvest), so writing only to localStorage would leave the UI looking logged out.
-  // Blocked on the role model: the backend returns a single uppercase `role` while the
-  // context expects a lowercase `roles` array — see BACKEND-REVIEW-FOR-HIEU.md §1.1.
-  // eslint-disable-next-line no-unused-vars -- intentionally unused until the wiring above lands
-  const handleBackendLogin = async () => {
-    try {
-      const result = await loginApi(identifier, password);
+    if (!result.ok) {
+      setErrors({ password: result.error });
+      return;
+    }
 
-      localStorage.setItem("accessToken", result.accessToken);
-      localStorage.setItem("refreshToken", result.refreshToken);
+    // RequireAccess sends the attempted path along, so a user bounced off a guarded
+    // page lands back on it instead of on a generic dashboard.
+    const from = location.state?.from;
+    if (from) {
+      navigate(from, { replace: true });
+      return;
+    }
 
-      switch (result.user.role) {
-        case "ADMIN":
-          navigate("/admin-dashboard");
-          break;
-
-        case "USER":
-          navigate("/creator-dashboard");
-          break;
-
-        default:
-          navigate("/discover");
-      }
-    } catch (err) {
-      setErrors({
-        password: err.response?.data?.message || "Login failed",
-      });
+    const roles = result.user?.roles || [];
+    if (roles.includes("creator")) {
+      navigate("/creator-dashboard");
+    } else if (roles.includes("admin")) {
+      navigate("/admin-dashboard");
+    } else {
+      navigate("/discover");
     }
   };
 

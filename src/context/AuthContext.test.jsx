@@ -1,19 +1,46 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+
+// AuthContext calls the backend before falling back to the mock accounts, so both
+// API modules are stubbed — no test may touch the real network.
+vi.mock("../api/authApi", () => ({
+  login: vi.fn(),
+  logout: vi.fn(() => Promise.resolve()),
+  register: vi.fn(),
+  refreshToken: vi.fn(),
+}));
+vi.mock("../api/classCoinApi", () => ({
+  getBalance: vi.fn(),
+  getTransactions: vi.fn(),
+}));
+
+import * as authApi from "../api/authApi";
+import * as classCoinApi from "../api/classCoinApi";
 import { AuthProvider, useAuth } from "./AuthContext";
 
 const STORAGE_KEY = "rmit_launchpad_user";
 const wrapper = ({ children }) => <AuthProvider>{children}</AuthProvider>;
 
-// Log a mock account in and return the fresh hook result.
+// An axios network error has no `response` property — that is the "backend is
+// unreachable" signal AuthContext uses to decide whether to fall back.
+function networkError() {
+  return new Error("Network Error");
+}
+
+function httpError(status, message) {
+  const err = new Error(message);
+  err.response = { status, data: { message } };
+  return err;
+}
+
 function renderAuth() {
   return renderHook(() => useAuth(), { wrapper });
 }
 
-function login(result, id, pw) {
+async function login(result, id, pw) {
   let res;
-  act(() => {
-    res = result.current.login(id, pw);
+  await act(async () => {
+    res = await result.current.login(id, pw);
   });
   return res;
 }
@@ -21,6 +48,10 @@ function login(result, id, pw) {
 describe("AuthContext", () => {
   beforeEach(() => {
     localStorage.clear();
+    vi.clearAllMocks();
+    // Default in tests: pretend the backend is down -> use the mock accounts.
+    authApi.login.mockRejectedValue(networkError());
+    classCoinApi.getBalance.mockResolvedValue({ balance: 0 });
   });
 
   it("starts logged out with no permissions", () => {
@@ -32,17 +63,17 @@ describe("AuthContext", () => {
     expect(result.current.balance).toBe(0);
   });
 
-  it("rejects invalid credentials and stays logged out", () => {
+  it("rejects invalid credentials and stays logged out", async () => {
     const { result } = renderAuth();
-    const res = login(result, "student1", "wrong-password");
+    const res = await login(result, "student1", "wrong-password");
     expect(res.ok).toBe(false);
     expect(res.error).toBeTruthy();
     expect(result.current.isLoggedIn).toBe(false);
   });
 
-  it("logs in student1 (backer + creator) with both create and invest access", () => {
+  it("logs in student1 (backer + creator) with both create and invest access", async () => {
     const { result } = renderAuth();
-    const res = login(result, "student1", "student1@");
+    const res = await login(result, "student1", "student1@");
     expect(res.ok).toBe(true);
     expect(result.current.isLoggedIn).toBe(true);
     expect(result.current.roles).toEqual(["backer", "creator"]);
@@ -51,9 +82,9 @@ describe("AuthContext", () => {
     expect(result.current.balance).toBe(4500);
   });
 
-  it("logs in creator1 (pure creator) who can create but CANNOT invest", () => {
+  it("logs in creator1 (pure creator) who can create but CANNOT invest", async () => {
     const { result } = renderAuth();
-    login(result, "creator1", "creator1@");
+    await login(result, "creator1", "creator1@");
     expect(result.current.isCreator).toBe(true);
     expect(result.current.canCreate).toBe(true);
     // A pure creator is not a backer -> no invest access. This is the key
@@ -61,9 +92,9 @@ describe("AuthContext", () => {
     expect(result.current.canInvest).toBe(false);
   });
 
-  it("logs in admin1 (superuser) with both create and invest access", () => {
+  it("logs in admin1 (superuser) with both create and invest access", async () => {
     const { result } = renderAuth();
-    login(result, "admin1", "admin1@");
+    await login(result, "admin1", "admin1@");
     expect(result.current.isAdmin).toBe(true);
     // Admin implies both creator-level and backer-level permissions.
     expect(result.current.canCreate).toBe(true);
@@ -72,16 +103,16 @@ describe("AuthContext", () => {
     expect(result.current.isCreator).toBe(false);
   });
 
-  it("is case-insensitive and trims the identifier", () => {
+  it("is case-insensitive and trims the identifier", async () => {
     const { result } = renderAuth();
-    const res = login(result, "  Student1  ", "student1@");
+    const res = await login(result, "  Student1  ", "student1@");
     expect(res.ok).toBe(true);
     expect(result.current.user.username).toBe("student1");
   });
 
-  it("persists the session to localStorage and clears it on logout", () => {
+  it("persists the session to localStorage and clears it on logout", async () => {
     const { result } = renderAuth();
-    login(result, "student1", "student1@");
+    await login(result, "student1", "student1@");
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).username).toBe("student1");
 
     act(() => {
@@ -100,5 +131,74 @@ describe("AuthContext", () => {
     expect(result.current.isLoggedIn).toBe(true);
     expect(result.current.canInvest).toBe(true);
     expect(result.current.canCreate).toBe(false);
+  });
+
+  describe("with the backend running", () => {
+    it("signs in through the API, lowercases roles and loads the balance", async () => {
+      authApi.login.mockResolvedValue({
+        accessToken: "access-123",
+        refreshToken: "refresh-456",
+        user: { id: 14, fullName: "Huy Test", email: "huy@test.com", roles: ["BACKER", "CREATOR"] },
+      });
+      classCoinApi.getBalance.mockResolvedValue({ balance: 4200 });
+
+      const { result } = renderAuth();
+      const res = await login(result, "huy@test.com", "HuyTest123");
+
+      expect(res.ok).toBe(true);
+      expect(result.current.roles).toEqual(["backer", "creator"]);
+      expect(result.current.balance).toBe(4200);
+      expect(result.current.user.id).toBe(14);
+      expect(result.current.isMockSession).toBe(false);
+      // Tokens must be stored under the exact keys api/axios.js reads.
+      expect(localStorage.getItem("accessToken")).toBe("access-123");
+      expect(localStorage.getItem("refreshToken")).toBe("refresh-456");
+    });
+
+    it("still signs in when the user has no ClassCoin wallet (balance = 0)", async () => {
+      authApi.login.mockResolvedValue({
+        accessToken: "a",
+        refreshToken: "r",
+        user: { id: 12, fullName: "No Wallet", email: "nowallet@test.com", roles: [] },
+      });
+      classCoinApi.getBalance.mockRejectedValue(httpError(404, "ClassCoin account not found"));
+
+      const { result } = renderAuth();
+      const res = await login(result, "nowallet@test.com", "pw");
+
+      expect(res.ok).toBe(true);
+      expect(result.current.balance).toBe(0);
+    });
+
+    it("does NOT fall back to a mock account when the backend returns 401", async () => {
+      authApi.login.mockRejectedValue(httpError(401, "Invalid email or password"));
+
+      const { result } = renderAuth();
+      // These are VALID mock credentials. If a 401 also fell back, this would sign
+      // in — exactly the hole this test guards.
+      const res = await login(result, "student1", "student1@");
+
+      expect(res.ok).toBe(false);
+      expect(res.error).toBe("Invalid email or password");
+      expect(result.current.isLoggedIn).toBe(false);
+    });
+
+    it("does NOT fall back to a mock account when the backend errors with 500", async () => {
+      authApi.login.mockRejectedValue(httpError(500, "column \"role\" does not exist"));
+
+      const { result } = renderAuth();
+      const res = await login(result, "student1", "student1@");
+
+      expect(res.ok).toBe(false);
+      // The backend's real error must surface instead of being swallowed.
+      expect(res.error).toContain("role");
+      expect(result.current.isLoggedIn).toBe(false);
+    });
+
+    it("flags the session as mock when the backend is unreachable", async () => {
+      const { result } = renderAuth();
+      await login(result, "student1", "student1@");
+      expect(result.current.isMockSession).toBe(true);
+    });
   });
 });
