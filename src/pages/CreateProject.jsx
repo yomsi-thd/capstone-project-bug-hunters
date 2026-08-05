@@ -7,6 +7,7 @@ import {
   ROLE_BADGE,
   CREATE_PROJECT_TIERS
 } from "../mock";
+import * as projectApi from "../api/projectApi";
 
 const MAX_GALLERY_IMAGES = 6;
 const DRAFT_STORAGE_KEY = "rmit-launchpad-create-project-draft";
@@ -738,15 +739,37 @@ export default function CreateProject() {
     setMessage("Draft saved locally. Continue when you're ready.");
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const requiredStepError = [1, 2, 3, 4].map(validateStep).find(Boolean);
     if (requiredStepError) {
       setMessage(requiredStepError);
       return;
     }
 
-    setMessage("");
-    setIsSubmitted(true);
+    setMessage("Submitting…");
+    try {
+      // The backend accepts: title, description, category, goal_amount, image_url,
+      // team_members. There is NO place for reward tiers, video, gallery or
+      // start_date/end_date.
+      // TODO: tiers are dropped on submit — there is no project_tiers table.
+      await projectApi.createProject({
+        title: basicData.title.trim(),
+        description: basicData.proposition.trim(),
+        category: basicData.school,
+        goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
+        image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
+        team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
+      });
+
+      setMessage(
+        tiers.length > 0
+          ? "Project submitted. Note: reward tiers were not saved — the API has no tiers table yet."
+          : ""
+      );
+      setIsSubmitted(true);
+    } catch (err) {
+      setMessage(err.response?.data?.message || err.message || "Could not submit the project");
+    }
   };
 
   const renderStep = () => {

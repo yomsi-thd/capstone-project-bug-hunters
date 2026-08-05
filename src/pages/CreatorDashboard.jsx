@@ -1,15 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import CreatorMyProjects from "./CreatorMyProjects";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
-import {
-  CREATOR_DISCUSSIONS as DISCUSSIONS,
-  CREATOR_TIERS as TIERS,
-  RECENT_BACKERS,
-  CREATOR_SIDEBAR_LINKS as RAW_SIDEBAR_LINKS,
-} from "../mock";
+import Header from "../components/layout/Header";
+import { CREATOR_SIDEBAR_LINKS as RAW_SIDEBAR_LINKS } from "../mock";
+import * as projectApi from "../api/projectApi";
+import { toNumber, fundedPercent } from "../api/mappers";
 
 // Remove the "Edit Project" sidebar link — editing now happens from My Projects
 const SIDEBAR_LINKS = RAW_SIDEBAR_LINKS.filter(link => link.id !== "edit");
@@ -19,6 +15,33 @@ export default function CreatorDashboard() {
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showMyProjects, setShowMyProjects] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // There is no stats endpoint — totals are summed client-side from GET /projects/my.
+  // TODO: ask for an aggregate endpoint once a creator can have many projects.
+  const [totals, setTotals] = useState({ raised: 0, goal: 0, count: 0 });
+  const [statsError, setStatsError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getMyProjects();
+        if (cancelled) return;
+        setTotals({
+          raised: (rows || []).reduce((s, r) => s + toNumber(r.current_amount), 0),
+          goal: (rows || []).reduce((s, r) => s + toNumber(r.goal_amount), 0),
+          count: (rows || []).length,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setStatsError(err.response?.data?.message || err.message || "Could not load your project stats");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const totalPct = fundedPercent(totals.raised, totals.goal);
   const navigate = useNavigate();
 
   const handleSidebarClick = (id) => {
@@ -33,8 +56,12 @@ export default function CreatorDashboard() {
   // ── Show My Projects page instead of the dashboard ──
   if (showMyProjects) {
     return (
-      <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
+      <div className="flex flex-col min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+        <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+        <div className="flex flex-1 min-h-0">
 
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setSidebarOpen(false)} />
@@ -42,21 +69,10 @@ export default function CreatorDashboard() {
 
         {/* Sidebar (kept so navigation stays consistent) */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+          className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           } md:relative md:translate-x-0`}
         >
-          <div className="px-5 py-5 border-b border-gray-200 flex items-center gap-2.5">
-            <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-              {/* Replace this src with your actual RMIT logo */}
-              <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-              <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-            </div>
-            <div>
-              <div className="text-[11px] font-extrabold text-gray-900">CREATOR STUDIO</div>
-            </div>
-          </div>
-
           <div className="px-4 py-4 border-b border-gray-200">
             <button
               onClick={() => { navigate("/create-project"); setSidebarOpen(false); }}
@@ -92,11 +108,11 @@ export default function CreatorDashboard() {
         </aside>
 
         <div className="flex-1 flex flex-col min-w-0">
-          <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
           <CreatorMyProjects
             embedded
             onBack={() => { setShowMyProjects(false); setActive("dashboard"); }}
           />
+        </div>
         </div>
         <PostUpdateModal open={showUpdateModal} onClose={() => setShowUpdateModal(false)} />
       </div>
@@ -104,8 +120,14 @@ export default function CreatorDashboard() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      {/* The shared Header spans the full width, exactly as on the public pages.
+          The sidebar and the content sit in a row underneath it. */}
+      <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+      <div className="flex flex-1 min-h-0">
 
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
@@ -117,21 +139,10 @@ export default function CreatorDashboard() {
 
       {/* ── Sidebar ── */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-200 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            {/* Replace this src with your actual RMIT logo */}
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">CREATOR STUDIO</div>
-          </div>
-        </div>
-
         <div className="px-4 py-4 border-b border-gray-200">
           <button
             onClick={() => {
@@ -177,8 +188,6 @@ export default function CreatorDashboard() {
 
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
-
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
             <div>
@@ -196,15 +205,20 @@ export default function CreatorDashboard() {
                 <span className="bg-white border border-gray-200 rounded-full px-3 py-0.5 text-[11px] font-semibold text-green-600">Active Campaign</span>
               </div>
               <div className="text-3xl md:text-[36px] font-extrabold text-brand leading-none mb-1">
-                $42,500 <span className="text-lg text-gray-400 font-normal">/ $50,000</span>
+                ${totals.raised.toLocaleString()}{" "}
+                <span className="text-lg text-gray-400 font-normal">/ ${totals.goal.toLocaleString()}</span>
               </div>
-              <p className="text-[12px] text-gray-400 mb-4">85% of your funding goal reached. 12 days remaining.</p>
+              <p className="text-[12px] text-gray-400 mb-4">
+                {statsError
+                  ? statsError
+                  : `${totalPct}% of your funding goal reached across ${totals.count} ${totals.count === 1 ? "project" : "projects"}.`}
+              </p>
               <div className="flex justify-between text-[11px] text-gray-400 mb-1">
                 <span>Progress</span>
-                <span className="text-brand font-bold">85%</span>
+                <span className="text-brand font-bold">{totalPct}%</span>
               </div>
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand rounded-full" style={{ width: "85%" }} />
+                <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min(totalPct, 100)}%` }} />
               </div>
             </div>
 
@@ -215,16 +229,18 @@ export default function CreatorDashboard() {
                   <div className="text-[11px] font-bold text-gray-400 tracking-widest">TOTAL BACKERS</div>
                   <span className="text-gray-300 text-lg">👥</span>
                 </div>
-                <div className="text-[28px] font-extrabold text-gray-900">342</div>
-                <div className="text-[12px] text-green-500 mt-0.5">↑ +12 this week</div>
+                {/* TODO: the backend does not count investors. */}
+                <div className="text-[28px] font-extrabold text-gray-900">—</div>
+                <div className="text-[12px] text-gray-400 mt-0.5">Not provided by the API yet</div>
               </div>
               <div className="bg-white border border-gray-200 rounded-xl p-5 flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <div className="text-[11px] font-bold text-gray-400 tracking-widest">PAGE VIEWS</div>
                   <span className="text-gray-300 text-lg">👁</span>
                 </div>
-                <div className="text-[28px] font-extrabold text-gray-900">12,450</div>
-                <div className="text-[12px] text-gray-400 mt-0.5">Conversion rate 2.7%</div>
+                {/* TODO: no analytics — the backend does not record page views. */}
+                <div className="text-[28px] font-extrabold text-gray-900">—</div>
+                <div className="text-[12px] text-gray-400 mt-0.5">No analytics endpoint yet</div>
               </div>
             </div>
           </div>
@@ -235,52 +251,31 @@ export default function CreatorDashboard() {
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Community Discussions</h3>
               <p className="text-[12px] text-gray-400 mb-4">Most active threads requiring your attention.</p>
-              <div className="flex flex-col gap-3">
-                {DISCUSSIONS.map((d, i) => (
-                  <div key={d.id} className={`flex gap-2.5 ${i < DISCUSSIONS.length - 1 ? "pb-3 border-b border-gray-100" : ""}`}>
-                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0" style={{ background: d.color }}>{d.avatar}</div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[13px] font-semibold text-brand mb-0.5 cursor-pointer hover:underline">{d.title}</div>
-                      <div className="text-[11px] text-gray-500 truncate">{d.preview}</div>
-                      <div className="text-[11px] text-gray-300 mt-1">{d.replies} Replies · {d.time}</div>
-                    </div>
-                  </div>
-                ))}
+              {/* TODO: the backend has no comments / discussions table. */}
+              <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+                No discussions — the API has no comments table yet.
               </div>
-              <button className="mt-3 bg-transparent border-none text-[11px] font-bold text-brand tracking-wide cursor-pointer hover:underline">VIEW ALL DISCUSSIONS →</button>
             </div>
 
             {/* Backer Tiers */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Backer Tiers</h3>
               <p className="text-[12px] text-gray-400 mb-4">Distribution of funds across defined reward levels.</p>
-              <div className="flex flex-col gap-3.5">
-                {TIERS.map(t => (
-                  <div key={t.name}>
-                    <div className="flex justify-between mb-1">
-                      <div>
-                        <span className="text-[13px] font-semibold text-gray-900">{t.name} </span>
-                        <span className="text-[12px] text-gray-400">{t.price}</span>
-                      </div>
-                      <span className="text-[12px] text-gray-400">{t.backers} Backers</span>
-                    </div>
-                    <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${t.pct}%`, background: t.color }} />
-                    </div>
-                  </div>
-                ))}
+              {/* TODO: the backend has no reward tiers table. */}
+              <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+                No reward tiers — the API has no tiers table yet.
               </div>
               <div className="mt-4 pt-3 border-t border-gray-100">
                 <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-2">RECENT BACKERS</div>
-                <div className="flex flex-wrap gap-2">
-                  {RECENT_BACKERS.map(b => (
-                    <span key={b} className="bg-gray-100 rounded-full px-3 py-1 text-[11px] text-gray-600 font-medium">{b}</span>
-                  ))}
+                {/* TODO: the backend does not expose who invested in a project. */}
+                <div className="text-[11px] text-gray-400">
+                  The API does not expose who backed a project yet.
                 </div>
               </div>
             </div>
           </div>
         </main>
+      </div>
       </div>
 
       {/* ── Post Update Modal ── */}

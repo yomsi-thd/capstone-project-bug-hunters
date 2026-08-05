@@ -7,6 +7,7 @@ import {
   EDIT_PROJECT_INITIAL_DATA,
   EDIT_PROJECT_INITIAL_TEAM,
 } from "../mock";
+import * as projectApi from "../api/projectApi";
 
 function TabBasicInfo({ data, setData }) {
   return (
@@ -190,12 +191,41 @@ export default function EditProject({ project, onClose }) {
           title: project.title || EDIT_PROJECT_INITIAL_DATA.title,
           school: project.dept ? `School of ${project.dept}` : EDIT_PROJECT_INITIAL_DATA.school,
           goal: project.goal ? String(project.goal).replace(/[$,]/g, "") : EDIT_PROJECT_INITIAL_DATA.goal,
-          proposition: project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
+          // description comes from the API (projects.description).
+          proposition: project.description || project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
         }
       : EDIT_PROJECT_INITIAL_DATA
   );
   const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
   const [tiers, setTiers] = useState(project?.tiers || MOCK_TIERS);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
+
+  // PUT /api/projects/:id — the backend only accepts title, description, category,
+  // goal_amount, image_url, team_members. The Media and Tiers tabs have nowhere to save.
+  const handleSave = async () => {
+    if (!project?.id) {
+      setSaveError("This modal was opened without a project, so there is nothing to save.");
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await projectApi.updateProject(project.id, {
+        title: basicData.title.trim(),
+        description: basicData.proposition.trim(),
+        category: project.category ?? basicData.school,
+        goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
+        image_url: project.img || "",
+        team_members: team,
+      });
+      onClose?.();
+    } catch (err) {
+      setSaveError(err.response?.data?.message || err.message || "Could not save changes");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const renderTab = () => {
     switch (activeTab) {
@@ -242,9 +272,22 @@ export default function EditProject({ project, onClose }) {
         <div className="p-6 overflow-y-auto flex-1">{renderTab()}</div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-gray-100 flex flex-col sm:flex-row justify-end gap-2.5 shrink-0">
-          <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">CANCEL CHANGES</button>
-          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SAVE CHANGES</button>
+        <div className="px-6 py-3.5 border-t border-gray-100 flex flex-col gap-2.5 shrink-0">
+          {saveError && (
+            <div className="text-[12px] text-brand bg-red-50 border border-red-200 rounded-md px-3 py-2">
+              {saveError}
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row justify-end gap-2.5">
+            <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">CANCEL CHANGES</button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-brand hover:bg-red-800 disabled:bg-gray-300 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto"
+            >
+              {saving ? "SAVING…" : "SAVE CHANGES"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

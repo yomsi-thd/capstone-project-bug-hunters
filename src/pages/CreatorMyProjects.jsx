@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
-import { CREATOR_MY_PROJECTS, CREATOR_SIDEBAR_LINKS } from "../mock";
-import DashboardHeader from "../components/layout/DashboardHeader";
+import { CREATOR_SIDEBAR_LINKS } from "../mock";
+import * as projectApi from "../api/projectApi";
+import { toCreatorProject } from "../api/mappers";
+import Header from "../components/layout/Header";
 
 const DEPT_STYLE = {
   Engineering: "bg-blue-900 text-white",
@@ -119,14 +121,10 @@ function SidebarShell({ active, sidebarOpen, onClose, onNavigate, onNewProject, 
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-4 border-b border-gray-200">
-          <span className="text-[13px] font-extrabold tracking-widest text-brand">RMIT LAUNCHPAD</span>
-        </div>
-
         <div className="px-4 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2.5 mb-3">
             <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-white text-xs font-bold shrink-0">PC</div>
@@ -183,12 +181,34 @@ function SidebarShell({ active, sidebarOpen, onClose, onNavigate, onNewProject, 
 }
 
 export default function CreatorMyProjects({ onBack, embedded = false }) {
-  const [projects] = useState(CREATOR_MY_PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [active, setActive] = useState("myprojects");
   const [showUpdateModal, setShowUpdateModal] = useState(false);
   const navigate = useNavigate();
+
+  // GET /api/projects/my — the signed-in creator's own projects.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const rows = await projectApi.getMyProjects();
+        if (!cancelled) setProjects((rows || []).map(toCreatorProject));
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err.response?.data?.message || err.message || "Could not load your projects");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const totalProjects = projects.length;
   const activeFunding = projects.filter(p => p.status === "Active").length;
@@ -228,6 +248,18 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
         <StatCard label="TOTAL RAISED" value={`$${totalRaised.toLocaleString()}`} icon="💳" />
       </div>
 
+      {loading && <div className="text-[13px] text-gray-400 py-10 text-center">Loading your projects…</div>}
+      {!loading && loadError && (
+        <div className="text-[13px] text-brand py-10 text-center">
+          Could not load your projects — {loadError}
+        </div>
+      )}
+      {!loading && !loadError && projects.length === 0 && (
+        <div className="text-[13px] text-gray-400 py-10 text-center">
+          You have not created any projects yet.
+        </div>
+      )}
+
       <div className="flex flex-col gap-5 lp-stagger">
         {projects.map(p =>
           p.status === "Active" ? (
@@ -250,8 +282,14 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      {/* The shared Header spans the full width, exactly as on the public pages.
+          The sidebar and the content sit in a row underneath it. */}
+      <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+      <div className="flex flex-1 min-h-0">
 
       <SidebarShell
         active={active}
@@ -263,11 +301,10 @@ export default function CreatorMyProjects({ onBack, embedded = false }) {
       />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
-
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {projectContent}
         </main>
+      </div>
       </div>
 
       {editTarget && <EditProject project={editTarget} onClose={() => setEditTarget(null)} />}

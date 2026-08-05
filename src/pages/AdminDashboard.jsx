@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
+import Header from "../components/layout/Header";
+import * as adminApi from "../api/adminApi";
+import { toAdminProject } from "../api/mappers";
 import {
-  ADMIN_PROJECTS as INITIAL_PROJECTS,
   ADMIN_STATUS_STYLE as STATUS_STYLE,
   ADMIN_CAT_STYLE as CAT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
@@ -14,8 +14,30 @@ export default function AdminDashboard() {
   const [activeNav, setActiveNav] = useState("projects");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
-  const [projects, setProjects] = useState(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+
+  // GET /api/admin/projects — returns every project in every status.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const rows = await adminApi.getAllProject();
+        if (!cancelled) setProjects((rows || []).map(toAdminProject));
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err.response?.data?.message || err.message || "Could not load projects");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const filtered = projects.filter(p => {
@@ -42,8 +64,14 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      {/* The shared Header spans the full width, exactly as on the public pages.
+          The sidebar and the content sit in a row underneath it. */}
+      <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+      <div className="flex flex-1 min-h-0">
 
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
@@ -55,19 +83,10 @@ export default function AdminDashboard() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-          </div>
-        </div>
         <nav className="flex-1 p-2">
           {NAV_ITEMS.map(item => (
             <button
@@ -93,11 +112,19 @@ export default function AdminDashboard() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
           <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900 mb-1">Project Management</h1>
           <p className="text-[14px] text-gray-400 mb-7">Oversee and manage all academic crowdfunding initiatives.</p>
+
+          {loading && (
+            <div className="text-[13px] text-gray-400 mb-5">Loading projects…</div>
+          )}
+          {loadError && (
+            <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-4 py-3 mb-5">
+              {loadError}
+            </div>
+          )}
 
           {/* Stats — now reactive to actual project list */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
@@ -159,7 +186,8 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="lp-stagger">
                   {filtered.length > 0 ? filtered.map((p, i) => {
-                    const s = STATUS_STYLE[p.status];
+                    // The backend also has REJECTED, which STATUS_STYLE has no key for.
+                    const s = STATUS_STYLE[p.status] || { text: "text-gray-500", dot: "bg-gray-400" };
                     const cc = CAT_STYLE[p.category] || "bg-gray-100 text-gray-600";
                     return (
                       <tr
@@ -222,6 +250,7 @@ export default function AdminDashboard() {
             </div>
           </div>
         </main>
+      </div>
       </div>
 
       {/* Delete Confirmation Modal */}

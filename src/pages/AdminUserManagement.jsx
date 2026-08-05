@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
+import Header from "../components/layout/Header";
+import * as adminApi from "../api/adminApi";
+import { toAdminUser } from "../api/mappers";
 import {
-  ADMIN_INITIAL_USERS as INITIAL_USERS,
   ADMIN_PROJECT_GROUPS as PROJECT_GROUPS,
   ADMIN_USER_NAV_ITEMS as NAV_ITEMS,
   ADMIN_USER_ROLES as ROLES,
@@ -256,12 +256,48 @@ function EditUserModal({ user, onClose, onSave }) {
 export default function AdminUserManagement() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("users");
-  const [users, setUsers] = useState(INITIAL_USERS);
+  const [users, setUsers] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [search, setSearch] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [removeTarget, setRemoveTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // GET /api/admin/users
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await adminApi.getAllUsers();
+        if (!cancelled) setUsers((rows || []).map(toAdminUser));
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err.response?.data?.message || err.message || "Could not load users");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Activating/deactivating is the ONLY user operation the backend supports.
+  // TODO: there is no route to change roles (userRepository has assignRole/removeRole
+  // but adminRoutes never exposes them), so Save in the Edit modal is local-only.
+  const handleToggleActive = async (u) => {
+    setActionError(null);
+    try {
+      if (u.isActive) await adminApi.deactivateUser(u.id);
+      else await adminApi.activateUser(u.id);
+      setUsers(prev => prev.map(x =>
+        x.id === u.id
+          ? { ...x, isActive: !u.isActive, status: !u.isActive ? "Active" : "Inactive" }
+          : x
+      ));
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message || "Could not change this user's status");
+    }
+  };
 
   const handleNavClick = (itemId) => {
     setActiveNav(itemId);
@@ -278,18 +314,40 @@ export default function AdminUserManagement() {
     u.studentId.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAdd = (newUser) => setUsers(prev => [...prev, newUser]);
+  // The backend has no admin create-user route. Sign-up goes through
+  // POST /auth/register and needs a password, so it cannot happen from this screen.
+  const handleAdd = () => {
+    setShowAddModal(false);
+    setActionError(
+      "The API has no admin create-user endpoint — new accounts must go through the Register page."
+    );
+  };
 
-  const handleSave = (updated) => setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+  // Local state only: there is no route to change roles or edit another user's profile.
+  const handleSave = (updated) => {
+    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+    setActionError(
+      "Saved on screen only — the API has no endpoint to change another user's role or profile yet."
+    );
+  };
 
+  // The backend only has DELETE /users/profile (delete yourself), not delete-by-id.
   const handleRemove = () => {
-    setUsers(prev => prev.filter(u => u.id !== removeTarget.id));
     setRemoveTarget(null);
+    setActionError(
+      "The API cannot delete another user — deactivate the account instead."
+    );
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      {/* The shared Header spans the full width, exactly as on the public pages.
+          The sidebar and the content sit in a row underneath it. */}
+      <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+      <div className="flex flex-1 min-h-0">
 
       {/* Sidebar Overlay for mobile */}
       {sidebarOpen && (
@@ -301,20 +359,10 @@ export default function AdminUserManagement() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            {/* Replace this src with your actual RMIT logo */}
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-          </div>
-        </div>
         <nav className="flex-1 p-2">
           {NAV_ITEMS.map(item => (
             <button
@@ -341,7 +389,6 @@ export default function AdminUserManagement() {
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top nav */}
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
           {/* Page header */}
@@ -357,6 +404,20 @@ export default function AdminUserManagement() {
               + ADD NEW USER
             </button>
           </div>
+
+          {(loadError || actionError) && (
+            <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-4 py-3 mb-5 flex justify-between items-center gap-3">
+              <span>{loadError || actionError}</span>
+              {actionError && !loadError && (
+                <button
+                  onClick={() => setActionError(null)}
+                  className="bg-transparent border-none cursor-pointer text-brand text-[15px] leading-none"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Filters */}
           <div className="bg-white border border-gray-200 rounded-xl px-4 md:px-5 py-4 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center mb-5">
@@ -434,6 +495,13 @@ export default function AdminUserManagement() {
                       {/* Status */}
                       <td className="px-5 py-3.5">
                         <StatusDot status={u.status} />
+                        {/* The only operation the backend supports on another user. */}
+                        <button
+                          onClick={() => handleToggleActive(u)}
+                          className="block mt-1 text-[11px] text-brand font-semibold bg-transparent border-none cursor-pointer hover:underline p-0"
+                        >
+                          {u.isActive ? "DEACTIVATE" : "ACTIVATE"}
+                        </button>
                       </td>
 
                       {/* Actions */}
@@ -476,6 +544,7 @@ export default function AdminUserManagement() {
             </div>
           </div>
         </main>
+      </div>
       </div>
 
       {/* Add New User Modal */}
