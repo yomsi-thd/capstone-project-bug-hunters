@@ -1,8 +1,5 @@
-export const ADMIN_PROJECTS = [
-  { id: 1, title: "Sustainable Micro-Grid Node",  creator: "Dr. Sarah Jenkins",      category: "Engineering", status: "Active",  pct: 75, raised: "$15k", goal: "$20k",  img: "https://images.unsplash.com/photo-1509391366360-2e959784a276?w=80&q=70" },
-  { id: 2, title: "Generative Art Archive",        creator: "Prof. Alan Turing",       category: "Design",      status: "Pending", pct: 0,  raised: "$0",   goal: "$5k",   img: "https://images.unsplash.com/photo-1561070791-2526d30994b5?w=80&q=70" },
-  { id: 3, title: "Blockchain Supply Chain App",   creator: "Mark Zuckerberg (Guest)", category: "Business",    status: "Flagged", pct: 12, raised: "$12k", goal: "$100k", img: "https://images.unsplash.com/photo-1639762681057-408e52192e55?w=80&q=70" },
-];
+// UI configuration for the admin dashboard — NOT data.
+// ADMIN_PROJECTS was removed when AdminDashboard was wired to GET /api/admin/projects.
 
 export const ADMIN_STATUS_STYLE = {
   Active:  { text: "text-green-600",  dot: "bg-green-500" },
