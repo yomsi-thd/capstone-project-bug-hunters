@@ -64,7 +64,7 @@ async function updateProject(projectId, userId, data) {
         team_members: data.team_members ?? project.team_members
     };
 
-    return await projectRepository.updateProject(projectId, data);
+    return await projectRepository.updateProject(projectId, updatedProject);
 }
 
 // Delete project

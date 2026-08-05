@@ -111,6 +111,20 @@ async function removeRole(userId, roleName) {
     );
 }
 
+async function updateStatus(userId, isActive) {
+    const result = await pool.query(
+        `
+        UPDATE users
+        SET is_active = $1
+        WHERE id = $2
+        RETURNING id, full_name, email, role, is_active
+        `,
+        [isActive, userId]
+    );
+
+    return result.rows[0];
+}
+
 module.exports = {
     createUser,
     findById,
@@ -120,5 +134,6 @@ module.exports = {
     deleteUser,
     getUserRoles,
     assignRole,
-    removeRole
+    removeRole,
+    updateStatus
 };

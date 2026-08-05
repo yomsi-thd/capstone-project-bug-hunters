@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const userRepository = require("../repositories/userRepository");
 
 function authenticate(req, res, next) {
 
@@ -19,7 +20,21 @@ function authenticate(req, res, next) {
             process.env.JWT_SECRET
         );
 
-        req.user = decoded;
+        const user = await userRepository.findById(decoded.id);
+
+        if (!user) {
+            return res.status(401).json({
+                message: "User not found"
+            });
+        }
+
+        if (!user.is_active) {
+            return res.status(403).json({
+                message: "Your account has been deactivated."
+            });
+        }
+
+        req.user = user;
 
         next();
 
