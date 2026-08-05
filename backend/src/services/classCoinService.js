@@ -13,7 +13,7 @@ async function getClassCoin(userId) {
 
 // Get transaction history
 async function getTransactions(userId) {
-    const classCoin = await classCoinRepository.findByUserId(userId);
+    const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
         throw new Error("ClassCoin account not found");
@@ -24,7 +24,7 @@ async function getTransactions(userId) {
 
 // Add ClassCoins
 async function addCoins(userId, amount) {
-    const classCoin = await classCoinRepository.findByUserId(userId);
+    const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
         throw new Error("ClassCoin account not found");
@@ -45,12 +45,12 @@ async function addCoins(userId, amount) {
         description: "Added ClassCoins"
     });
 
-    return await classCoinRepository.findByUserId(userId);
+    return await classCoinRepository.getBalance(userId);
 }
 
 // Deduct ClassCoins
 async function deductCoins(userId, amount) {
-    const classCoin = await classCoinRepository.findByUserId(userId);
+    const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
         throw new Error("ClassCoin account not found");
@@ -75,43 +75,43 @@ async function deductCoins(userId, amount) {
         description: "Deducted ClassCoins"
     });
 
-    return await classCoinRepository.findByUserId(userId);
+    return await classCoinRepository.getBalance(userId);
 }
 
 // Support a project (used later)
-async function transferToProject(userId, projectId, amount) {
-    const classCoin = await classCoinRepository.findByUserId(userId);
+//async function transferToProject(userId, projectId, amount) {
+//    const classCoin = await classCoinRepository.findByUserId(userId);
+//
+//    if (!classCoin) {
+//        throw new Error("ClassCoin account not found");
+//    }
 
-    if (!classCoin) {
-        throw new Error("ClassCoin account not found");
-    }
+//    if (classCoin.balance < amount) {
+//        throw new Error("Insufficient ClassCoins");
+//    }
+//
+//    const newBalance = classCoin.balance - amount;
 
-    if (classCoin.balance < amount) {
-        throw new Error("Insufficient ClassCoins");
-    }
+//  await classCoinRepository.updateBalance(
+//       classCoin.id,
+//        newBalance
+//    );
 
-    const newBalance = classCoin.balance - amount;
+//    await classCoinRepository.createTransaction({
+//        classcoin_id: classCoin.id,
+//        project_id: projectId,
+//        type: "SUPPORT",
+//        amount,
+//        description: "Supported a project"
+//    });
 
-    await classCoinRepository.updateBalance(
-        classCoin.id,
-        newBalance
-    );
-
-    await classCoinRepository.createTransaction({
-        classcoin_id: classCoin.id,
-        project_id: projectId,
-        type: "SUPPORT",
-        amount,
-        description: "Supported a project"
-    });
-
-    return await classCoinRepository.findByUserId(userId);
-}
+//   return await classCoinRepository.findByUserId(userId);
+//}
 
 module.exports = {
     getClassCoin,
     getTransactions,
     addCoins,
     deductCoins,
-    transferToProject
+    //transferToProject
 };
