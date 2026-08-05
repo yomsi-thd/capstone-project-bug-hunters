@@ -1,49 +1,49 @@
 const express = require("express");
 const router = express.Router();
 
-const authenticate = require("../middleware/authenticate");
-const authorize = require("../middleware/authorize");
+const authenticate = require("../middlewares/authMiddleware");
+const authorize = require("../middlewares/authorize");
 const adminController = require("../controllers/adminController");
 
 router.patch(
     "/users/:id/deactivate",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.deactivateUser
 );
 
 router.patch(
     "/users/:id/activate",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.activateUser
 );
 
 router.get(
     "/users",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.getAllUsers
 );
 
 router.get(
     "/users/:id",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.getUserById
 );
 
 router.get(
     "/projects",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.getAllProjects
 );
 
 router.get(
     "/projects/:id",
     authenticate,
-    authorize("admin"),
+    authorize("ADMIN"),
     adminController.getProjectById
 );
 

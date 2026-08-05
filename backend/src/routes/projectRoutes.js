@@ -9,9 +9,10 @@ router.post("/", authenticate, projectController.createProject);
 
 router.get("/", projectController.getAllProjects);
 
-router.get("/:id", projectController.getProjectById);
+// Must come BEFORE "/:id", otherwise Express matches "/:id" with id = "my".
+router.get("/my", authenticate, projectController.getMyProjects);
 
-router.get("/my", projectController.getMyProjects);
+router.get("/:id", projectController.getProjectById);
 
 router.put("/:id", authenticate, projectController.updateProject);
 

@@ -4,7 +4,7 @@ async function createUser(fullName, email, password) {
     const result = await pool.query(
         `INSERT INTO users (full_name, email, password)
          VALUES ($1, $2, $3)
-         RETURNING id, full_name, email, role`,
+         RETURNING id, full_name, email, is_active`,
         [fullName, email, password]
     );
 
@@ -13,7 +13,7 @@ async function createUser(fullName, email, password) {
 
 async function findById(id) {
     const result = await pool.query(
-        `SELECT id, full_name, email, role, created_at
+        `SELECT id, full_name, email, is_active, created_at
          FROM users
          WHERE id = $1`,
         [id]
@@ -38,7 +38,7 @@ async function updateProfile(id, fullName, email) {
          SET full_name = $1,
              email = $2
          WHERE id = $3
-         RETURNING id, full_name, email, role`,
+         RETURNING id, full_name, email, is_active`,
         [fullName, email, id]
     );
 
@@ -63,6 +63,32 @@ async function deleteUser(id) {
     );
 
     return result.rows[0];
+}
+
+// adminService.getAllUsers() calls this function, but it did not exist before
+// -> GET /api/admin/users returned "userRepository.findAllUsers is not a function".
+// Returns a roles array because the users table no longer has a role column.
+async function findAllUsers() {
+    const result = await pool.query(
+        `
+        SELECT u.id,
+               u.full_name,
+               u.email,
+               u.is_active,
+               u.created_at,
+               COALESCE(
+                   ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL),
+                   '{}'
+               ) AS roles
+        FROM users u
+        LEFT JOIN user_roles ur ON ur.user_id = u.id
+        LEFT JOIN roles r ON r.id = ur.role_id
+        GROUP BY u.id
+        ORDER BY u.id
+        `
+    );
+
+    return result.rows;
 }
 
 async function getUserRoles(userId) {
@@ -117,7 +143,7 @@ async function updateStatus(userId, isActive) {
         UPDATE users
         SET is_active = $1
         WHERE id = $2
-        RETURNING id, full_name, email, role, is_active
+        RETURNING id, full_name, email, is_active
         `,
         [isActive, userId]
     );
@@ -132,6 +158,7 @@ module.exports = {
     updateProfile,
     updatePassword,
     deleteUser,
+    findAllUsers,
     getUserRoles,
     assignRole,
     removeRole,

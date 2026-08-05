@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const userRepository = require("../repositories/userRepository");
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
 
     const authHeader = req.headers.authorization;
 
@@ -34,7 +34,9 @@ function authenticate(req, res, next) {
             });
         }
 
-        req.user = user;
+        // `users` no longer has a `role` column (roles moved to the user_roles table),
+        // so roles come from the access token payload - authorize() reads req.user.roles.
+        req.user = { ...user, roles: decoded.roles || [] };
 
         next();
 

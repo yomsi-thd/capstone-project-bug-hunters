@@ -151,11 +151,13 @@ async function investProject(userId, projectId, amount) {
 
     // Save transaction history
     const transaction =
-        await classCoinTransactionRepository.createTransaction(
-            userId,
-            projectId,
-            amount
-        );
+        await classCoinRepository.createTransaction({
+            classcoin_id: wallet.id,
+            project_id: projectId,
+            type: "INVEST",
+            amount,
+            description: `Invested in project #${projectId}`
+        });
 
     return {
         message: "Investment successful.",

@@ -30,12 +30,7 @@ async function addCoins(userId, amount) {
         throw new Error("ClassCoin account not found");
     }
 
-    const newBalance = classCoin.balance + amount;
-
-    await classCoinRepository.updateBalance(
-        classCoin.id,
-        newBalance
-    );
+    await classCoinRepository.addBalance(userId, amount);
 
     await classCoinRepository.createTransaction({
         classcoin_id: classCoin.id,
@@ -60,12 +55,7 @@ async function deductCoins(userId, amount) {
         throw new Error("Insufficient ClassCoins");
     }
 
-    const newBalance = classCoin.balance - amount;
-
-    await classCoinRepository.updateBalance(
-        classCoin.id,
-        newBalance
-    );
+    await classCoinRepository.deductBalance(userId, amount);
 
     await classCoinRepository.createTransaction({
         classcoin_id: classCoin.id,
