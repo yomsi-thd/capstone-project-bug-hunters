@@ -68,6 +68,9 @@ export default function Header(props = {}) {
   // Defaults to true for backward compatibility; pages without a searchable
   // collection pass showSearch={false} to hide the box, toggle, and dropdown.
   const showSearch = pick(props.showSearch, true);
+  // Dashboard pages (creator/admin) render a sidebar and pass this in so the
+  // header can toggle it on narrow screens. Public pages omit it and get no button.
+  const onToggleSidebar = props.onToggleSidebar;
 
   const search = pick(props.search, searchState);
   const setSearch = pick(props.setSearch, setSearchState);
@@ -95,6 +98,30 @@ export default function Header(props = {}) {
         display: "flex", alignItems: "center", gap: isMobile ? "8px" : "16px",
         height: "56px",
       }}>
+        {/* Sidebar toggle, dashboard pages only. Visibility is driven by Tailwind's
+            `md:hidden` rather than this header's own isMobile/isDesktop, because it
+            has to disappear at exactly the width where the sidebar stops sliding and
+            becomes permanent — and that is the sidebar's own `md:relative` breakpoint
+            (768px). The header's thresholds are 640 and 1200, so using either would
+            leave a dead button on screens where the sidebar is already visible.
+            No `display` in the style object: an inline display would beat md:hidden. */}
+        {onToggleSidebar && (
+          <button
+            onClick={onToggleSidebar}
+            className="md:hidden"
+            aria-label="Toggle sidebar"
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: "4px",
+              fontSize: "20px", color: "#444", borderRadius: "4px", flexShrink: 0,
+              transition: "background 0.15s",
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
+            onMouseLeave={e => e.currentTarget.style.background = "none"}
+          >
+            ☰
+          </button>
+        )}
+
         {/* Logo */}
         <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
           <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "var(--color-brand)", lineHeight: 1.1 }}>
