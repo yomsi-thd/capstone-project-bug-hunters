@@ -12,6 +12,25 @@ export const getProjectById = async (id) => {
   return response.data;
 };
 
+// Projects belonging to the signed-in creator. Requires a token.
+export const getMyProjects = async () => {
+  const response = await api.get("/projects/my");
+
+  return response.data;
+};
+
+export const approveProject = async (id) => {
+  const response = await api.patch(`/projects/${id}/approve`);
+
+  return response.data;
+};
+
+export const rejectProject = async (id) => {
+  const response = await api.patch(`/projects/${id}/reject`);
+
+  return response.data;
+};
+
 export const createProject = async (projectData) => {
   const response = await api.post("/projects", projectData);
 
