@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import DashboardHeader from "../components/layout/DashboardHeader";
-import rmitLogo from "../assets/rmit-logo.png";
+import Header from "../components/layout/Header";
+import * as adminApi from "../api/adminApi";
+import * as projectApi from "../api/projectApi";
+import { toApprovalProject } from "../api/mappers";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
-  ADMIN_APPROVAL_PROJECTS as INITIAL_PROJECTS,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
 } from "../mock";
 
@@ -145,24 +146,59 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
 export default function AdminApprovals() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("approvals");
-  const [projects, setProjects] = useState(INITIAL_PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // GET /api/admin/projects then filter to PENDING — there is no dedicated route for
+  // the approval queue. TODO: ask for a ?status=PENDING filter.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await adminApi.getAllProject();
+        if (!cancelled) {
+          setProjects((rows || []).filter(r => r.status === "PENDING").map(toApprovalProject));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err.response?.data?.message || err.message || "Could not load the approval queue");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = projects.filter(p =>
     p.title.toLowerCase().includes(search.toLowerCase()) ||
     p.creator.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleApprove = (id) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Approved" } : p));
-    setReviewTarget(null);
+  const handleApprove = async (id) => {
+    setActionError(null);
+    try {
+      await projectApi.approveProject(id);
+      setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Approved" } : p));
+      setReviewTarget(null);
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message || "Could not approve this project");
+    }
   };
 
-  const handleRequestChanges = (id, feedback) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Changes Requested", feedback } : p));
-    setReviewTarget(null);
+  // The backend only has PATCH /projects/:id/reject — feedback has nowhere to go.
+  // TODO: ask for a feedback column or a review-notes table.
+  const handleRequestChanges = async (id, feedback) => {
+    setActionError(null);
+    try {
+      await projectApi.rejectProject(id);
+      setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Changes Requested", feedback } : p));
+      setReviewTarget(null);
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message || "Could not reject this project");
+    }
   };
 
   const handleNavClick = (itemId) => {
@@ -181,8 +217,14 @@ export default function AdminApprovals() {
   const approved  = projects.filter(p => p.status === "Approved").length;
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-gray-50 font-sans relative overflow-x-hidden">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+
+      {/* The shared Header spans the full width, exactly as on the public pages.
+          The sidebar and the content sit in a row underneath it. */}
+      <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
+
+      <div className="flex flex-1 min-h-0">
 
       {sidebarOpen && (
         <div
@@ -193,20 +235,10 @@ export default function AdminApprovals() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
+        className={`fixed top-14 bottom-0 left-0 md:top-0 z-40 w-48 bg-white border-r border-gray-200 flex flex-col shrink-0 transition-transform duration-300 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } md:relative md:translate-x-0`}
       >
-        <div className="px-5 py-5 border-b border-gray-100 flex items-center gap-2.5">
-          <div className="w-9 h-9 shrink-0 flex items-center justify-center">
-            {/* Replace this src with your actual RMIT logo */}
-            <img src={rmitLogo} alt="RMIT" className="w-full h-full object-contain" onError={(e) => { e.target.style.display='none'; e.target.nextSibling.style.display='flex'; }} />
-            <div className="w-full h-full rounded-lg bg-brand hidden items-center justify-center text-white font-extrabold text-base">R</div>
-          </div>
-          <div>
-            <div className="text-[11px] font-extrabold text-gray-900">ADMIN PORTAL</div>
-          </div>
-        </div>
         <nav className="flex-1 p-2">
           {NAV_ITEMS.map(item => (
             <button
@@ -233,7 +265,6 @@ export default function AdminApprovals() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader onToggleSidebar={() => setSidebarOpen(true)} />
 
         {reviewTarget ? (
           <ProjectReview
@@ -250,11 +281,17 @@ export default function AdminApprovals() {
             <p className="text-[14px] text-gray-400">Review and validate student project submissions for the upcoming funding cycle.</p>
           </div>
 
+          {(loadError || actionError) && (
+            <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-4 py-3 mb-5">
+              {loadError || actionError}
+            </div>
+          )}
+
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 lp-stagger">
             {[
-              { label: "Pending Review",    value: pending,  sub: `↑ 12%`, subColor: "text-green-500" },
-              { label: "Approved (MoM)",    value: approved + 142, sub: null },
+              { label: "Pending Review",    value: pending,  sub: null },
+              { label: "Approved (this session)", value: approved, sub: null },
             ].map(c => (
               <div key={c.label} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="text-[11px] font-semibold text-gray-400 mb-2">{c.label}</div>
@@ -352,6 +389,7 @@ export default function AdminApprovals() {
           </div>
           </main>
         )}
+      </div>
       </div>
     </div>
   );
