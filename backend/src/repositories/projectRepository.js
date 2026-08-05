@@ -54,6 +54,22 @@ async function findById(id) {
     return result.rows[0];
 }
 
+//Find all projects by User ID
+async function findByCreatorId(userId) {
+
+    const result = await pool.query(
+        `
+        SELECT *
+        FROM projects
+        WHERE creator_id = $1
+        ORDER BY created_at DESC
+        `,
+        [userId]
+    );
+
+    return result.rows;
+}
+
 // Update project
 async function updateProject(id, project) {
     const result = await pool.query(
@@ -142,6 +158,7 @@ module.exports = {
     createProject,
     findAll,
     findById,
+    findByCreatorId,
     updateProject,
     deleteProject,
     approveProject,

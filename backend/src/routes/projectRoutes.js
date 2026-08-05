@@ -11,6 +11,8 @@ router.get("/", projectController.getAllProjects);
 
 router.get("/:id", projectController.getProjectById);
 
+router.get("/my", projectController.getMyProjects);
+
 router.put("/:id", authenticate, projectController.updateProject);
 
 router.delete("/:id", authenticate, projectController.deleteProject);

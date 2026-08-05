@@ -11,3 +11,9 @@ export const updateProfile = async (userData) => {
 
   return response.data;
 };
+
+export const deleteProfile = async () => {
+  const response = await api.delete("/users/profile");
+
+  return response.data;
+};

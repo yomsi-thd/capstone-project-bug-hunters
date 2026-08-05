@@ -49,6 +49,23 @@ const getProjectById = async (req, res) => {
     }
 };
 
+//Get all Project of a User
+async function getMyProjects(req, res) {
+
+    try {
+
+        const projects = await projectService.getMyProjects(req.user.id);
+
+        res.status(200).json(projects);
+
+    } catch (error) {
+
+        res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
 // Update Project
 const updateProject = async (req, res) => {
     try {
@@ -153,6 +170,7 @@ module.exports = {
     createProject,
     getAllProjects,
     getProjectById,
+    getMyProjects,
     updateProject,
     deleteProject,
     approveProject,

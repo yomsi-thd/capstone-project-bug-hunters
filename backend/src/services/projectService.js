@@ -42,6 +42,11 @@ async function getProjectById(id) {
     return project;
 }
 
+async function getMyProjects(userId) {
+
+    return await projectRepository.findByCreatorId(userId);
+}
+
 // Update project
 async function updateProject(projectId, userId, data) {
 
@@ -162,6 +167,7 @@ module.exports = {
     createProject,
     getAllProjects,
     getProjectById,
+    getMyProjects,
     updateProject,
     deleteProject,
     approveProject,
