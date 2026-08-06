@@ -35,3 +35,19 @@ export const getProjectById = async (id) => {
 
   return response.data;
 };
+
+export const getAllCreatorRequests = async () => {
+  const response = await api.get("/admin/creator-requests");
+
+  return response.data;
+};
+
+export const approveCreatorRequest = async (id) => {
+  const response = await api.patch(`/admin/creator-requests/${id}/approve`);
+  return response.data;
+} 
+
+export const rejectCreatorRequest = async (id) => {
+  const response = await api.patch(`/admin/creator-requests/${id}/reject`);
+  return response.data;
+}
