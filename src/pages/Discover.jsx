@@ -206,9 +206,10 @@ export default function Discover() {
       try {
         const rows = await projectApi.getAllProjects();
         if (cancelled) return;
-        // GET /projects returns every status, including PENDING and REJECTED, so
-        // filter client-side. TODO: ask for a public route that only returns APPROVED.
-        setProjects(rows.filter(r => r.status === "APPROVED").map(toCard));
+        // GET /projects now returns APPROVED rows only (findAllApprovedProjects), so
+        // there is no client-side status filter here any more. Filtering in the browser
+        // only hid the drafts visually — the rows were still sent to every visitor.
+        setProjects(rows.map(toCard));
       } catch (err) {
         if (!cancelled) {
           setLoadError(

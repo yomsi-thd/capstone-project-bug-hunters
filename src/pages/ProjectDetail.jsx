@@ -9,7 +9,7 @@ import BackerInvestmentSuccessModal from "../components/project/BackerInvestment
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
-import { toDetail } from "../api/mappers";
+import { toDetail, toProjectUpdate, toCommentThread } from "../api/mappers";
 
 // Plain progress track for the detail-page sidebar (no % label — the sidebar
 // renders its own big % + "FUNDED" below). Distinct from the labelled card
@@ -103,8 +103,44 @@ export default function ProjectDetail() {
   const [loadError, setLoadError] = useState(null);
   const [investError, setInvestError] = useState(null);
 
-  // TODO: there is no comments API — the database has no comments table.
-  const comments = [];
+  const [comments, setComments] = useState([]);
+  const [commentError, setCommentError] = useState(null);
+  // Bumped after a successful post to re-run the fetch below. Refetching rather than
+  // appending locally is deliberate: the author name and the CREATOR / BACKER badge are
+  // both derived server-side, so an optimistic row would render without them.
+  const [commentsVersion, setCommentsVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getProjectComments(id);
+        if (!cancelled) setComments(toCommentThread(rows || []));
+      } catch {
+        if (!cancelled) setComments([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, commentsVersion]);
+
+  // Comments and replies share this handler; `parentId` is null for a new thread.
+  // Returns true so CommentList only clears its box when the post actually landed.
+  const handlePostComment = async (text, parentId = null) => {
+    setCommentError(null);
+    try {
+      await projectApi.postComment(id, { body: text, parentId });
+      setCommentsVersion(v => v + 1);
+      return true;
+    } catch (err) {
+      setCommentError(err.response?.data?.message || err.message || "Could not post your comment");
+      return false;
+    }
+  };
+
+  // Updates live on their own endpoint rather than inside the project row, so they load
+  // separately. A failure here must not take the whole page down — the project itself is
+  // still perfectly readable without them.
+  const [updates, setUpdates] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +157,19 @@ export default function ProjectDetail() {
         else setLoadError(err.response?.data?.message || err.message || "Could not load this project");
       } finally {
         if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getProjectUpdates(id);
+        if (!cancelled) setUpdates((rows || []).map(toProjectUpdate));
+      } catch {
+        if (!cancelled) setUpdates([]);
       }
     })();
     return () => { cancelled = true; };
@@ -220,7 +269,7 @@ export default function ProjectDetail() {
   const tabs = [
     { id: "about", label: "About" },
     { id: "rewards", label: "Rewards" },
-    { id: "updates", label: "Updates", count: p.updates },
+    { id: "updates", label: "Updates", count: updates.length },
   ];
 
   return (
@@ -317,21 +366,24 @@ export default function ProjectDetail() {
                   {p.about}
                 </p>
 
-                {/* The backend has a single `description` column. The three sections below
-                    (Challenge / Solution / Funding) have nowhere to be stored, so they
-                    only render when data is actually present. */}
+                {/* Challenge / Solution / Funding come from their own columns on
+                    `projects` and are optional, so each section renders only when the
+                    creator actually filled it in. Projects created before 2026-08-06
+                    have none and show just the blurb above. */}
                 {p.challenge && (
                   <>
                     <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
                       The Challenge
                     </h2>
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 28px" }}>
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 28px", whiteSpace: "pre-line" }}>
                       {p.challenge}
                     </p>
                   </>
                 )}
 
-                {/* Gallery image */}
+                {/* Gallery: the images uploaded in CreateProject step 2, stored as a
+                    jsonb array on the project. The first one sits between The Challenge
+                    and Our Solution, exactly as the original design had it. */}
                 {p.gallery[0] && (
                   <div
                     style={{ borderRadius: "10px", overflow: "hidden", marginBottom: "28px", background: "#111" }}
@@ -347,19 +399,24 @@ export default function ProjectDetail() {
                     <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
                       Our Solution
                     </h2>
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 16px" }}>
-                      {p.solution.intro}
+                    {/* Plain prose, not the old mock's { intro, bullets } object — the
+                        column is a single TEXT field the creator writes freely.
+                        whiteSpace preserves their paragraph breaks. */}
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: p.solutionBullets.length ? "0 0 16px" : "0 0 28px", whiteSpace: "pre-line" }}>
+                      {p.solution}
                     </p>
-                    <ul style={{ margin: "0 0 28px", padding: "0", listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {p.solution.bullets.map((b, i) => (
-                        <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                          <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
-                          <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
-                            <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                    {p.solutionBullets.length > 0 && (
+                      <ul style={{ margin: "0 0 28px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+                        {p.solutionBullets.map((b, i) => (
+                          <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+                            <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
+                            <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
+                              <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </>
                 )}
 
@@ -368,21 +425,10 @@ export default function ProjectDetail() {
                     <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
                       How Your Funding Helps
                     </h2>
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 40px" }}>
+                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 40px", whiteSpace: "pre-line" }}>
                       {p.funding}
                     </p>
                   </>
-                )}
-
-                {!p.challenge && !p.solution && !p.funding && (
-                  <div style={{
-                    background: "#fafafa", border: "1px dashed #ddd", borderRadius: "8px",
-                    padding: "18px 20px", marginBottom: "40px",
-                    fontSize: "13px", color: "#999", lineHeight: 1.7,
-                  }}>
-                    The API stores a single description per project, so “The Challenge”,
-                    “Our Solution” and “How Your Funding Helps” have nowhere to come from yet.
-                  </div>
                 )}
 
                 {/* Team members come from projects.team_members (jsonb). */}
@@ -403,13 +449,12 @@ export default function ProjectDetail() {
                 )}
 
                 <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "32px" }}>
-                  <div style={{ fontSize: "12px", color: "#aaa", marginBottom: "12px" }}>
-                    Comments are not stored by the API yet — there is no comments table in the database.
-                  </div>
                   <CommentList
                     comments={comments}
-                    totalComments={p.totalComments}
+                    totalComments={comments.reduce((n, c) => n + 1 + c.replies.length, 0)}
                     isLoggedIn={isLoggedIn}
+                    onPost={handlePostComment}
+                    error={commentError}
                   />
                 </div>
               </div>
@@ -423,11 +468,34 @@ export default function ProjectDetail() {
             )}
 
             {activeTab === "updates" && (
-              <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>No updates yet</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>The API has no project-updates endpoint yet</div>
-              </div>
+              updates.length === 0 ? (
+                <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa" }}>
+                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600 }}>No updates yet</div>
+                  <div style={{ fontSize: "13px", marginTop: "4px" }}>
+                    {isOwner
+                      ? "Post one from My Projects to keep your backers in the loop."
+                      : "The creator has not posted an update for this project."}
+                  </div>
+                </div>
+              ) : (
+                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "18px" }}>
+                  {updates.map(u => (
+                    <li key={u.id} style={{ borderLeft: "3px solid var(--color-brand)", paddingLeft: "16px" }}>
+                      <div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>
+                        {u.postedOn} · {u.author}
+                      </div>
+                      <h2 style={{ fontSize: "16px", fontWeight: 800, margin: "0 0 6px", color: "#111" }}>
+                        {u.title}
+                      </h2>
+                      {/* Plain text from the API — keep the author's line breaks. */}
+                      <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: 0, whiteSpace: "pre-line" }}>
+                        {u.body}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )
             )}
           </div>
 
@@ -477,10 +545,10 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
       </div>
 
       <div style={{ fontSize: "22px", fontWeight: 800, color: "#111" }}>
-        ${p.stats.raised.toLocaleString()}
+        {p.stats.raised.toLocaleString()} CC
       </div>
       <div style={{ fontSize: "13px", color: "#888", marginBottom: "18px" }}>
-        pledged of ${p.stats.goal.toLocaleString()} goal
+        pledged of {p.stats.goal.toLocaleString()} CC goal
       </div>
 
       <div style={{ display: "flex", gap: "24px", marginBottom: "22px" }}>

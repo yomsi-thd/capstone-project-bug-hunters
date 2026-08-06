@@ -73,7 +73,7 @@ function InvestmentCard({ investment, isMobile }) {
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
               </svg>
-              {investment.investedAmount} Coins
+              {investment.investedAmount.toLocaleString()} CC
             </div>
           </div>
 
