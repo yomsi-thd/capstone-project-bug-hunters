@@ -10,7 +10,7 @@ router.post("/", authenticate, authorize("CREATOR"), projectController.createPro
 router.get("/", projectController.getAllApprovedProjects);
 
 // Must come BEFORE "/:id", otherwise Express matches "/:id" with id = "my".
-router.get("/my", authenticate, projectController.getMyProjects);
+router.get("/:id/my", authenticate, projectController.getMyProjects);
 
 router.get("/:id", projectController.getProjectById);
 
