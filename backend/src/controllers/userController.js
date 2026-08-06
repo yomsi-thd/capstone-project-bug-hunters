@@ -24,13 +24,15 @@ async function updateProfile(req, res) {
 
     try {
 
-        const { fullName, email } = req.body;
+        // `title` is optional: leaving it out of the body keeps the stored value.
+        const { fullName, email, title } = req.body;
 
         const user =
             await userService.updateProfile(
                 req.user.id,
                 fullName,
-                email
+                email,
+                title
             );
 
         res.json(user);

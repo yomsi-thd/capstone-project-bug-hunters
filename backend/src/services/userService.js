@@ -5,7 +5,7 @@ async function getProfile(userId) {
     return await userRepository.findById(userId);
 }
 
-async function updateProfile(userId, fullName, email) {
+async function updateProfile(userId, fullName, email, title) {
 
     const user =
         await userRepository.findById(userId);
@@ -22,7 +22,9 @@ async function updateProfile(userId, fullName, email) {
     return await userRepository.updateProfile(
         userId,
         fullName,
-        email
+        email,
+        // undefined means "not supplied" -> keep what is already stored.
+        title === undefined ? user.title : title
     );
 }
 

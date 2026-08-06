@@ -149,6 +149,148 @@ async function rejectProject(req, res) {
     }
 }
 
+async function endorseProject(req, res) {
+    try {
+
+        const project = await projectService.setProjectEndorsed(
+            req.params.id,
+            req.body.endorsed
+        );
+
+        res.status(200).json(project);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function getProjectComments(req, res) {
+    try {
+
+        const comments = await projectService.getProjectComments(req.params.id);
+
+        res.status(200).json(comments);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function createComment(req, res) {
+    try {
+
+        const comment = await projectService.createComment(
+            req.user.id,
+            req.params.id,
+            req.body
+        );
+
+        res.status(201).json({
+            message: "Comment posted successfully",
+            comment
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function deleteComment(req, res) {
+    try {
+
+        await projectService.deleteComment(
+            req.user.id,
+            req.user.roles,
+            req.params.commentId
+        );
+
+        res.status(200).json({
+            message: "Comment deleted successfully"
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function getProjectUpdates(req, res) {
+    try {
+
+        const updates = await projectService.getProjectUpdates(req.params.id);
+
+        res.status(200).json(updates);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function createProjectUpdate(req, res) {
+    try {
+
+        const update = await projectService.createProjectUpdate(
+            req.user.id,
+            req.user.roles,
+            req.params.id,
+            req.body
+        );
+
+        res.status(201).json({
+            message: "Update posted successfully",
+            update
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function deleteProjectUpdate(req, res) {
+    try {
+
+        await projectService.deleteProjectUpdate(
+            req.user.id,
+            req.user.roles,
+            req.params.updateId
+        );
+
+        res.status(200).json({
+            message: "Update deleted successfully"
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
 async function investProject(req, res) {
     try {
         const userId = req.user.id;
@@ -181,5 +323,12 @@ module.exports = {
     deleteProject,
     approveProject,
     rejectProject,
+    endorseProject,
+    getProjectComments,
+    createComment,
+    deleteComment,
+    getProjectUpdates,
+    createProjectUpdate,
+    deleteProjectUpdate,
     investProject
 };
