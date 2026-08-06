@@ -5,9 +5,9 @@ const projectController = require("../controllers/projectController");
 const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 
-router.post("/", authenticate, projectController.createProject);
+router.post("/", authenticate, authorize("CREATOR"), projectController.createProject);
 
-router.get("/", projectController.getAllProjects);
+router.get("/", projectController.getAllApprovedProjects);
 
 // Must come BEFORE "/:id", otherwise Express matches "/:id" with id = "my".
 router.get("/my", authenticate, projectController.getMyProjects);

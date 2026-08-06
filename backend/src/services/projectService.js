@@ -20,14 +20,16 @@ async function createProject(userId, data) {
     const createdProject =
         await projectRepository.createProject(project);
 
-    await userRepository.assignRole(userId, "CREATOR");
-
     return createdProject;
 }
 
 // Get all projects
 async function getAllProjects() {
     return await projectRepository.findAll();
+}
+
+async function getAllApprovedProjects() {
+    return await projectRepository.findAllApprovedProjects();
 }
 
 // Get project by ID
@@ -131,43 +133,80 @@ async function investProject(userId, projectId, amount) {
         throw new Error("Insufficient ClassCoins.");
     }
 
-    // Find project
-    const project = await projectRepository.findById(projectId);
+    const client = await pool.connect();
 
-    if (!project) {
-        throw new Error("Project not found.");
-    }
+    try {
 
-    // Only approved projects can receive investments
-    if (project.status !== "APPROVED") {
-        throw new Error("Only approved projects can receive investments.");
-    }
+        await client.query("BEGIN");
 
-    // Deduct user's ClassCoins
-    await classCoinRepository.deductBalance(userId, amount);
+        // Find project
+        const project = await projectRepository.findById(projectId);
 
-    // Increase project's current amount
-    await projectRepository.increaseCurrentAmount(projectId, amount);
+        if (!project) {
+            throw new Error("Project not found.");
+        }
 
-    // Save transaction history
-    const transaction =
-        await classCoinRepository.createTransaction({
-            classcoin_id: wallet.id,
-            project_id: projectId,
-            type: "INVEST",
+        // Only approved projects can receive investments
+        if (project.status !== "APPROVED") {
+            throw new Error("Only approved projects can receive investments.");
+        }
+
+        // Atomically deduct balance
+        const wallet = await classCoinRepository.deductBalance(
+            userId,
             amount,
-            description: `Invested in project #${projectId}`
-        });
+            client
+        );
 
-    return {
-        message: "Investment successful.",
-        transaction
-    };
+        if (!wallet) {
+            throw new Error("Insufficient ClassCoins.");
+        }
+
+        // Increase project's current amount
+        await projectRepository.increaseCurrentAmount(
+            projectId,
+            amount,
+            client
+        );
+
+        // Save transaction history
+        const transaction =
+            await classCoinRepository.createTransaction(
+                {
+                    classcoin_id: wallet.id,
+                    project_id: projectId,
+                    type: "INVEST",
+                    amount,
+                    description: `Invested in project #${projectId}`
+                },
+                client
+            );
+
+        await client.query("COMMIT");
+
+        return {
+            message: "Investment successful.",
+            transaction
+        };
+
+    } catch (err) {
+
+        await client.query("ROLLBACK");
+
+        throw err;  
+
+    } finally {
+
+        client.release();
+
+    }
+
 }
 
 module.exports = {
     createProject,
     getAllProjects,
+    getAllApprovedProjects,
     getProjectById,
     getMyProjects,
     updateProject,

@@ -22,17 +22,22 @@ const createProject = async (req, res) => {
 };
 
 // Get All Projects
-const getAllProjects = async (req, res) => {
+async function getAllApprovedProjects(req, res) {
     try {
-        const projects = await projectService.getAllProjects();
+
+        const projects =
+            await projectService.getAllApprovedProjects();
 
         res.status(200).json(projects);
-    } catch (error) {
+
+    } catch (err) {
+
         res.status(500).json({
-            message: error.message
+            message: err.message
         });
+
     }
-};
+}
 
 // Get Project By ID
 const getProjectById = async (req, res) => {
@@ -168,7 +173,8 @@ async function investProject(req, res) {
 
 module.exports = {
     createProject,
-    getAllProjects,
+    //getAllProjects,
+    getAllApprovedProjects,
     getProjectById,
     getMyProjects,
     updateProject,

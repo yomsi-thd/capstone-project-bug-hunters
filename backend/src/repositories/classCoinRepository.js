@@ -29,14 +29,15 @@ async function getBalance(userId) {
 }
 
 // Update balance
-async function deductBalance(userId, amount) {
-    const result = await pool.query(
+async function deductBalance(userId, amount, client) {
+    const result = await client.query(
         `
         UPDATE classcoins
         SET
             balance = balance - $1,
             updated_at = CURRENT_TIMESTAMP
         WHERE user_id = $2
+          AND balance >= $1
         RETURNING *;
         `,
         [amount, userId]
@@ -45,8 +46,8 @@ async function deductBalance(userId, amount) {
     return result.rows[0];
 }
 
-async function addBalance(userId, amount) {
-    const result = await pool.query(
+async function addBalance(userId, amount, client) {
+    const result = await client.query(
         `
         UPDATE classcoins
         SET
@@ -62,8 +63,8 @@ async function addBalance(userId, amount) {
 }
 
 // Create transaction
-async function createTransaction(transaction) {
-    const result = await pool.query(
+async function createTransaction(transaction, client) {
+    const result = await client.query(
         `
         INSERT INTO classcoin_transactions
         (

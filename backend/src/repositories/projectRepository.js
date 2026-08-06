@@ -44,9 +44,22 @@ async function findAll() {
     return result.rows;
 }
 
-// Get project by ID
-async function findById(id) {
+async function findAllApprovedProjects() {
     const result = await pool.query(
+        `
+        SELECT *
+        FROM projects
+        WHERE status = 'APPROVED'
+        ORDER BY created_at DESC;
+        `
+    );
+
+    return result.rows;
+}
+
+// Get project by ID
+async function findById(id, client = pool) {
+    const result = await client.query(
         "SELECT * FROM projects WHERE id = $1",
         [id]
     );
@@ -157,6 +170,7 @@ async function increaseCurrentAmount(projectId, amount) {
 module.exports = {
     createProject,
     findAll,
+    findAllApprovedProjects,
     findById,
     findByCreatorId,
     updateProject,
