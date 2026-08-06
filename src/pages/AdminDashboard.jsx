@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
+import * as projectApi from "../api/projectApi";
 import { toAdminProject } from "../api/mappers";
 import {
   ADMIN_STATUS_STYLE as STATUS_STYLE,
@@ -18,6 +19,8 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState(null);
 
   // GET /api/admin/projects — returns every project in every status.
   useEffect(() => {
@@ -48,9 +51,23 @@ export default function AdminDashboard() {
     return matchSearch && matchStatus;
   });
 
-  const confirmDelete = () => {
-    setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
-    setDeleteTarget(null);
+  // This used to drop the row from local state and nothing else — no API call at all,
+  // so the project came straight back on the next reload and stayed live on Discover.
+  // The row is only removed once the server confirms the delete.
+  const confirmDelete = async () => {
+    setDeleting(true);
+    setActionError(null);
+    try {
+      await projectApi.deleteProject(deleteTarget.id);
+      setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
+      setDeleteTarget(null);
+    } catch (err) {
+      setActionError(
+        err.response?.data?.message || err.message || "Could not delete this project"
+      );
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleNavClick = (itemId) => {
@@ -268,19 +285,33 @@ export default function AdminDashboard() {
               Are you sure you want to delete{" "}
               <span className="font-bold text-gray-900">"{deleteTarget.title}"</span>?{" "}
               This action is <span className="font-semibold text-gray-700">permanent</span> and cannot be undone.
+              {" "}Its investments, comments and updates go with it.
             </p>
+
+            {actionError && (
+              <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-3 py-2 mb-4">
+                {actionError}
+              </div>
+            )}
+
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => setDeleteTarget(null)}
-                className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => { setDeleteTarget(null); setActionError(null); }}
+                disabled={deleting}
+                className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmDelete}
-                className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2 text-[13px] font-bold cursor-pointer transition-colors"
+                disabled={deleting}
+                className={`border-none rounded-md px-5 py-2 text-[13px] font-bold transition-colors ${
+                  deleting
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-brand hover:bg-red-800 text-white cursor-pointer"
+                }`}
               >
-                Delete
+                {deleting ? "Deleting…" : "Delete"}
               </button>
             </div>
           </div>

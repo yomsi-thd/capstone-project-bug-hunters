@@ -96,7 +96,8 @@ const deleteProject = async (req, res) => {
     try {
         await projectService.deleteProject(
             req.params.id,
-            req.user.id
+            req.user.id,
+            req.user.roles
         );
 
         res.status(200).json({

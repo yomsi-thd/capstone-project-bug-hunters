@@ -127,7 +127,10 @@ async function updateProject(projectId, userId, data) {
 }
 
 // Delete project
-async function deleteProject(projectId, userId) {
+// An ADMIN may delete any project — that is the whole point of the moderation screen.
+// Without the bypass the admin dashboard's delete button could only ever remove a
+// project the admin happened to have created themselves.
+async function deleteProject(projectId, userId, roles) {
 
     const project = await projectRepository.findById(projectId);
 
@@ -135,7 +138,9 @@ async function deleteProject(projectId, userId) {
         throw new Error("Project not found");
     }
 
-    if (project.creator_id !== userId) {
+    const isAdmin = Array.isArray(roles) && roles.includes("ADMIN");
+
+    if (project.creator_id !== userId && !isAdmin) {
         throw new Error("Unauthorized");
     }
 

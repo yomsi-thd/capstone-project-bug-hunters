@@ -530,7 +530,10 @@ export default function AdminApprovals() {
                         <span className="inline-flex items-center gap-1 whitespace-nowrap bg-red-50 text-red-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-red-200">● PENDING REVIEW</span>
                       )}
                     </td>
-                    {/* Actions */}
+                    {/* Actions. Both decisions are available straight from the row —
+                        APPROVE was here on its own, so rejecting meant opening REVIEW
+                        first and looked like a missing feature. REVIEW is still the way
+                        to read the submission before deciding. */}
                     <td className="px-5 py-3.5">
                       <div className="flex gap-2">
                         <button
@@ -539,6 +542,18 @@ export default function AdminApprovals() {
                         >
                           REVIEW
                         </button>
+                        {/* Each button hides only once its own decision has been made, so
+                            a mis-click is recoverable: a rejected project can still be
+                            approved from here. Once the page reloads the queue only
+                            fetches PENDING, and there would be no way back. */}
+                        {p.status !== "Changes Requested" && (
+                          <button
+                            onClick={() => handleRequestChanges(p.id, "")}
+                            className="bg-white border border-gray-300 text-gray-600 rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer hover:bg-red-50 hover:text-brand hover:border-red-200 transition-colors"
+                          >
+                            REJECT
+                          </button>
+                        )}
                         {p.status !== "Approved" && (
                           <button
                             onClick={() => handleApprove(p.id)}
