@@ -25,10 +25,13 @@ export default function Register() {
   const validate = () => {
     const next = {};
     if (!fullName.trim()) next.fullName = "Full name is required";
+    // Hiếu confirmed on 2026-08-06 that sign-up is email-only — the users table has
+    // no rmit_id column and there is no plan to add one, so the RMIT ID branch that
+    // used to pass validation and then fail at submit time is gone.
     if (!identifier.trim()) {
-      next.identifier = "RMIT ID or email is required";
-    } else if (!/^s\d{7}$/i.test(identifier.trim()) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) {
-      next.identifier = "Use a valid RMIT ID (e.g. s1234567) or email";
+      next.identifier = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) {
+      next.identifier = "Enter a valid email address";
     }
     if (!password) {
       next.password = "Password is required";
@@ -46,21 +49,20 @@ export default function Register() {
     if (!validate()) return;
 
     const email = identifier.trim();
-    // The backend only accepts an email — the users table has no rmit_id / username.
-    // TODO: drop this guard once the backend supports signing up with an RMIT ID.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setErrors({
-        identifier: "The API only accepts an email address for now — RMIT ID sign-up needs a backend change",
-      });
-      return;
-    }
 
     setIsSubmitting(true);
     try {
       // The backend assigns the BACKER role and creates a ClassCoin wallet (4500 CC).
-      // TODO: the Creator role request is still mock — there is no POST /role-requests
-      // and no admin approval queue behind it.
-      await authApi.register({ fullName: fullName.trim(), email, password });
+      // wantCreator writes a PENDING row into creator_requests; an admin approves it
+      // from GET /admin/creator-requests, which is what actually grants CREATOR.
+      // Ticking the box never grants the role by itself, so the "pending admin review"
+      // message in RegisterSuccessModal is now literally true.
+      await authApi.register({
+        fullName: fullName.trim(),
+        email,
+        password,
+        wantCreator: requestCreator,
+      });
       setShowSuccess(true);
     } catch (err) {
       setErrors({
@@ -90,11 +92,13 @@ export default function Register() {
           error={errors.fullName}
         />
 
+        {/* Deliberately not type="email" — the browser's native validation bubble
+            would pre-empt the custom error line rendered under the field. */}
         <AuthInput
-          label="RMIT ID OR EMAIL"
+          label="EMAIL"
           value={identifier}
           onChange={e => { setIdentifier(e.target.value); setErrors(p => ({ ...p, identifier: null })); }}
-          placeholder="e.g. s1234567 or staff@rmit.edu.au"
+          placeholder="e.g. s1234567@rmit.edu.vn"
           error={errors.identifier}
         />
 

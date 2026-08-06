@@ -19,7 +19,9 @@ export default function Login() {
 
   const validate = () => {
     const next = {};
-    if (!identifier.trim()) next.identifier = "RMIT ID or email is required";
+    // Email-only by Hiếu's decision (2026-08-06): users has no rmit_id column and
+    // findByEmail is the only lookup, so an RMIT ID would just 401.
+    if (!identifier.trim()) next.identifier = "Email is required";
     if (!password) next.password = "Password is required";
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -68,10 +70,10 @@ export default function Login() {
 
       <form onSubmit={handleSubmit}>
         <AuthInput
-          label="RMIT ID OR EMAIL"
+          label="EMAIL"
           value={identifier}
           onChange={e => { setIdentifier(e.target.value); setErrors(p => ({ ...p, identifier: null })); }}
-          placeholder="e.g. s1234567 or staff@rmit.edu.au"
+          placeholder="e.g. s1234567@rmit.edu.vn"
           error={errors.identifier}
         />
 
