@@ -106,14 +106,14 @@ async function getUserRoles(userId) {
     return result.rows.map(role => role.name);
 }
 
-async function assignRole(userId, roleName) {
-    const result = await pool.query(
+async function assignRole(userId, roleName, client = pool) {
+    const result = await client.query(
         `
         INSERT INTO user_roles (user_id, role_id)
         SELECT $1, id
         FROM roles
         WHERE name = $2
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (user_id, role_id) DO NOTHING
         RETURNING *;
         `,
         [userId, roleName]

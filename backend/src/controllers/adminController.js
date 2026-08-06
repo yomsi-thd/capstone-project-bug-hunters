@@ -99,11 +99,77 @@ async function getProjectById(req, res) {
     }
 }
 
+async function getAllCreatorRequests(req, res) {
+    try {
+
+        const requests =
+            await adminService.getAllCreatorRequests();
+
+        res.status(200).json(requests);
+
+    } catch (err) {
+
+        res.status(500).json({
+            message: err.message
+        });
+
+    }
+}
+
+async function approveCreatorRequest(req, res) {
+    try {
+
+        const request =
+            await adminService.approveCreatorRequest(
+                req.params.id,
+                req.user.id
+            );
+
+        res.status(200).json({
+            message: "Creator request approved.",
+            request
+        });
+
+    } catch (err) {
+
+        res.status(400).json({
+            message: err.message
+        });
+
+    }
+}
+
+async function rejectCreatorRequest(req, res) {
+    try {
+
+        const request =
+            await adminService.rejectCreatorRequest(
+                req.params.id,
+                req.user.id
+            );
+
+        res.status(200).json({
+            message: "Creator request rejected.",
+            request
+        });
+
+    } catch (err) {
+
+        res.status(400).json({
+            message: err.message
+        });
+
+    }
+}
+
 module.exports = {
     deactivateUser,
     activateUser,
     getAllUsers,
     getUserById,
     getAllProjects,
-    getProjectById
+    getProjectById,
+    getAllCreatorRequests,
+    approveCreatorRequest,
+    rejectCreatorRequest
 };

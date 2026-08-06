@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const userRepository = require("../repositories/userRepository");
 const refreshTokenRepository = require("../repositories/refreshTokenRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
+const creatorRequestRepository = require("../repositories/creatorRequestRepository");
 
 const {
     generateAccessToken,
@@ -10,7 +11,7 @@ const {
     verifyRefreshToken
 } = require("../utils/jwt");
 
-async function register(fullName, email, password) {
+async function register(fullName, email, password, wantCreator) {
 
     const existing =
         await userRepository.findByEmail(email);
@@ -26,12 +27,17 @@ async function register(fullName, email, password) {
         await userRepository.createUser(
             fullName,
             email,
-            hashedPassword
+            hashedPassword,
+            wantCreator
         );
 
     await userRepository.assignRole(user.id, "BACKER");
 
     await classCoinRepository.createClassCoin(user.id);
+
+    if (wantCreator) {
+        await creatorRequestRepository.create(user.id);
+    }
 
     return user;
 }

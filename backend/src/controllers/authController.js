@@ -4,13 +4,14 @@ async function register(req, res) {
 
     try {
 
-        const { fullName, email, password } = req.body;
+        const { fullName, email, password, wantCreator } = req.body;
 
         const user =
             await authService.register(
                 fullName,
                 email,
-                password
+                password,
+                wantCreator
             );
 
         res.status(201).json(user);

@@ -47,4 +47,25 @@ router.get(
     adminController.getProjectById
 );
 
+router.get(
+    "/creator-requests",
+    authenticate,
+    authorize("ADMIN"),
+    adminController.getAllCreatorRequests
+);
+
+router.patch(
+    "/creator-requests/:id/approve",
+    authenticate,
+    authorize("ADMIN"),
+    adminController.approveCreatorRequest
+);
+
+router.patch(
+    "/creator-requests/:id/reject",
+    authenticate,
+    authorize("ADMIN"),
+    adminController.rejectCreatorRequest
+);
+
 module.exports = router;
