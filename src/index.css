@@ -21,7 +21,10 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
-  color-scheme: light dark;
+  /* Light-only on purpose. Every page hardcodes a light background (bg-gray-100,
+     #fff cards), so honouring the OS dark theme only flipped the text colours and
+     the native form controls, leaving light text on light panels. */
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -34,25 +37,12 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
-
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
-}
+/* The dark-theme override that used to sit here was removed on 2026-08-06.
+   It came from the Vite starter template (along with --accent purple and #social),
+   not from this design: it repainted --text-h to near-white while the pages stayed
+   light, so on a dark-mode machine every heading vanished. There is no dark design
+   to fall back to — if the team ever wants one it has to be built deliberately,
+   page backgrounds included. */
 
 body {
   margin: 0;
@@ -77,29 +67,39 @@ img {
   box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
+/* These heading defaults MUST stay inside `@layer base`.
+   Tailwind 4 puts its utilities in `@layer utilities`, and unlayered CSS beats any
+   layered rule no matter the specificity. Unlayered, this block silently overrode
+   every Tailwind class on a heading: `<h1 className="text-[28px] font-extrabold
+   text-gray-900">` rendered at 56px / weight 500 / var(--text-h) instead. That is
+   what made the page titles on the creator + admin pages the wrong size and — on a
+   machine set to dark mode — near-white on a light background, i.e. invisible.
+   Inline styles were unaffected, which is why only the Tailwind-styled pages broke. */
+@layer base {
+  h1,
+  h2 {
+    font-family: var(--heading);
+    font-weight: 500;
+    color: var(--text-h);
   }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
+
+  h1 {
+    font-size: 56px;
+    letter-spacing: -1.68px;
+    margin: 32px 0;
+    @media (max-width: 1024px) {
+      font-size: 36px;
+      margin: 20px 0;
+    }
+  }
+  h2 {
+    font-size: 24px;
+    line-height: 118%;
+    letter-spacing: -0.24px;
+    margin: 0 0 8px;
+    @media (max-width: 1024px) {
+      font-size: 20px;
+    }
   }
 }
 p {
