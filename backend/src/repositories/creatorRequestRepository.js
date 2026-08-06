@@ -3,8 +3,8 @@ const pool = require("../config/db");
 async function create(userId) {
     const result = await pool.query(
         `
-        INSERT INTO creator_requests (user_id)
-        VALUES ($1)
+        INSERT INTO creator_requests (user_id, role)
+        VALUES ($1, 'CREATOR')
         RETURNING *;
         `,
         [userId]
