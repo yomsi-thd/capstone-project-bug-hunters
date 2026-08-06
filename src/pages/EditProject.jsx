@@ -9,6 +9,21 @@ import {
 } from "../mock";
 import * as projectApi from "../api/projectApi";
 
+// The three optional story sections ProjectDetail renders under the blurb. Kept in the
+// Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
+const STORY_FIELDS = [
+  { key: "challenge", label: "The Challenge" },
+  { key: "solution", label: "Our Solution" },
+  { key: "funding", label: "How Your Funding Helps" },
+];
+
+// projects.category stores the bare department ("ENGINEERING") — the SCHOOLS dropdown
+// offers "School of Engineering". Saving the label verbatim gives the project a category
+// no filter chip and no tag colour can match. Same normalisation as CreateProject.
+function toCategory(school) {
+  return String(school || "").replace(/^School of\s+/i, "").trim().toUpperCase();
+}
+
 function TabBasicInfo({ data, setData }) {
   return (
     <div className="flex flex-col gap-4">
@@ -20,20 +35,42 @@ function TabBasicInfo({ data, setData }) {
         <div>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">School / Department</label>
           <select value={data.school} onChange={e => setData({ ...data, school: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors">
+            {/* The existing rows use departments that are not in SCHOOLS (BIOTECH,
+                ARCHITECTURE…). Without keeping the project's own value as an option the
+                select would fall back to the first entry and silently recategorise the
+                project the moment anything else on the tab was saved. */}
+            {!SCHOOLS.includes(data.school) && data.school && <option key={data.school}>{data.school}</option>}
             {SCHOOLS.map(s => <option key={s}>{s}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Funding Goal (AUD)</label>
+          <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Funding Goal (CC)</label>
           <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
-            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} className="w-full border border-gray-200 rounded-md pl-6 pr-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[11px]">CC</span>
+            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} className="w-full border border-gray-200 rounded-md pl-9 pr-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
           </div>
         </div>
       </div>
       <div>
         <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Value Proposition</label>
         <textarea value={data.proposition} onChange={e => setData({ ...data, proposition: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand min-h-[100px] resize-y transition-colors leading-relaxed" />
+      </div>
+
+      <div className="border-t border-gray-100 pt-4">
+        <div className="text-[13px] font-bold text-gray-900 mb-1">Project Story <span className="font-normal text-gray-400">(optional)</span></div>
+        <p className="text-[12px] text-gray-400 mb-3">Each section only appears on the project page when it has text.</p>
+        <div className="flex flex-col gap-3">
+          {STORY_FIELDS.map(field => (
+            <div key={field.key}>
+              <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">{field.label}</label>
+              <textarea
+                value={data[field.key]}
+                onChange={e => setData({ ...data, [field.key]: e.target.value })}
+                className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand min-h-[90px] resize-y transition-colors leading-relaxed"
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -189,20 +226,30 @@ export default function EditProject({ project, onClose }) {
     project
       ? {
           title: project.title || EDIT_PROJECT_INITIAL_DATA.title,
-          school: project.dept ? `School of ${project.dept}` : EDIT_PROJECT_INITIAL_DATA.school,
-          goal: project.goal ? String(project.goal).replace(/[$,]/g, "") : EDIT_PROJECT_INITIAL_DATA.goal,
+          // Prefill from the stored category, not from `dept` — dept is a display label
+          // derived from it, so `School of ${dept}` produced "School of School of design"
+          // for anything created through the form.
+          school: project.category || EDIT_PROJECT_INITIAL_DATA.school,
+          // toCreatorProject hands this over as "12,500 CC", so strip every non-digit —
+          // stripping only "$" and "," would leave " CC" in the number input.
+          goal: project.goal ? String(project.goal).replace(/[^0-9.]/g, "") : EDIT_PROJECT_INITIAL_DATA.goal,
           // description comes from the API (projects.description).
           proposition: project.description || project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
+          // toCreatorProject passes these through from the story columns; "" when unset.
+          challenge: project.challenge || "",
+          solution: project.solution || "",
+          funding: project.funding || "",
         }
-      : EDIT_PROJECT_INITIAL_DATA
+      : { ...EDIT_PROJECT_INITIAL_DATA, challenge: "", solution: "", funding: "" }
   );
   const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
   const [tiers, setTiers] = useState(project?.tiers || MOCK_TIERS);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  // PUT /api/projects/:id — the backend only accepts title, description, category,
-  // goal_amount, image_url, team_members. The Media and Tiers tabs have nowhere to save.
+  // PUT /api/projects/:id — the backend accepts title, description, category,
+  // goal_amount, image_url, team_members and the three story columns. The Media and
+  // Tiers tabs still have nowhere to save.
   const handleSave = async () => {
     if (!project?.id) {
       setSaveError("This modal was opened without a project, so there is nothing to save.");
@@ -214,10 +261,20 @@ export default function EditProject({ project, onClose }) {
       await projectApi.updateProject(project.id, {
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
-        category: project.category ?? basicData.school,
+        // Was `project.category ?? basicData.school`, which always won — the School
+        // dropdown looked editable but every change to it was thrown away on save.
+        category: toCategory(basicData.school),
         goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
         image_url: project.img || "",
         team_members: team,
+        // The column is funding_usage; the form field is called `funding`.
+        challenge: basicData.challenge.trim(),
+        solution: basicData.solution.trim(),
+        funding_usage: basicData.funding.trim(),
+        // Echoed back unchanged: this modal has no editor for either yet, and the
+        // service overwrites the column with whatever it is handed.
+        gallery: project.gallery ?? [],
+        solution_bullets: project.solutionBullets ?? [],
       });
       onClose?.();
     } catch (err) {

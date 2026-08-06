@@ -12,10 +12,22 @@ import * as projectApi from "../api/projectApi";
 const MAX_GALLERY_IMAGES = 6;
 const DRAFT_STORAGE_KEY = "rmit-launchpad-create-project-draft";
 
+// Class Coins, not AUD. CC is an internal score with no real-world value, so it must
+// never be rendered as a currency — Intl's AUD style produced "$15,000", which read as
+// a real funding target.
 function formatCurrency(value) {
   const numericValue = Number(String(value).replace(/[^\d.]/g, ""));
   if (Number.isNaN(numericValue) || numericValue <= 0) return "—";
-  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", maximumFractionDigits: 0 }).format(numericValue);
+  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(numericValue)} CC`;
+}
+
+// The dropdown offers "School of Engineering", but projects.category holds the bare
+// department ("ENGINEERING") — that is what TAG_COLORS and FILTER_TAGS key on and what
+// every existing row uses. Submitting the label verbatim produced a category that
+// matched no filter chip and no tag colour, so a freshly created project was invisible
+// to TECH / ART / SCIENCE and rendered with the fallback grey tag.
+function toCategory(school) {
+  return String(school || "").replace(/^School of\s+/i, "").trim().toUpperCase();
 }
 
 function formatFileSize(bytes) {
@@ -180,12 +192,12 @@ function Step1({ data, setData }) {
           </select>
         </div>
         <div>
-          <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">FUNDING GOAL (AUD)</label>
+          <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">FUNDING GOAL (CC)</label>
           <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-semibold">$</span>
-            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} placeholder="15,000" className="w-full border border-gray-200 rounded-md pl-8 pr-3 py-2.5 text-[14px] outline-none focus:border-brand transition-colors" />
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-[12px]">CC</span>
+            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} placeholder="15,000" className="w-full border border-gray-200 rounded-md pl-10 pr-3 py-2.5 text-[14px] outline-none focus:border-brand transition-colors" />
           </div>
-          <p className="text-[11px] text-gray-300 mt-1">Minimum target is $500. This must cover your core research or prototyping costs.</p>
+          <p className="text-[11px] text-gray-300 mt-1">Minimum target is 500 CC. Class Coins measure support from the RMIT community — they hold no real-world value.</p>
         </div>
         <div>
           <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">VALUE PROPOSITION</label>
@@ -196,7 +208,32 @@ function Step1({ data, setData }) {
   );
 }
 
-function Step2({ media, setMedia }) {
+// The three story fields behind ProjectDetail's "The Challenge" / "Our Solution" /
+// "How Your Funding Helps" sections. They live in step 2 because that step is called
+// "Story & Media" — until 2026-08-06 it only ever collected the media half.
+// All three are optional: a project that leaves them blank just shows its blurb.
+const STORY_FIELDS = [
+  {
+    key: "challenge",
+    label: "THE CHALLENGE",
+    hint: "What problem are you tackling, and why does it matter?",
+    placeholder: "Describe the gap or problem your project addresses…",
+  },
+  {
+    key: "solution",
+    label: "OUR SOLUTION",
+    hint: "How does your project solve it?",
+    placeholder: "Explain your approach, method or prototype…",
+  },
+  {
+    key: "funding",
+    label: "HOW YOUR FUNDING HELPS",
+    hint: "What will the Class Coins be used for?",
+    placeholder: "Break down what the support enables — equipment, lab time, materials…",
+  },
+];
+
+function Step2({ media, setMedia, story, setStory }) {
   const coverInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const galleryInputRef = useRef(null);
@@ -272,8 +309,76 @@ function Step2({ media, setMedia }) {
 
   return (
     <div>
-      <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Media Uploads</h2>
-      <p className="text-[13px] text-gray-400 mb-6">Upload high-quality visual assets to showcase your project.</p>
+      <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Story &amp; Media</h2>
+      <p className="text-[13px] text-gray-400 mb-6">Tell backers what you are building, then upload the visuals that show it.</p>
+
+      <div className="flex flex-col gap-5 mb-8">
+        <div className="text-[14px] font-bold text-gray-900">Project Story <span className="font-normal text-gray-400">(optional)</span></div>
+        {STORY_FIELDS.map(field => (
+          <div key={field.key}>
+            <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1">{field.label}</label>
+            <p className="text-[12px] text-gray-400 mb-1.5">{field.hint}</p>
+            <textarea
+              value={story[field.key]}
+              onChange={e => setStory({ ...story, [field.key]: e.target.value })}
+              placeholder={field.placeholder}
+              className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[14px] outline-none focus:border-brand min-h-[110px] resize-y transition-colors leading-relaxed"
+            />
+
+            {/* The bullet highlights render under "Our Solution" on the project page, so
+                the editor for them lives with that field rather than in its own step. */}
+            {field.key === "solution" && (
+              <div className="mt-3 border-l-2 border-gray-100 pl-3">
+                <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1.5">
+                  KEY POINTS <span className="font-normal normal-case tracking-normal">(optional)</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {story.bullets.map((b, i) => (
+                    <div key={i} className="flex gap-2 items-start">
+                      <input
+                        value={b.title}
+                        onChange={e => {
+                          const next = [...story.bullets];
+                          next[i] = { ...next[i], title: e.target.value };
+                          setStory({ ...story, bullets: next });
+                        }}
+                        placeholder="Short label"
+                        className="w-1/3 border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors"
+                      />
+                      <input
+                        value={b.desc}
+                        onChange={e => {
+                          const next = [...story.bullets];
+                          next[i] = { ...next[i], desc: e.target.value };
+                          setStory({ ...story, bullets: next });
+                        }}
+                        placeholder="One sentence explaining it"
+                        className="flex-1 border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setStory({ ...story, bullets: story.bullets.filter((_, j) => j !== i) })}
+                        className="text-gray-400 hover:text-brand bg-transparent border-none cursor-pointer px-1 py-2 text-[14px]"
+                        aria-label="Remove key point"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStory({ ...story, bullets: [...story.bullets, { title: "", desc: "" }] })}
+                  className="mt-2 text-[12px] font-bold text-brand bg-transparent border-none cursor-pointer p-0 hover:underline"
+                >
+                  + Add a key point
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
       <div className="flex flex-col gap-7">
         <div>
           <div className="text-[14px] font-bold text-gray-900 mb-1">Cover Image</div>
@@ -518,7 +623,7 @@ function Step4({ tiers, setTiers }) {
   );
 }
 
-function Step5({ basicData, media, team, tiers, onEdit }) {
+function Step5({ basicData, story, media, team, tiers, onEdit }) {
   return (
     <div>
       <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Review & Submit</h2>
@@ -537,6 +642,28 @@ function Step5({ basicData, media, team, tiers, onEdit }) {
             <div><span className="text-gray-400">Funding goal:</span> {formatCurrency(basicData.goal)}</div>
           </div>
           <div className="mt-4 text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">{basicData.proposition || "No value proposition added yet."}</div>
+        </section>
+
+        <section className="bg-white border border-gray-200 rounded-xl p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">PROJECT STORY</div>
+              <div className="text-lg font-extrabold text-gray-900">
+                {STORY_FIELDS.some(f => hasText(story[f.key])) ? "Sections backers will read" : "No story sections added"}
+              </div>
+            </div>
+            <button type="button" onClick={() => onEdit(2)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
+          </div>
+          <div className="flex flex-col gap-4">
+            {STORY_FIELDS.map(field => (
+              <div key={field.key}>
+                <div className="text-gray-400 text-[11px] font-bold tracking-widest mb-1">{field.label}</div>
+                <div className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">
+                  {hasText(story[field.key]) ? story[field.key] : <span className="text-gray-300">Left blank — this section will not appear on the project page.</span>}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
 
         <section className="bg-white border border-gray-200 rounded-xl p-5">
@@ -627,6 +754,11 @@ export default function CreateProject() {
   const [step, setStep] = useState(storedDraft?.step ?? 1);
   const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", goal: "", proposition: "" });
   const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", videoFile: null, galleryImages: [] });
+  const [story, setStory] = useState(
+    storedDraft?.story
+      ? { bullets: [], ...storedDraft.story }
+      : { challenge: "", solution: "", funding: "", bullets: [] }
+  );
   const [team, setTeam] = useState(storedDraft?.team ?? MOCK_TEAM);
   const [tiers, setTiers] = useState(storedDraft?.tiers ?? CREATE_PROJECT_TIERS);
   const [message, setMessage] = useState("");
@@ -638,11 +770,12 @@ export default function CreateProject() {
     saveDraftToStorage({
       step,
       basicData,
+      story,
       media: serializeMedia(media),
       team,
       tiers,
     });
-  }, [basicData, media, step, team, tiers]);
+  }, [basicData, story, media, step, team, tiers]);
 
   useEffect(() => {
     if (!hasRestoredDraft) return;
@@ -665,7 +798,7 @@ export default function CreateProject() {
       if (!hasText(basicData.title)) return "Add a project title before continuing.";
       if (!hasText(basicData.school)) return "Choose a school or department before continuing.";
       const goalValue = Number(String(basicData.goal).replace(/[^\d.]/g, ""));
-      if (!hasText(basicData.goal) || Number.isNaN(goalValue) || goalValue < 500) return "Enter a funding goal of at least $500.";
+      if (!hasText(basicData.goal) || Number.isNaN(goalValue) || goalValue < 500) return "Enter a funding goal of at least 500 CC.";
       if (!hasText(basicData.proposition)) return "Add your value proposition before continuing.";
     }
 
@@ -749,16 +882,29 @@ export default function CreateProject() {
     setMessage("Submitting…");
     try {
       // The backend accepts: title, description, category, goal_amount, image_url,
-      // team_members. There is NO place for reward tiers, video, gallery or
-      // start_date/end_date.
+      // team_members, challenge, solution, funding_usage (and start_date/end_date,
+      // which it defaults for us). There is still NO place for reward tiers, the
+      // video or the gallery.
       // TODO: tiers are dropped on submit — there is no project_tiers table.
+      // The column is funding_usage; the form calls the field `funding`.
       await projectApi.createProject({
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
-        category: basicData.school,
+        category: toCategory(basicData.school),
         goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
         image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
         team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
+        challenge: story.challenge.trim(),
+        solution: story.solution.trim(),
+        funding_usage: story.funding.trim(),
+        // Same data-URL treatment the cover image already gets, so the gallery survives
+        // the submit instead of being dropped with the video.
+        gallery: media.galleryImages
+          .map(img => img.dataUrl || img.preview)
+          .filter(Boolean),
+        solution_bullets: story.bullets
+          .filter(b => b.title.trim() && b.desc.trim())
+          .map(b => ({ title: b.title.trim(), desc: b.desc.trim() })),
       });
 
       setMessage(
@@ -785,10 +931,10 @@ export default function CreateProject() {
 
     switch (step) {
       case 1: return <Step1 data={basicData} setData={setBasicData} />;
-      case 2: return <Step2 media={media} setMedia={setMedia} />;
+      case 2: return <Step2 media={media} setMedia={setMedia} story={story} setStory={setStory} />;
       case 3: return <Step3 team={team} setTeam={setTeam} />;
       case 4: return <Step4 tiers={tiers} setTiers={setTiers} />;
-      case 5: return <Step5 basicData={basicData} media={media} team={team} tiers={tiers} onEdit={goToStep} />;
+      case 5: return <Step5 basicData={basicData} story={story} media={media} team={team} tiers={tiers} onEdit={goToStep} />;
       default: return <div className="text-gray-400 text-sm">Step {step} — coming soon.</div>;
     }
   };
