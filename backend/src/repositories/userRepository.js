@@ -13,7 +13,7 @@ async function createUser(fullName, email, password) {
 
 async function findById(id) {
     const result = await pool.query(
-        `SELECT id, full_name, email, is_active, created_at
+        `SELECT id, full_name, email, title, is_active, created_at
          FROM users
          WHERE id = $1`,
         [id]
@@ -32,14 +32,17 @@ async function findByEmail(email) {
     return result.rows[0];
 }
 
-async function updateProfile(id, fullName, email) {
+// `title` is the creator's academic affiliation shown under their name on the project
+// page ("Lead Researcher, RMIT Robotics Lab"). Optional — pass null to clear it.
+async function updateProfile(id, fullName, email, title) {
     const result = await pool.query(
         `UPDATE users
          SET full_name = $1,
-             email = $2
-         WHERE id = $3
-         RETURNING id, full_name, email, is_active`,
-        [fullName, email, id]
+             email = $2,
+             title = $3
+         WHERE id = $4
+         RETURNING id, full_name, email, title, is_active`,
+        [fullName, email, title ?? null, id]
     );
 
     return result.rows[0];
@@ -122,6 +125,45 @@ async function assignRole(userId, roleName, client = pool) {
     return result.rows[0];
 }
 
+// Replaces a user's whole role set in one shot, for PATCH /admin/users/:id/roles.
+// Pass the transaction client so the DELETE and the INSERT cannot half-apply and
+// leave the user with no roles at all.
+async function setUserRoles(userId, roleNames, client = pool) {
+
+    await client.query(
+        `DELETE FROM user_roles WHERE user_id = $1`,
+        [userId]
+    );
+
+    if (roleNames.length === 0) {
+        return [];
+    }
+
+    const result = await client.query(
+        `
+        INSERT INTO user_roles (user_id, role_id)
+        SELECT $1, id
+        FROM roles
+        WHERE name = ANY($2::text[])
+        ON CONFLICT (user_id, role_id) DO NOTHING
+        RETURNING role_id;
+        `,
+        [userId, roleNames]
+    );
+
+    return result.rows;
+}
+
+// The role vocabulary lives in the roles table, so validate against it rather than
+// hardcoding ADMIN / BACKER / CREATOR in the service.
+async function findAllRoleNames() {
+    const result = await pool.query(
+        `SELECT name FROM roles ORDER BY id;`
+    );
+
+    return result.rows.map(row => row.name);
+}
+
 async function removeRole(userId, roleName) {
     await pool.query(
         `
@@ -161,6 +203,8 @@ module.exports = {
     findAllUsers,
     getUserRoles,
     assignRole,
+    setUserRoles,
+    findAllRoleNames,
     removeRole,
     updateStatus
 };

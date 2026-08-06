@@ -33,6 +33,14 @@ router.get(
     adminController.getUserById
 );
 
+// Body: { "roles": ["BACKER", "CREATOR"] } — replaces the user's whole role set.
+router.patch(
+    "/users/:id/roles",
+    authenticate,
+    authorize("ADMIN"),
+    adminController.updateUserRoles
+);
+
 router.get(
     "/projects",
     authenticate,

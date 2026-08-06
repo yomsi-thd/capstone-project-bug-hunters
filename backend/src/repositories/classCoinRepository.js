@@ -28,8 +28,13 @@ async function getBalance(userId) {
     return result.rows[0];
 }
 
-// Update balance
-async function deductBalance(userId, amount, client) {
+// Update balance.
+// `client = pool` so classCoinService can still call these outside a transaction —
+// without the default, POST /classcoins/add and /deduct threw
+// "Cannot read properties of undefined (reading 'query')".
+// The `AND balance >= $1` guard is what makes the invest flow race-safe: the check
+// and the write are one statement, so two concurrent requests cannot both pass it.
+async function deductBalance(userId, amount, client = pool) {
     const result = await client.query(
         `
         UPDATE classcoins
@@ -46,7 +51,7 @@ async function deductBalance(userId, amount, client) {
     return result.rows[0];
 }
 
-async function addBalance(userId, amount, client) {
+async function addBalance(userId, amount, client = pool) {
     const result = await client.query(
         `
         UPDATE classcoins
@@ -63,7 +68,7 @@ async function addBalance(userId, amount, client) {
 }
 
 // Create transaction
-async function createTransaction(transaction, client) {
+async function createTransaction(transaction, client = pool) {
     const result = await client.query(
         `
         INSERT INTO classcoin_transactions

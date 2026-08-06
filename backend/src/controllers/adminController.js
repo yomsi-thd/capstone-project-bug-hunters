@@ -75,6 +75,30 @@ async function getUserById(req, res) {
     }
 }
 
+async function updateUserRoles(req, res) {
+
+    try {
+
+        const user = await adminService.updateUserRoles(
+            req.params.id,
+            req.body.roles,
+            req.user.id
+        );
+
+        res.status(200).json({
+            message: "User roles updated successfully",
+            user
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
 async function getAllProjects(req, res) {
     try {
         const projects = await projectService.getAllProjects();
@@ -167,6 +191,7 @@ module.exports = {
     activateUser,
     getAllUsers,
     getUserById,
+    updateUserRoles,
     getAllProjects,
     getProjectById,
     getAllCreatorRequests,
