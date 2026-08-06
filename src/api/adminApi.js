@@ -24,6 +24,15 @@ export const activateUser = async (id) => {
   return response.data;
 };
 
+// Replaces the user's whole role set — send every role they should end up with,
+// e.g. ["BACKER", "CREATOR"]. This is the only way to grant a role by hand now that
+// createProject no longer auto-grants CREATOR.
+export const updateUserRoles = async (id, roles) => {
+  const response = await api.patch(`/admin/users/${id}/roles`, { roles });
+
+  return response.data;
+};
+
 export const getAllProject = async () => {
   const response = await api.get("/admin/projects");
 

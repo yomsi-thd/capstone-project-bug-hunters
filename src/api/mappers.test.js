@@ -10,6 +10,8 @@ import {
   toApprovalProject,
   toAdminUser,
   toInvestment,
+  toProjectUpdate,
+  toCommentThread,
 } from "./mappers";
 
 // A project row as Postgres actually returns it through node-postgres: note that
@@ -133,8 +135,41 @@ describe("toDetail", () => {
     expect(d.stats.funded).toBe(3);
   });
 
+  it("reads the creator name and backer count off the joined row", () => {
+    const d = toDetail(projectRow({ creator_name: "Huy Test Creator", backers_count: 3 }));
+    expect(d.creator).toEqual({ name: "Huy Test Creator", role: "Project Creator" });
+    expect(d.stats.backers).toBe(3);
+  });
+
+  it("keeps a real zero backer count instead of turning it into null", () => {
+    // 0 is falsy — the check has to be against null, or a project nobody backed
+    // would render the "not supplied by the API" placeholder.
+    expect(toDetail(projectRow({ backers_count: 0 })).stats.backers).toBe(0);
+  });
+
+  it("maps the three story columns onto the About sections", () => {
+    // The column is funding_usage; the UI prop has always been `funding`.
+    const d = toDetail(projectRow({
+      challenge: "Rescue teams cannot map a collapsed site fast enough.",
+      solution: "A swarm that divides the area between units.",
+      funding_usage: "Airframes, LiDAR units and flight-test hours.",
+    }));
+    expect(d.challenge).toBe("Rescue teams cannot map a collapsed site fast enough.");
+    expect(d.solution).toBe("A swarm that divides the area between units.");
+    expect(d.funding).toBe("Airframes, LiDAR units and flight-test hours.");
+  });
+
+  it("treats an empty story column as absent so the section is skipped", () => {
+    // ProjectDetail renders each section on truthiness — "" must not open an empty one.
+    const d = toDetail(projectRow({ challenge: "", solution: "", funding_usage: "" }));
+    expect(d.challenge).toBeNull();
+    expect(d.solution).toBeNull();
+    expect(d.funding).toBeNull();
+  });
+
   it("nulls out every field the backend cannot supply", () => {
     const d = toDetail(projectRow());
+    // No join columns on this fixture — a deleted creator row looks the same.
     expect(d.creator).toBeNull();
     expect(d.stats.backers).toBeNull();
     expect(d.stats.daysLeft).toBeNull();
@@ -161,6 +196,80 @@ describe("toDetail", () => {
   });
 });
 
+describe("toCommentThread", () => {
+  const row = (over = {}) => ({
+    id: 1,
+    project_id: 4,
+    user_id: 25,
+    parent_id: null,
+    body: "Does it export to CAD?",
+    author_name: "Test Lecturer",
+    author_role: "BACKER",
+    created_at: new Date().toISOString(),
+    ...over,
+  });
+
+  it("nests replies under their parent and drops nothing", () => {
+    const thread = toCommentThread([
+      row({ id: 1 }),
+      row({ id: 2, parent_id: 1, body: "Yes — .PLY and .LAS.", author_name: "Test Student", author_role: "CREATOR" }),
+    ]);
+    expect(thread).toHaveLength(1);
+    expect(thread[0].replies).toHaveLength(1);
+    expect(thread[0].replies[0].role).toBe("CREATOR");
+  });
+
+  it("puts the newest thread first but keeps replies oldest-first", () => {
+    const thread = toCommentThread([
+      row({ id: 1, body: "older" }),
+      row({ id: 2, body: "newer" }),
+      row({ id: 3, parent_id: 1, body: "reply A" }),
+      row({ id: 4, parent_id: 1, body: "reply B" }),
+    ]);
+    // CommentItem reads `text`, not `body` — the mapper renames it.
+    expect(thread.map(c => c.text)).toEqual(["newer", "older"]);
+    expect(thread[1].replies.map(r => r.text)).toEqual(["reply A", "reply B"]);
+  });
+
+  it("survives a reply whose parent is missing", () => {
+    // comments.user_id is SET NULL and a parent can vanish between requests; an
+    // orphaned reply must not throw.
+    expect(() => toCommentThread([row({ id: 9, parent_id: 999 })])).not.toThrow();
+    expect(toCommentThread([row({ id: 9, parent_id: 999 })])).toEqual([]);
+  });
+
+  it("names a deleted author rather than rendering nothing", () => {
+    expect(toCommentThread([row({ author_name: null })])[0].author).toBe("Deleted user");
+  });
+});
+
+describe("toProjectUpdate", () => {
+  const updateRow = (over = {}) => ({
+    id: 7,
+    project_id: 6,
+    title: "Prototype Phase 1 Completed",
+    body: "First pavilion assembled on campus.",
+    author_name: "Test Student",
+    created_at: "2026-08-06T05:29:26.910Z",
+    ...over,
+  });
+
+  it("maps a row onto the Updates tab entry", () => {
+    expect(toProjectUpdate(updateRow())).toEqual({
+      id: 7,
+      title: "Prototype Phase 1 Completed",
+      body: "First pavilion assembled on campus.",
+      author: "Test Student",
+      postedOn: "Aug 06, 2026",
+    });
+  });
+
+  it("falls back when the author row was deleted", () => {
+    // project_updates.author_id is ON DELETE SET NULL, so the join really can be empty.
+    expect(toProjectUpdate(updateRow({ author_name: null })).author).toBe("Unknown creator");
+  });
+});
+
 describe("toCreatorProject", () => {
   it("maps backend statuses onto the creator labels", () => {
     expect(toCreatorProject(projectRow({ status: "APPROVED" })).status).toBe("Active");
@@ -172,16 +281,31 @@ describe("toCreatorProject", () => {
     expect(toCreatorProject(projectRow({ status: "ARCHIVED" })).status).toBe("ARCHIVED");
   });
 
-  it("formats money as strings, because the page parses them back", () => {
-    // CreatorMyProjects does parseFloat(p.raised.replace(/[$,]/g, "")).
+  it("formats amounts in Class Coins, as strings the pages parse back", () => {
+    // CreatorMyProjects and EditProject strip non-digits back out of these.
     const p = toCreatorProject(projectRow({ current_amount: "10625.00", goal_amount: "12500.00" }));
-    expect(p.raised).toBe("$10,625");
-    expect(p.goal).toBe("$12,500");
+    expect(p.raised).toBe("10,625 CC");
+    expect(p.goal).toBe("12,500 CC");
     expect(typeof p.raised).toBe("string");
+  });
+
+  it("never labels an amount in dollars — CC has no real-world value", () => {
+    const p = toCreatorProject(projectRow());
+    expect(p.raised).not.toContain("$");
+    expect(p.goal).not.toContain("$");
   });
 
   it("title-cases the department so DEPT_STYLE can key on it", () => {
     expect(toCreatorProject(projectRow({ category: "ENGINEERING" })).dept).toBe("Engineering");
+  });
+
+  it("carries the story columns through as strings for the edit modal", () => {
+    // EditProject binds these straight to <textarea value=…>, so null would make the
+    // input uncontrolled and React would warn.
+    const p = toCreatorProject(projectRow({ challenge: "A problem", funding_usage: "Lab time" }));
+    expect(p.challenge).toBe("A problem");
+    expect(p.funding).toBe("Lab time");
+    expect(toCreatorProject(projectRow()).solution).toBe("");
   });
 });
 
@@ -192,7 +316,8 @@ describe("toAdminProject", () => {
     expect(toAdminProject(projectRow({ status: "REJECTED" })).status).toBe("Rejected");
   });
 
-  it("stands in a placeholder creator because the API returns only an id", () => {
+  it("uses the joined creator name, falling back to the id", () => {
+    expect(toAdminProject(projectRow({ creator_name: "Huy Test Creator" })).creator).toBe("Huy Test Creator");
     expect(toAdminProject(projectRow()).creator).toBe("Creator #14");
   });
 });
@@ -203,8 +328,19 @@ describe("toApprovalProject", () => {
   });
 
   it("shows the range once both dates exist", () => {
-    const row = projectRow({ start_date: "2026-08-01", end_date: "2026-09-01" });
-    expect(toApprovalProject(row).duration).toBe("2026-08-01 → 2026-09-01");
+    // createProject writes full timestamps, so the raw values would render as
+    // "2026-08-01T00:00:00.000Z → …" in the table.
+    const row = projectRow({ start_date: "2026-08-01T00:00:00.000Z", end_date: "2026-09-01T00:00:00.000Z" });
+    expect(toApprovalProject(row).duration).toBe("Aug 01, 2026 → Sep 01, 2026");
+  });
+
+  it("uses the joined creator name and email, falling back to the id", () => {
+    const joined = projectRow({ creator_name: "Huy Test Creator", creator_email: "creator@test.com" });
+    expect(toApprovalProject(joined).creator).toBe("Huy Test Creator");
+    expect(toApprovalProject(joined).email).toBe("creator@test.com");
+    // A deleted creator row leaves the join columns null.
+    expect(toApprovalProject(projectRow()).creator).toBe("Creator #14");
+    expect(toApprovalProject(projectRow()).email).toBe("");
   });
 
   it("uppercases the department for ADMIN_APPROVAL_DEPT_STYLE", () => {
