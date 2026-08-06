@@ -116,21 +116,8 @@ async function rejectProject(id) {
 
 async function investProject(userId, projectId, amount) {
 
-    // Validate amount
     if (!amount || amount <= 0) {
         throw new Error("Investment amount must be greater than 0.");
-    }
-
-    // Get user's ClassCoin wallet
-    const wallet = await classCoinRepository.getBalance(userId);
-
-    if (!wallet) {
-        throw new Error("ClassCoin wallet not found.");
-    }
-
-    // Check balance
-    if (wallet.balance < amount) {
-        throw new Error("Insufficient ClassCoins.");
     }
 
     const client = await pool.connect();
@@ -139,14 +126,13 @@ async function investProject(userId, projectId, amount) {
 
         await client.query("BEGIN");
 
-        // Find project
-        const project = await projectRepository.findById(projectId);
+        // Get project inside transaction
+        const project = await projectRepository.findById(projectId, client);
 
         if (!project) {
             throw new Error("Project not found.");
         }
 
-        // Only approved projects can receive investments
         if (project.status !== "APPROVED") {
             throw new Error("Only approved projects can receive investments.");
         }
@@ -162,25 +148,24 @@ async function investProject(userId, projectId, amount) {
             throw new Error("Insufficient ClassCoins.");
         }
 
-        // Increase project's current amount
+        // Increase project funding
         await projectRepository.increaseCurrentAmount(
             projectId,
             amount,
             client
         );
 
-        // Save transaction history
-        const transaction =
-            await classCoinRepository.createTransaction(
-                {
-                    classcoin_id: wallet.id,
-                    project_id: projectId,
-                    type: "INVEST",
-                    amount,
-                    description: `Invested in project #${projectId}`
-                },
-                client
-            );
+        // Save transaction
+        const transaction = await classCoinRepository.createTransaction(
+            {
+                classcoin_id: wallet.id,
+                project_id: projectId,
+                type: "INVEST",
+                amount,
+                description: `Invested in project #${projectId}`
+            },
+            client
+        );
 
         await client.query("COMMIT");
 
@@ -192,8 +177,7 @@ async function investProject(userId, projectId, amount) {
     } catch (err) {
 
         await client.query("ROLLBACK");
-
-        throw err;  
+        throw err;
 
     } finally {
 
