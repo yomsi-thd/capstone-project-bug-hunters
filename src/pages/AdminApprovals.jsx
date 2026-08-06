@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
 import * as projectApi from "../api/projectApi";
-import { toApprovalProject } from "../api/mappers";
+import { toApprovalProject, toCreatorRequest } from "../api/mappers";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
@@ -38,13 +38,20 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
         <div className="grid grid-cols-[1fr_280px] gap-6">
           {/* Left col */}
           <div>
-            {/* Gallery */}
-            <div className="rounded-xl overflow-hidden mb-3 relative" style={{ height: "220px" }}>
-              <img src={project.gallery[0]} alt={project.title} className="w-full h-full object-cover" />
-              <div className="absolute bottom-3 right-3 bg-black/60 text-white text-[11px] font-semibold px-3 py-1 rounded-full cursor-pointer">▶ Project Pitch Video</div>
+            {/* Gallery. A submission may have no images at all — falling straight to
+                project.gallery[0] is what used to crash this whole screen. Show the
+                cover image, then the gallery, then a placeholder. */}
+            <div className="rounded-xl overflow-hidden mb-3 relative bg-gray-100" style={{ height: "220px" }}>
+              {(project.gallery?.[0] || project.img) ? (
+                <img src={project.gallery?.[0] || project.img} alt={project.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[12px] text-gray-400">
+                  No images submitted
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 mb-5">
-              {project.gallery.slice(1).map((img, i) => (
+              {(project.gallery || []).slice(1).map((img, i) => (
                 <div key={i} className="rounded-lg overflow-hidden h-28">
                   <img src={img} alt="" className="w-full h-full object-cover" />
                 </div>
@@ -105,14 +112,22 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <h3 className="text-[13px] font-bold text-gray-900 mb-3">Team Members</h3>
               <div className="flex flex-col gap-2.5">
-                {project.team.map(m => {
-                  const initials = m.name.split(" ").map(n => n[0]).join("").slice(0, 2);
+                {(project.team || []).length === 0 && (
+                  <div className="text-[11px] text-gray-400">No team members listed.</div>
+                )}
+                {(project.team || []).map((m, idx) => {
+                  // team_members is free-form jsonb — a row may hold a bare string, or an
+                  // object with no name at all. Neither must take the screen down.
+                  const name = (typeof m === "string" ? m : m?.name) || "Unnamed member";
+                  const initials = name.split(" ").map(n => n[0]).join("").slice(0, 2);
                   return (
-                    <div key={m.id} className="flex items-center gap-2.5">
+                    <div key={m?.id ?? idx} className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initials}</div>
                       <div>
-                        <div className="text-[12px] font-semibold text-gray-900">{m.name}</div>
-                        <div className="text-[10px] text-gray-400">ID: {m.id} · {m.role}</div>
+                        <div className="text-[12px] font-semibold text-gray-900">{name}</div>
+                        <div className="text-[10px] text-gray-400">
+                          {[m?.rmitId && `ID: ${m.rmitId}`, m?.role].filter(Boolean).join(" · ") || "No role given"}
+                        </div>
                       </div>
                     </div>
                   );
@@ -124,7 +139,14 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
             <div className="bg-white border border-gray-200 rounded-xl p-4">
               <h3 className="text-[13px] font-bold text-gray-900 mb-3">Reward Tiers</h3>
               <div className="flex flex-col gap-3">
-                {project.tiers.map((t, i) => (
+                {/* Always empty for now — there is no project_tiers table, and
+                    CreateProject drops whatever the creator typed. */}
+                {(project.tiers || []).length === 0 && (
+                  <div className="text-[11px] text-gray-400">
+                    No reward tiers — the API has no tiers table yet.
+                  </div>
+                )}
+                {(project.tiers || []).map((t, i) => (
                   <div key={i} className="border border-gray-100 rounded-lg p-3">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-[14px] font-extrabold text-gray-900">{t.amount}</span>
@@ -143,10 +165,20 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
 }
 
 // ── Main Approvals Page ──
+// The two things an admin approves. Projects came first; creator requests are the other
+// half of the "Creator" checkbox on Register — approving one is now the ONLY way a user
+// gets the CREATOR role, since createProject stopped granting it automatically.
+const QUEUES = [
+  { id: "projects", label: "Project Submissions" },
+  { id: "creators", label: "Creator Requests" },
+];
+
 export default function AdminApprovals() {
   const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState("approvals");
+  const [queue, setQueue] = useState("projects");
   const [projects, setProjects] = useState([]);
+  const [creatorRequests, setCreatorRequests] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -172,10 +204,47 @@ export default function AdminApprovals() {
     return () => { cancelled = true; };
   }, []);
 
+  // GET /api/admin/creator-requests already returns only PENDING rows.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await adminApi.getAllCreatorRequests();
+        if (!cancelled) setCreatorRequests((rows || []).map(toCreatorRequest));
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err.response?.data?.message || err.message || "Could not load creator requests");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const term = search.toLowerCase();
+
   const filtered = projects.filter(p =>
-    p.title.toLowerCase().includes(search.toLowerCase()) ||
-    p.creator.toLowerCase().includes(search.toLowerCase())
+    p.title.toLowerCase().includes(term) ||
+    p.creator.toLowerCase().includes(term)
   );
+
+  const filteredRequests = creatorRequests.filter(r =>
+    r.name.toLowerCase().includes(term) || r.email.toLowerCase().includes(term)
+  );
+
+  // Approving grants the CREATOR role inside a DB transaction on the backend; the row is
+  // kept in the list with its new status so the admin can see what they just did.
+  const handleCreatorDecision = async (id, decision) => {
+    setActionError(null);
+    try {
+      if (decision === "approve") await adminApi.approveCreatorRequest(id);
+      else await adminApi.rejectCreatorRequest(id);
+      setCreatorRequests(prev =>
+        prev.map(r => r.id === id ? { ...r, status: decision === "approve" ? "APPROVED" : "REJECTED" } : r)
+      );
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message || "Could not update this request");
+    }
+  };
 
   const handleApprove = async (id) => {
     setActionError(null);
@@ -276,9 +345,35 @@ export default function AdminApprovals() {
         ) : (
           <main className="flex-1 p-4 md:p-9 overflow-y-auto">
           {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-[28px] font-extrabold text-gray-900 mb-1">Project Approvals</h1>
-            <p className="text-[14px] text-gray-400">Review and validate student project submissions for the upcoming funding cycle.</p>
+          <div className="mb-5">
+            <h1 className="text-[28px] font-extrabold text-gray-900 mb-1">Approvals</h1>
+            <p className="text-[14px] text-gray-400">
+              {queue === "projects"
+                ? "Review and validate student project submissions for the upcoming funding cycle."
+                : "Students who asked for Creator access when they signed up. Approving one grants the CREATOR role."}
+            </p>
+          </div>
+
+          {/* Queue switcher */}
+          <div className="flex border-b-2 border-gray-200 mb-5 gap-0">
+            {QUEUES.map(q => {
+              const count = q.id === "projects"
+                ? projects.filter(p => p.status === "Pending Review").length
+                : creatorRequests.filter(r => r.status === "PENDING").length;
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => { setQueue(q.id); setSearch(""); }}
+                  className={`lp-navlink flex items-center gap-2 px-5 py-2.5 text-[14px] bg-transparent cursor-pointer -mb-0.5 ${queue === q.id ? "is-active font-bold" : ""}`}
+                  style={{ "--nav-base": "#666" }}
+                >
+                  {q.label}
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${queue === q.id ? "bg-brand text-white" : "bg-gray-200 text-gray-600"}`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {(loadError || actionError) && (
@@ -289,10 +384,16 @@ export default function AdminApprovals() {
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5 lp-stagger">
-            {[
-              { label: "Pending Review",    value: pending,  sub: null },
-              { label: "Approved (this session)", value: approved, sub: null },
-            ].map(c => (
+            {(queue === "projects"
+              ? [
+                  { label: "Pending Review", value: pending },
+                  { label: "Approved (this session)", value: approved },
+                ]
+              : [
+                  { label: "Pending Requests", value: creatorRequests.filter(r => r.status === "PENDING").length },
+                  { label: "Granted (this session)", value: creatorRequests.filter(r => r.status === "APPROVED").length },
+                ]
+            ).map(c => (
               <div key={c.label} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="text-[11px] font-semibold text-gray-400 mb-2">{c.label}</div>
                 <div className="flex items-baseline gap-2">
@@ -309,12 +410,86 @@ export default function AdminApprovals() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Filter projects..."
+              placeholder={queue === "projects" ? "Filter projects..." : "Filter by name or email..."}
               className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
             />
           </div>
 
-          {/* Table */}
+          {/* Creator requests queue */}
+          {queue === "creators" && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+              <table className="min-w-[700px] w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {["Student", "Requested Role", "Requested On", "Status", "Actions"].map(h => (
+                      <th key={h} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-wide text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="lp-stagger">
+                  {filteredRequests.length > 0 ? filteredRequests.map((r, i) => (
+                    <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${i < filteredRequests.length - 1 ? "border-b border-gray-100" : ""}`}>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center text-[12px] font-bold shrink-0">
+                            {r.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <div className="text-[13px] font-bold text-gray-900 leading-snug">{r.name}</div>
+                            <div className="text-[11px] text-gray-400">{r.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className="bg-red-50 text-brand border border-red-200 text-[10px] font-bold px-2.5 py-1 rounded-sm">{r.role}</span>
+                      </td>
+                      <td className="px-5 py-3.5 text-[13px] text-gray-500">{r.requestedOn}</td>
+                      <td className="px-5 py-3.5">
+                        {r.status === "APPROVED" ? (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap bg-green-50 text-green-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-green-200">● GRANTED</span>
+                        ) : r.status === "REJECTED" ? (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap bg-gray-100 text-gray-500 text-[10px] font-bold px-2.5 py-1 rounded-full border border-gray-200">● DECLINED</span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 whitespace-nowrap bg-red-50 text-red-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-red-200">● PENDING</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        {r.status === "PENDING" ? (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleCreatorDecision(r.id, "reject")}
+                              className="bg-white border border-gray-200 text-gray-600 rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                            >
+                              DECLINE
+                            </button>
+                            <button
+                              onClick={() => handleCreatorDecision(r.id, "approve")}
+                              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer transition-colors"
+                            >
+                              GRANT CREATOR
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[12px] text-gray-300">Reviewed</span>
+                        )}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-10 text-center text-[13px] text-gray-400">
+                        {creatorRequests.length === 0
+                          ? "No creator requests waiting. One appears here when a student ticks “Creator” while signing up."
+                          : "No requests match that filter."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Project submissions queue */}
+          {queue === "projects" && (
           <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
             <table className="min-w-[800px] w-full border-collapse">
               <thead>
@@ -387,6 +562,7 @@ export default function AdminApprovals() {
               <button className="bg-white border border-gray-200 rounded px-2 py-1 text-gray-400 cursor-pointer hover:bg-gray-50 text-sm">›</button>
             </div>
           </div>
+          )}
           </main>
         )}
       </div>

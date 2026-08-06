@@ -1,40 +1,100 @@
-export default function PostUpdateModal({ open, onClose }) {
-  if (!open) return null;
+import { useState } from "react";
+import * as projectApi from "../../api/projectApi";
+
+/**
+ * "Post Project Update", opened from the UPDATE button on a project card.
+ *
+ * POST /api/projects/:id/updates — the backend only accepts it from the project's own
+ * creator (or an admin), so a backer opening this by other means gets a 400 back rather
+ * than a silent no-op.
+ *
+ * `project` is required: an update with no project has nowhere to appear, so the caller
+ * mounts this only when it has one (`{target && <PostUpdateModal project={target} …/>}`,
+ * the same pattern as EditProject). Mounting per open is also what keeps the draft from
+ * leaking between projects — closing unmounts the component, so the next open is empty.
+ */
+export default function PostUpdateModal({ project, onClose, onPosted }) {
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [posting, setPosting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const canPost = title.trim() && body.trim() && !posting;
+
+  const handlePost = async () => {
+    if (!canPost) return;
+    setPosting(true);
+    setError(null);
+    try {
+      await projectApi.postProjectUpdate(project.id, { title: title.trim(), body: body.trim() });
+      onPosted?.();
+      onClose?.();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Could not post this update");
+    } finally {
+      setPosting(false);
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-[500px] p-6 relative shadow-2xl overflow-y-auto max-h-full">
+    <div className="lp-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="lp-modal bg-white rounded-xl w-full max-w-[500px] p-6 relative shadow-2xl overflow-y-auto max-h-full"
+        onClick={e => e.stopPropagation()}
+      >
         <button onClick={onClose} className="absolute top-4 right-4 bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer">×</button>
-        <h2 className="text-lg font-extrabold text-gray-900 mb-4">Post Project Update</h2>
+
+        <h2 className="text-lg font-extrabold text-gray-900 mb-1">Post Project Update</h2>
+        <p className="text-[13px] text-gray-400 mb-4">
+          For <span className="font-semibold text-gray-600">{project.title}</span>
+        </p>
+
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-[12px] text-blue-700 mb-4 leading-relaxed">
-          ℹ Updates are emailed directly to your backers and posted publicly on your project page.
+          ℹ Updates are posted publicly on your project page for backers to read.
         </div>
+
         <div className="mb-3">
           <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">UPDATE TITLE</label>
-          <input placeholder="e.g., Prototype Phase 1 Completed!" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+          <input
+            value={title}
+            onChange={e => { setTitle(e.target.value); setError(null); }}
+            maxLength={200}
+            placeholder="e.g., Prototype Phase 1 Completed!"
+            className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors"
+          />
         </div>
-        <div className="mb-3">
+
+        <div className="mb-4">
           <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">UPDATE CONTENT</label>
-          <div className="border border-gray-200 rounded-md overflow-hidden">
-            <div className="bg-gray-50 border-b border-gray-200 px-3 py-1.5 flex gap-2">
-              {["B", "I", "≡", "⊞", "🔗"].map(t => (
-                <button key={t} className="bg-transparent border-none text-[13px] font-bold text-gray-500 px-1.5 py-0.5 hover:bg-gray-200 rounded cursor-pointer">{t}</button>
-              ))}
-            </div>
-            <textarea placeholder="Share the details of your progress..." className="w-full border-none outline-none px-3 py-2.5 text-[13px] min-h-[80px] resize-y" />
-          </div>
+          <textarea
+            value={body}
+            onChange={e => { setBody(e.target.value); setError(null); }}
+            placeholder="Share the details of your progress..."
+            className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] min-h-[110px] resize-y outline-none focus:border-brand transition-colors leading-relaxed"
+          />
         </div>
-        <div className="mb-5">
-          <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">MEDIA ATTACHMENTS</label>
-          <div className="border-2 border-dashed border-gray-200 rounded-lg p-7 text-center cursor-pointer hover:border-brand transition-colors">
-            <div className="text-2xl text-gray-300 mb-1.5">☁</div>
-            <div className="text-[13px] font-semibold text-gray-600">Click to upload or drag and drop</div>
-            <div className="text-[11px] text-gray-300 mt-1">SVG, PNG, JPG or GIF (max. 800×400px)</div>
-          </div>
-        </div>
+
+        {/* The rich-text toolbar and the media dropzone that used to sit here were
+            removed: neither button did anything, and project_updates stores plain text
+            with nowhere to keep an attachment. Bring them back with the backend. */}
+
+        {error && (
+          <div className="text-[12px] text-brand mb-4">{error}</div>
+        )}
+
         <div className="flex justify-end gap-2.5">
           <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50">CANCEL</button>
-          <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2 text-[13px] font-bold cursor-pointer transition-colors">POST UPDATE</button>
+          <button
+            onClick={handlePost}
+            disabled={!canPost}
+            className={`border-none rounded-md px-5 py-2 text-[13px] font-bold transition-colors ${
+              canPost
+                ? "bg-brand hover:bg-red-800 text-white cursor-pointer"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {posting ? "POSTING…" : "POST UPDATE"}
+          </button>
         </div>
       </div>
     </div>
