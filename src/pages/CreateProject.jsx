@@ -39,6 +39,15 @@ function isObjectUrl(value) {
   return typeof value === "string" && value.startsWith("blob:");
 }
 
+// Images are stored as base64 data URIs inside the project row, so an untouched phone
+// photo (2-5 MB, +33% from base64) both exceeded the server's body limit — a plain 413
+// before any controller ran — and would sit in `gallery` for every Discover request to
+// carry. Downscaling before encoding is what makes that storage choice survivable:
+// 1600px / quality 0.8 takes a 4 MB photo to roughly 200 KB with no visible loss at the
+// sizes this UI renders (a 240px card thumbnail, a full-width hero).
+const MAX_IMAGE_DIMENSION = 1600;
+const IMAGE_QUALITY = 0.8;
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -47,6 +56,43 @@ function readFileAsDataUrl(file) {
     reader.onerror = () => reject(reader.error || new Error("Failed to read file preview."));
     reader.readAsDataURL(file);
   });
+}
+
+/**
+ * Read an image file and return a downscaled JPEG data URI.
+ *
+ * Falls back to the original data URI whenever the browser cannot decode the file —
+ * an SVG, an unusual format, a corrupt upload. Losing the image entirely would be a
+ * worse outcome than sending a large one, and the server limit has headroom for it.
+ */
+async function readImageAsCompressedDataUrl(file) {
+  const original = await readFileAsDataUrl(file);
+
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Not a decodable image."));
+      image.src = original;
+    });
+
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
+
+    // Already small enough — re-encoding a modest PNG as JPEG can make it *bigger*.
+    if (scale === 1 && original.length <= 400 * 1024) return original;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const compressed = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
+
+    // toDataURL returns "data:," on a tainted or zero-sized canvas.
+    return compressed.length > 32 && compressed.length < original.length ? compressed : original;
+  } catch {
+    return original;
+  }
 }
 
 function createFileItem(file, dataUrl = "") {
@@ -58,9 +104,20 @@ function createFileItem(file, dataUrl = "") {
   };
 }
 
+// Reports the size that will actually be SUBMITTED, not the size of the file on disk.
+// Images are downscaled before encoding, so the Review & Submit screen was showing
+// "cover.png · 3.7 MB" for something that goes over the wire at ~100 KB — alarming right
+// at the moment someone is deciding whether to press submit.
+// base64 carries 3 bytes per 4 characters; the "data:...;base64," prefix is negligible.
+function submittedSize(fileItem) {
+  const dataUrl = fileItem.dataUrl;
+  if (!dataUrl) return fileItem.file?.size ?? 0;
+  return Math.round((dataUrl.length - dataUrl.indexOf(",") - 1) * 0.75);
+}
+
 function fileLabel(fileItem) {
   if (!fileItem) return "Not uploaded";
-  return `${fileItem.file.name} · ${formatFileSize(fileItem.file.size)}`;
+  return `${fileItem.file.name} · ${formatFileSize(submittedSize(fileItem))}`;
 }
 
 function hasText(value) {
@@ -138,6 +195,18 @@ function getStoredDraft() {
   }
 }
 
+// Is there anything in this draft worth telling the user about? A draft written by the
+// autosave effect on mount is structurally present but completely blank.
+function draftHasContent(draft) {
+  if (!draft) return false;
+
+  const { title, school, goal, proposition } = draft.basicData || {};
+  if ([title, school, goal, proposition].some(hasText)) return true;
+  if (Object.values(draft.story || {}).some(v => typeof v === "string" && hasText(v))) return true;
+
+  return Boolean(draft.media?.coverImage) || (draft.media?.galleryImages || []).length > 0;
+}
+
 function saveDraftToStorage(draft) {
   if (typeof window === "undefined") return;
 
@@ -146,6 +215,64 @@ function saveDraftToStorage(draft) {
   } catch {
     // Ignore storage errors so the form still works if storage is unavailable.
   }
+}
+
+// Called once a submit succeeds. The draft is a recovery aid for an UNFINISHED project;
+// once it has been sent it is a finished one, and leaving it behind meant opening
+// "New Project" again presented the project you just submitted, pre-filled and ready to
+// be submitted a second time.
+// Cancelling deliberately does NOT clear it — that is the case the draft exists for.
+function clearDraftFromStorage() {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+  } catch {
+    // Ignore storage errors — same reasoning as saveDraftToStorage.
+  }
+}
+
+/**
+ * Shown after a successful submit, over a backdrop with no dismiss path back to the
+ * form. That is deliberate: the previous inline "SUBMISSION RECEIVED" panel left the
+ * SUBMIT button live in the footer underneath it, so a second click created a duplicate
+ * project. Leaving is now the only thing you can do from here.
+ *
+ * Navigating on an explicit click rather than automatically, matching
+ * RegisterSuccessModal — the page should not vanish out from under someone mid-read.
+ */
+function SubmitSuccessModal({ title, note, onGoToProjects }) {
+  return (
+    <div className="lp-overlay fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="lp-modal bg-white rounded-xl shadow-2xl w-full max-w-[460px] p-7 text-center">
+        <div className="w-14 h-14 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5">
+            <path d="M20 6 9 17l-5-5" />
+          </svg>
+        </div>
+
+        <h2 className="text-[21px] font-extrabold text-gray-900 mb-2">Project submitted</h2>
+        <p className="text-[14px] text-gray-500 leading-relaxed mb-1">
+          <span className="font-semibold text-gray-700">"{title}"</span> has been sent to the RMIT
+          board for review. It stays in <span className="font-semibold text-gray-700">Pending Review</span> until
+          an admin approves it, and appears on Discover once they do.
+        </p>
+
+        {note && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 text-[12px] text-amber-800 leading-relaxed mt-4 text-left">
+            {note}
+          </div>
+        )}
+
+        <button
+          onClick={onGoToProjects}
+          className="w-full bg-brand hover:bg-red-800 text-white border-none rounded-md px-6 py-3 text-[13px] font-bold tracking-wide cursor-pointer transition-colors mt-6"
+        >
+          GO TO MY PROJECTS
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function StepIndicator({ steps, current }) {
@@ -241,7 +368,7 @@ function Step2({ media, setMedia, story, setStory }) {
   const uploadCover = async event => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const dataUrl = await readFileAsDataUrl(file);
+    const dataUrl = await readImageAsCompressedDataUrl(file);
     setMedia(prev => {
       if (prev.coverImage?.preview && isObjectUrl(prev.coverImage.preview)) URL.revokeObjectURL(prev.coverImage.preview);
       return { ...prev, coverImage: createFileItem(file, dataUrl) };
@@ -259,7 +386,7 @@ function Step2({ media, setMedia, story, setStory }) {
   const uploadGallery = async event => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
-    const dataUrls = await Promise.all(files.map(file => readFileAsDataUrl(file)));
+    const dataUrls = await Promise.all(files.map(file => readImageAsCompressedDataUrl(file)));
     setMedia(prev => {
       const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
       const nextGallery = files.slice(0, remainingSlots).map((file, index) => createFileItem(file, dataUrls[index]));
@@ -289,7 +416,7 @@ function Step2({ media, setMedia, story, setStory }) {
     if (!files.length) return;
 
     if (kind === "cover") {
-      const dataUrl = await readFileAsDataUrl(files[0]);
+      const dataUrl = await readImageAsCompressedDataUrl(files[0]);
       setMedia(prev => {
         if (prev.coverImage?.preview && isObjectUrl(prev.coverImage.preview)) URL.revokeObjectURL(prev.coverImage.preview);
         return { ...prev, coverImage: createFileItem(files[0], dataUrl) };
@@ -298,7 +425,7 @@ function Step2({ media, setMedia, story, setStory }) {
     }
 
     if (kind === "gallery") {
-      const dataUrls = await Promise.all(files.map(file => readFileAsDataUrl(file)));
+      const dataUrls = await Promise.all(files.map(file => readImageAsCompressedDataUrl(file)));
       setMedia(prev => {
         const remainingSlots = MAX_GALLERY_IMAGES - prev.galleryImages.length;
         const nextGallery = files.slice(0, remainingSlots).map((file, index) => createFileItem(file, dataUrls[index]));
@@ -389,7 +516,7 @@ function Step2({ media, setMedia, story, setStory }) {
               <div className="p-4 flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[13px] font-bold text-gray-900">{media.coverImage.file.name}</div>
-                  <div className="text-[11px] text-gray-400">{formatFileSize(media.coverImage.file.size)}</div>
+                  <div className="text-[11px] text-gray-400">{formatFileSize(submittedSize(media.coverImage))}</div>
                 </div>
                 <button onClick={removeCover} className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors">Remove</button>
               </div>
@@ -763,10 +890,30 @@ export default function CreateProject() {
   const [tiers, setTiers] = useState(storedDraft?.tiers ?? CREATE_PROJECT_TIERS);
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [hasRestoredDraft, setHasRestoredDraft] = useState(Boolean(storedDraft));
+  // In flight. Drives the button label and disabled state.
+  const [submitting, setSubmitting] = useState(false);
+  // The ACTUAL double-submit latch, and it has to be a ref rather than the state above.
+  // State updates are asynchronous: two clicks in the same tick both read the stale
+  // `submitting === false` from their closure and both fire a POST, and `disabled` does
+  // not help either because React has not re-rendered yet. Measured — a state-only guard
+  // still created two identical projects on a double click. A ref changes synchronously,
+  // so the second call sees the lock immediately.
+  const submitLockRef = useRef(false);
+  // Anything worth saying in the success modal — currently only the reward-tiers warning.
+  const [submitNote, setSubmitNote] = useState("");
+  // "Draft restored" only when there is actually something to restore. The autosave
+  // effect writes on mount, so merely opening this page and leaving stores an EMPTY
+  // draft — and the old `Boolean(storedDraft)` then announced a restored draft over a
+  // blank form on the next visit. Very visible now that submitting sends you away and
+  // you come back to a cleared form.
+  const [hasRestoredDraft, setHasRestoredDraft] = useState(() => draftHasContent(storedDraft));
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Stop autosaving once the project is away, otherwise this effect would immediately
+    // write the draft back over the one handleSubmit just cleared.
+    if (isSubmitted) return;
+
     saveDraftToStorage({
       step,
       basicData,
@@ -775,7 +922,7 @@ export default function CreateProject() {
       team,
       tiers,
     });
-  }, [basicData, story, media, step, team, tiers]);
+  }, [basicData, story, media, step, team, tiers, isSubmitted]);
 
   useEffect(() => {
     if (!hasRestoredDraft) return;
@@ -819,9 +966,11 @@ export default function CreateProject() {
     return "";
   };
 
+  // These two used to clear isSubmitted, back when success was an inline panel you could
+  // navigate away from. Success is a modal now and it covers the page, so neither is
+  // reachable afterwards — and clearing the flag here would re-arm the SUBMIT button and
+  // restart the autosave, which is the duplicate-project bug all over again.
   const goToStep = targetStep => {
-    setIsSubmitted(false);
-
     if (targetStep < step) {
       setMessage("");
       setStep(targetStep);
@@ -841,8 +990,6 @@ export default function CreateProject() {
   };
 
   const advanceStep = () => {
-    setIsSubmitted(false);
-
     const validation = validateStep(step);
     if (validation) {
       setMessage(validation);
@@ -854,16 +1001,23 @@ export default function CreateProject() {
   };
 
   const handlePrimaryFooterAction = () => {
+    // Same reasoning as goToStep/advanceStep: this cleared isSubmitted for the old inline
+    // success panel. The modal covers the footer, so "← BACK" cannot be clicked after a
+    // successful submit, and un-setting the flag there would re-arm SUBMIT.
     if (step === STEPS.length) {
       setMessage("");
-      setIsSubmitted(false);
       setStep(STEPS.length - 1);
       return;
     }
 
+    // `story` was missing here while the autosave effect above does include it. Since
+    // clicking SAVE DRAFT changes none of that effect's dependencies, the effect did not
+    // re-run afterwards — so this write was the last one to land and the saved draft came
+    // back from a reload with The Challenge / Our Solution / How Your Funding Helps blank.
     saveDraftToStorage({
       step,
       basicData,
+      story,
       media: serializeMedia(media),
       team,
       tiers,
@@ -873,13 +1027,20 @@ export default function CreateProject() {
   };
 
   const handleSubmit = async () => {
+    // Checked and taken synchronously, before any await, so concurrent clicks cannot
+    // both get through. Released only on failure — a success keeps it latched for the
+    // life of the component, so this form can create at most one project.
+    if (submitLockRef.current) return;
+
     const requiredStepError = [1, 2, 3, 4].map(validateStep).find(Boolean);
     if (requiredStepError) {
       setMessage(requiredStepError);
       return;
     }
 
-    setMessage("Submitting…");
+    submitLockRef.current = true;
+    setSubmitting(true);
+    setMessage("");
     try {
       // The backend accepts: title, description, category, goal_amount, image_url,
       // team_members, challenge, solution, funding_usage (and start_date/end_date,
@@ -907,28 +1068,33 @@ export default function CreateProject() {
           .map(b => ({ title: b.title.trim(), desc: b.desc.trim() })),
       });
 
-      setMessage(
+      // Clear the saved draft BEFORE flipping isSubmitted, so there is no render in
+      // between where the autosave effect could put it back.
+      clearDraftFromStorage();
+
+      setSubmitNote(
         tiers.length > 0
-          ? "Project submitted. Note: reward tiers were not saved — the API has no tiers table yet."
+          ? "Your reward tiers were not saved — the API has no tiers table yet. Everything else was submitted."
           : ""
       );
+      setMessage("");
       setIsSubmitted(true);
     } catch (err) {
+      // Left on the form on purpose: the draft is intact and the error is usually
+      // retryable, so release the latch and put the SUBMIT button back rather than
+      // stranding the work. This is the ONLY place the latch is released.
+      submitLockRef.current = false;
       setMessage(err.response?.data?.message || err.message || "Could not submit the project");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const renderStep = () => {
-    if (isSubmitted) {
-      return (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-          <div className="inline-flex items-center gap-2 rounded-full bg-green-50 text-green-700 border border-green-200 px-3 py-1 text-[11px] font-bold tracking-widest mb-4">SUBMISSION RECEIVED</div>
-          <h2 className="text-[24px] font-extrabold text-gray-900 mb-2">Your project is ready for review</h2>
-          <p className="text-[14px] text-gray-500 leading-relaxed">The submission has been prepared for admin review. You can return to the summary if you need to make a last edit.</p>
-        </div>
-      );
-    }
-
+    // No isSubmitted branch here any more. It used to swap this area for an inline
+    // "SUBMISSION RECEIVED" panel while leaving the footer's SUBMIT button live
+    // underneath — which is exactly how a second click produced a duplicate project.
+    // Success is a modal now, and leaving for My Projects is the only way out of it.
     switch (step) {
       case 1: return <Step1 data={basicData} setData={setBasicData} />;
       case 2: return <Step2 media={media} setMedia={setMedia} story={story} setStory={setStory} />;
@@ -961,7 +1127,11 @@ export default function CreateProject() {
         <div className="min-w-0">
           {renderStep()}
           <div className="flex flex-col sm:flex-row gap-3 justify-between mt-9 pt-5 border-t border-gray-100">
-            <button onClick={handlePrimaryFooterAction} className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto">
+            <button
+              onClick={handlePrimaryFooterAction}
+              disabled={submitting}
+              className="bg-white border border-gray-200 rounded-md px-6 py-2.5 text-[13px] text-gray-600 cursor-pointer hover:bg-gray-50 transition-colors w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {step === STEPS.length ? "← BACK" : "SAVE DRAFT"}
             </button>
             <div className="flex flex-col-reverse sm:flex-row gap-2.5 w-full sm:w-auto">
@@ -971,12 +1141,33 @@ export default function CreateProject() {
               {step < STEPS.length ? (
                 <button onClick={advanceStep} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">NEXT STEP →</button>
               ) : (
-                <button onClick={handleSubmit} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SUBMIT PROJECT FOR APPROVAL ▶</button>
+                // Disabled while the request is open — the visible half of the
+                // double-submit guard, so nobody is left clicking a button that looks
+                // idle but is not.
+                <button
+                  onClick={handleSubmit}
+                  disabled={submitting || isSubmitted}
+                  className={`border-none rounded-md px-7 py-2.5 text-[13px] font-bold transition-colors w-full sm:w-auto ${
+                    submitting || isSubmitted
+                      ? "bg-gray-300 text-white cursor-not-allowed"
+                      : "bg-brand hover:bg-red-800 text-white cursor-pointer"
+                  }`}
+                >
+                  {submitting ? "SUBMITTING…" : "SUBMIT PROJECT FOR APPROVAL ▶"}
+                </button>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {isSubmitted && (
+        <SubmitSuccessModal
+          title={basicData.title.trim()}
+          note={submitNote}
+          onGoToProjects={() => navigate("/creator-my-projects")}
+        />
+      )}
     </div>
   );
 }
