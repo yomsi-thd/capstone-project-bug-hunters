@@ -34,6 +34,23 @@ function resolveCampaignDates(data) {
     return { start, end };
 }
 
+function isAdminRole(roles) {
+    return Array.isArray(roles) && roles.includes("ADMIN");
+}
+
+// An archived project is frozen: no edits, no investments, no comments, no updates,
+// no approve/reject. Freezing edits is not tidiness — it is what makes "restore puts
+// the project back at its previous status without re-approval" safe. If editing while
+// archived is ever allowed, restore MUST be changed to send the project back to
+// PENDING, otherwise archive → edit → restore is a route onto Discover that skips
+// moderation entirely.
+function assertNotArchived(project) {
+
+    if (project.archived_at) {
+        throw new Error("This project is archived. Restore it first.");
+    }
+}
+
 // Create project
 async function createProject(userId, data) {
 
@@ -107,6 +124,8 @@ async function updateProject(projectId, userId, data) {
         throw new Error("Unauthorized");
     }
 
+    assertNotArchived(project);
+
     const updatedProject = {
         title: data.title ?? project.title,
         description: data.description ?? project.description,
@@ -126,10 +145,81 @@ async function updateProject(projectId, userId, data) {
     return await projectRepository.updateProject(projectId, updatedProject);
 }
 
-// Delete project
-// An ADMIN may delete any project — that is the whole point of the moderation screen.
-// Without the bypass the admin dashboard's delete button could only ever remove a
-// project the admin happened to have created themselves.
+// Archive a project instead of destroying it. Replaces "delete" as the everyday action
+// after the demo feedback: nothing should leave the database on a single click.
+// A creator may archive their own project; an ADMIN may archive any.
+async function archiveProject(projectId, userId, roles, reason) {
+
+    const project = await projectRepository.findById(projectId);
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    if (project.archived_at) {
+        throw new Error("This project is already archived.");
+    }
+
+    const isAdmin = isAdminRole(roles);
+    const isOwner = project.creator_id === userId;
+
+    if (!isOwner && !isAdmin) {
+        throw new Error("Unauthorized");
+    }
+
+    const trimmedReason = (reason || "").trim();
+
+    // An admin archiving someone else's project locks the creator out of restoring it
+    // (see restoreProject), so the creator is at least owed the reason. Archiving your
+    // own project needs no justification.
+    if (isAdmin && !isOwner && !trimmedReason) {
+        throw new Error("A reason is required when archiving another user's project.");
+    }
+
+    return await projectRepository.archiveProject(projectId, userId, trimmedReason);
+}
+
+// Restore. The asymmetry here is deliberate and is the core rule of the feature:
+// a creator may only undo an archive they performed themselves. If an ADMIN archived
+// the project, only an admin can bring it back — otherwise the creator could simply
+// reverse a moderation decision.
+// Note `archived_by` is ON DELETE SET NULL, so if the archiver's account is gone the
+// comparison fails and only an admin can restore. That is the safe direction.
+async function restoreProject(projectId, userId, roles) {
+
+    const project = await projectRepository.findById(projectId);
+
+    if (!project) {
+        throw new Error("Project not found");
+    }
+
+    if (!project.archived_at) {
+        throw new Error("This project is not archived.");
+    }
+
+    const isAdmin = isAdminRole(roles);
+    const archivedBySelf = project.archived_by === userId;
+    const isOwner = project.creator_id === userId;
+
+    if (!isAdmin && !(isOwner && archivedBySelf)) {
+        throw new Error(
+            "This project was archived by an administrator and can only be restored by one."
+        );
+    }
+
+    // `status` was never touched by archiveProject, so the project comes back at the
+    // verdict it already had: APPROVED goes straight back onto Discover, PENDING
+    // returns to the approval queue. No re-approval, and no previous_status column.
+    return await projectRepository.restoreProject(projectId);
+}
+
+// Permanent delete — the second step of the two-step bin, not the first.
+// Tightened from the previous behaviour in two ways:
+//   1. ADMIN only. A creator used to be able to hard-delete their own project; now the
+//      most they can do is archive it, and an admin has to sign off on the destruction.
+//   2. The project must already be archived, so nothing is ever one click from gone.
+// The cascade is unchanged: comments and project_updates go with it, and
+// classcoin_transactions.project_id is set to NULL so the spend record survives.
 async function deleteProject(projectId, userId, roles) {
 
     const project = await projectRepository.findById(projectId);
@@ -138,37 +228,79 @@ async function deleteProject(projectId, userId, roles) {
         throw new Error("Project not found");
     }
 
-    const isAdmin = Array.isArray(roles) && roles.includes("ADMIN");
-
-    if (project.creator_id !== userId && !isAdmin) {
+    if (!isAdminRole(roles)) {
         throw new Error("Unauthorized");
+    }
+
+    if (!project.archived_at) {
+        throw new Error("Only an archived project can be permanently deleted. Archive it first.");
     }
 
     await projectRepository.deleteProject(projectId);
 }
 
+// The approval queue already filters archived projects out, so this guard covers the
+// stale-tab case: an admin left the queue open, someone archived a project meanwhile,
+// and the verdict would otherwise land silently on a project nobody can see.
 async function approveProject(id) {
 
-    const project =
-        await projectRepository.approveProject(id);
+    const existing = await projectRepository.findById(id);
 
-    if (!project) {
+    if (!existing) {
         throw new Error("Project not found");
     }
 
-    return project;
+    assertNotArchived(existing);
+
+    return await projectRepository.approveProject(id);
 }
 
-async function rejectProject(id) {
+async function rejectProject(id, note) {
 
-    const project =
-        await projectRepository.rejectProject(id);
+    const existing = await projectRepository.findById(id);
+
+    if (!existing) {
+        throw new Error("Project not found");
+    }
+
+    assertNotArchived(existing);
+
+    const trimmedNote = (note || "").trim();
+
+    // Optional, but strongly encouraged by the UI: without it the creator is told their
+    // project was refused and nothing about why, which is the state this column exists
+    // to end. Not enforced here because the queue's one-click REJECT is a legitimate
+    // quick action for obvious spam.
+    return await projectRepository.rejectProject(id, trimmedNote);
+}
+
+// The creator's way back after a rejection. Without this a REJECTED project is a dead
+// end: the approval queue only lists PENDING and the admin dashboard has no approve
+// button, so nothing could ever move it forward again no matter how well it was revised.
+async function resubmitProject(projectId, userId, roles) {
+
+    const project = await projectRepository.findById(projectId);
 
     if (!project) {
         throw new Error("Project not found");
     }
 
-    return project;
+    assertNotArchived(project);
+
+    const isAdmin = isAdminRole(roles);
+
+    if (project.creator_id !== userId && !isAdmin) {
+        throw new Error("Only the project's creator can resubmit it.");
+    }
+
+    // Only from REJECTED. Allowing it from PENDING would let someone bump their own
+    // project around the queue, and from APPROVED it would take a live project off
+    // Discover by accident.
+    if (project.status !== "REJECTED") {
+        throw new Error("Only a rejected project can be resubmitted for review.");
+    }
+
+    return await projectRepository.resubmitProject(projectId);
 }
 
 async function setProjectEndorsed(id, endorsed) {
@@ -211,6 +343,8 @@ async function createComment(userId, projectId, data) {
     if (!project) {
         throw new Error("Project not found");
     }
+
+    assertNotArchived(project);
 
     let parentId = null;
 
@@ -288,10 +422,20 @@ async function createProjectUpdate(userId, roles, projectId, data) {
         throw new Error("Project not found");
     }
 
-    const isAdmin = Array.isArray(roles) && roles.includes("ADMIN");
+    const isAdmin = isAdminRole(roles);
 
     if (project.creator_id !== userId && !isAdmin) {
         throw new Error("Only the project's creator can post an update.");
+    }
+
+    assertNotArchived(project);
+
+    // A project update is a public announcement on the project page. A rejected project
+    // is not on Discover and has no backers, so the post would go nowhere — and worse,
+    // GET /projects/:id/updates is public, so if the project is later approved that
+    // update surfaces with a timestamp from a period nobody could see it.
+    if (project.status === "REJECTED") {
+        throw new Error("This project was not approved, so it cannot post updates. Revise it and resubmit for review.");
     }
 
     return await projectUpdateRepository.create({
@@ -341,6 +485,12 @@ async function investProject(userId, projectId, amount) {
 
         if (project.status !== "APPROVED") {
             throw new Error("Only approved projects can receive investments.");
+        }
+
+        // Checked inside the transaction alongside the status, so an archive landing
+        // mid-flight rolls the investment back rather than funding a hidden project.
+        if (project.archived_at) {
+            throw new Error("This project has been archived and is no longer accepting investments.");
         }
 
         // Atomically deduct balance
@@ -400,9 +550,12 @@ module.exports = {
     getProjectById,
     getMyProjects,
     updateProject,
+    archiveProject,
+    restoreProject,
     deleteProject,
     approveProject,
     rejectProject,
+    resubmitProject,
     setProjectEndorsed,
     getProjectComments,
     createComment,

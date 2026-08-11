@@ -21,6 +21,17 @@ router.get("/:id", projectController.getProjectById);
 
 router.put("/:id", authenticate, projectController.updateProject);
 
+// Archive / restore / permanent delete — the two-step bin that replaced plain delete.
+// No authorize() guard on purpose: the rule is about OWNERSHIP, not role, and it is the
+// same pattern the project-updates and comment routes already use. archive is allowed
+// for the creator or an admin; restore is allowed for an admin, or for the creator only
+// when they were the one who archived it. Both are decided in projectService.
+router.patch("/:id/archive", authenticate, projectController.archiveProject);
+
+router.patch("/:id/restore", authenticate, projectController.restoreProject);
+
+// PERMANENT. The service restricts this to an ADMIN acting on an already-archived
+// project, so a creator can no longer destroy their own project in one click.
 router.delete("/:id", authenticate, projectController.deleteProject);
 
 router.patch(
@@ -36,6 +47,12 @@ router.patch(
     authorize("ADMIN"),
     projectController.rejectProject
 );
+
+// Resubmit a REJECTED project for review. No authorize() guard — like archive/restore
+// this is about OWNERSHIP, and the service checks it (creator of the project, or admin).
+// Without this route a rejected project is permanently stuck: the approval queue only
+// lists PENDING and the admin dashboard has no approve button.
+router.patch("/:id/resubmit", authenticate, projectController.resubmitProject);
 
 // The "RMIT Endorsed" badge is a university endorsement, so only an admin may set it.
 router.patch(

@@ -104,6 +104,11 @@ CREATE TABLE projects (
     category          VARCHAR(100),
     status            VARCHAR(20)   DEFAULT 'PENDING'
                       CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    -- Why the board rejected it, written by the admin in AdminApprovals and shown to
+    -- the creator on their My Projects card. Cleared on approve and on resubmit, so it
+    -- only ever describes the CURRENT verdict — a stale note on an approved project
+    -- would be worse than none.
+    review_note       TEXT,
     start_date        DATE,
     end_date          DATE,
     team_members      JSONB         NOT NULL DEFAULT '[]'::jsonb,
@@ -118,9 +123,26 @@ CREATE TABLE projects (
     gallery           JSONB         NOT NULL DEFAULT '[]'::jsonb,
     -- "RMIT Endorsed" badge. ADMIN-only (PATCH /projects/:id/endorse).
     endorsed          BOOLEAN       NOT NULL DEFAULT FALSE,
+    -- ── Archive (soft delete). A SECOND axis, independent of `status` above.
+    -- `status` is the moderation verdict (PENDING/APPROVED/REJECTED); these three
+    -- are visibility. A project can be APPROVED *and* archived. Archived is
+    -- `archived_at IS NOT NULL` — there is deliberately no PUBLISHED/ARCHIVED
+    -- column, because a second copy of the same fact can drift out of step.
+    -- Restoring NULLs all three, which is why `status` survives an archive round
+    -- trip untouched and a restored project needs no re-approval.
+    archived_at       TIMESTAMPTZ,
+    -- Drives WHO may restore: a creator may only restore what they archived
+    -- themselves, so an admin archiving their project locks them out.
+    -- SET NULL, not CASCADE: deleting a user must not erase a project.
+    archived_by       INTEGER       REFERENCES users(id) ON DELETE SET NULL,
+    -- Required when an admin archives someone else's project — they cannot undo
+    -- it themselves, so they are at least told why.
+    archive_reason    TEXT,
     created_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_projects_archived ON projects (archived_at);
 
 
 -- ─── classcoins / classcoin_transactions ────────────────────────────────────

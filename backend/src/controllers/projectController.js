@@ -91,7 +91,49 @@ const updateProject = async (req, res) => {
     }
 };
 
-// Delete Project
+// Archive Project — the everyday "remove it" action. Soft, reversible.
+const archiveProject = async (req, res) => {
+    try {
+        const project = await projectService.archiveProject(
+            req.params.id,
+            req.user.id,
+            req.user.roles,
+            req.body.reason
+        );
+
+        res.status(200).json({
+            message: "Project archived successfully",
+            project
+        });
+    } catch (error) {
+        res.status(400).json({
+            message: error.message
+        });
+    }
+};
+
+// Restore Project — brings it back at the status it already had.
+const restoreProject = async (req, res) => {
+    try {
+        const project = await projectService.restoreProject(
+            req.params.id,
+            req.user.id,
+            req.user.roles
+        );
+
+        res.status(200).json({
+            message: "Project restored successfully",
+            project
+        });
+    } catch (error) {
+        res.status(400).json({
+            message: error.message
+        });
+    }
+};
+
+// Delete Project — PERMANENT. Admin only, and only for an already-archived project;
+// both rules live in the service.
 const deleteProject = async (req, res) => {
     try {
         await projectService.deleteProject(
@@ -101,7 +143,7 @@ const deleteProject = async (req, res) => {
         );
 
         res.status(200).json({
-            message: "Project deleted successfully"
+            message: "Project deleted permanently"
         });
     } catch (error) {
         res.status(400).json({
@@ -134,9 +176,12 @@ async function rejectProject(req, res) {
 
     try {
 
+        // `note` is the reviewer's explanation, shown to the creator on their project
+        // card. AdminApprovals collected it long before there was a column for it.
         const project =
             await projectService.rejectProject(
-                req.params.id
+                req.params.id,
+                req.body?.note
             );
 
         res.json(project);
@@ -144,6 +189,31 @@ async function rejectProject(req, res) {
     } catch (error) {
 
         res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+// The creator's route back into the approval queue after revising a rejected project.
+async function resubmitProject(req, res) {
+
+    try {
+
+        const project = await projectService.resubmitProject(
+            req.params.id,
+            req.user.id,
+            req.user.roles
+        );
+
+        res.status(200).json({
+            message: "Project resubmitted for review",
+            project
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
             message: error.message
         });
 
@@ -321,9 +391,12 @@ module.exports = {
     getProjectById,
     getMyProjects,
     updateProject,
+    archiveProject,
+    restoreProject,
     deleteProject,
     approveProject,
     rejectProject,
+    resubmitProject,
     endorseProject,
     getProjectComments,
     createComment,
