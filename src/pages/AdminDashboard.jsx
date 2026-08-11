@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
@@ -18,55 +18,120 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
+  // Archive is the everyday action now; permanent delete is the second step, reachable
+  // only from the Archived bin. Separate targets so the two confirmations can never be
+  // confused with one another.
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiveReason, setArchiveReason] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [deleting, setDeleting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
+  // id of the row whose RESTORE is in flight — restore happens inline, with no modal.
+  const [restoringId, setRestoringId] = useState(null);
 
-  // GET /api/admin/projects — returns every project in every status.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
+  // GET /api/admin/projects — returns every project in every status, archived included.
+  // Every mutation below refetches through this rather than patching local state: the
+  // archive columns arrive with joins (archived_by_name) that a mutation response does
+  // not carry, so a hand-patched row would show the wrong name.
+  // Nothing here sets state before the first `await`: `loading` already starts true, so
+  // the effect below never triggers a synchronous cascading render
+  // (react-hooks/set-state-in-effect). Keep it that way if you edit this.
+  const loadProjects = useCallback(async () => {
+    try {
+      const rows = await adminApi.getAllProject();
+      setProjects((rows || []).map(toAdminProject));
       setLoadError(null);
-      try {
-        const rows = await adminApi.getAllProject();
-        if (!cancelled) setProjects((rows || []).map(toAdminProject));
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load projects");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    } catch (err) {
+      setLoadError(err.response?.data?.message || err.message || "Could not load projects");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  // Wrapped in an async IIFE, matching every other fetch effect in the codebase:
+  // calling loadProjects() bare here trips react-hooks/set-state-in-effect, which reads
+  // the call graph and sees the setStates inside it.
+  useEffect(() => { (async () => { await loadProjects(); })(); }, [loadProjects]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Archived projects live in their own bin, not mixed into the normal list — including
+  // under "All Statuses", which means "all moderation statuses", not "everything ever".
+  // Selecting Archived shows only those.
+  const showArchived = statusFilter === "Archived";
+
   const filtered = projects.filter(p => {
+    if (Boolean(p.archived) !== showArchived) return false;
     const matchSearch =
       p.title.toLowerCase().includes(search.toLowerCase()) ||
       p.creator.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = statusFilter === "All Statuses" || p.status === statusFilter;
+    const matchStatus =
+      showArchived || statusFilter === "All Statuses" || p.status === statusFilter;
     return matchSearch && matchStatus;
   });
 
-  // This used to drop the row from local state and nothing else — no API call at all,
-  // so the project came straight back on the next reload and stayed live on Discover.
-  // The row is only removed once the server confirms the delete.
+  const liveProjects = projects.filter(p => !p.archived);
+  const archivedCount = projects.length - liveProjects.length;
+
+  const closeModals = () => {
+    setArchiveTarget(null);
+    setDeleteTarget(null);
+    setArchiveReason("");
+    setActionError(null);
+  };
+
+  // Archive — replaces the old delete button. The reason is required by the backend
+  // whenever an admin archives someone else's project, which on this screen is almost
+  // always the case, so the field is validated here too rather than round-tripping.
+  const confirmArchive = async () => {
+    if (!archiveReason.trim()) {
+      setActionError("Please give a reason — the creator cannot restore this themselves.");
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      await projectApi.archiveProject(archiveTarget.id, archiveReason.trim());
+      await loadProjects();
+      closeModals();
+    } catch (err) {
+      setActionError(
+        err.response?.data?.message || err.message || "Could not archive this project"
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRestore = async (project) => {
+    setRestoringId(project.id);
+    setActionError(null);
+    try {
+      await projectApi.restoreProject(project.id);
+      await loadProjects();
+    } catch (err) {
+      setLoadError(
+        err.response?.data?.message || err.message || "Could not restore this project"
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  // Permanent delete. The backend refuses this unless the project is already archived,
+  // so it is only ever offered from the Archived bin. The row goes for good.
   const confirmDelete = async () => {
-    setDeleting(true);
+    setBusy(true);
     setActionError(null);
     try {
       await projectApi.deleteProject(deleteTarget.id);
       setProjects(prev => prev.filter(p => p.id !== deleteTarget.id));
-      setDeleteTarget(null);
+      closeModals();
     } catch (err) {
       setActionError(
         err.response?.data?.message || err.message || "Could not delete this project"
       );
     } finally {
-      setDeleting(false);
+      setBusy(false);
     }
   };
 
@@ -146,9 +211,12 @@ export default function AdminDashboard() {
           {/* Stats — now reactive to actual project list */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
             {[
-              { label: "Total Projects",    value: projects.length,                                  icon: "▦",  accent: false },
-              { label: "Pending Approvals", value: projects.filter(p => p.status === "Pending").length, icon: "📋", accent: false },
-              { label: "Flagged Content",   value: projects.filter(p => p.status === "Flagged").length, icon: "🚩", accent: true  },
+              // Counted over live projects only. An archived project is in the bin, and
+              // counting it as a "Total Project" would make archiving look like it did
+              // nothing.
+              { label: "Total Projects",    value: liveProjects.length,                                   icon: "▦",  accent: false },
+              { label: "Pending Approvals", value: liveProjects.filter(p => p.status === "Pending").length, icon: "📋", accent: false },
+              { label: "Archived",          value: archivedCount,                                         icon: "🗄", accent: false },
             ].map(c => (
               <div key={c.label} className={`bg-white rounded-xl p-6 border ${c.accent ? "border-brand" : "border-gray-200"}`} style={{ borderWidth: c.accent ? "1.5px" : "1px" }}>
                 <div className="flex justify-between items-start mb-2">
@@ -186,6 +254,12 @@ export default function AdminDashboard() {
               <option>Active</option>
               <option>Pending</option>
               <option>Flagged</option>
+              {/* The bin. Archived is a separate axis from the three above — a project
+                  in here still has its own Active/Pending verdict, which is what it
+                  returns to when restored. */}
+              {/* Explicit value: the label carries a count, so without it the option's
+                  value would be "Archived (3)" and never match showArchived. */}
+              <option value="Archived">Archived ({archivedCount})</option>
             </select>
             <button className="bg-white border border-gray-200 rounded-md px-3.5 py-2 text-[12px] font-semibold text-gray-500 cursor-pointer whitespace-nowrap hover:bg-gray-50 transition-colors w-full sm:w-auto">⊞ More Filters</button>
           </div>
@@ -225,6 +299,22 @@ export default function AdminDashboard() {
                           <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${s.text}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${s.dot}`} />{p.status}
                           </span>
+                          {/* Archived is shown ALONGSIDE the verdict, not instead of it —
+                              that verdict is what the project returns to on restore. */}
+                          {p.archived && (
+                            <div className="mt-1">
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-1.5 py-0.5">
+                                ARCHIVED
+                              </span>
+                              <div className="text-[11px] text-gray-400 mt-1 leading-snug max-w-[190px]">
+                                {p.archivedByName ? `by ${p.archivedByName}` : "by a deleted account"}
+                                {p.archivedAt && ` · ${p.archivedAt}`}
+                                {p.archiveReason && (
+                                  <div className="text-gray-500 italic">"{p.archiveReason}"</div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </td>
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
@@ -236,16 +326,40 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td className="px-5 py-3.5">
-                          <div className="flex gap-1.5">
-                            <button
-                              onClick={() => setDeleteTarget(p)}
-                              title="Delete project"
-                              className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-red-50 hover:border-brand transition-colors"
-                            >
-                              🗑
-                            </button>
-                            <button className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-gray-50 transition-colors">⋮</button>
-                          </div>
+                          {/* Archived rows get the two recovery-bin actions; live rows get
+                              ARCHIVE, which is now the only way a project can start
+                              leaving. Permanent delete is deliberately unreachable until
+                              a project sits in the bin — the backend enforces that too. */}
+                          {p.archived ? (
+                            <div className="flex flex-wrap gap-1.5">
+                              <button
+                                onClick={() => handleRestore(p)}
+                                disabled={restoringId === p.id}
+                                title="Restore this project to its previous status"
+                                className="bg-white border border-gray-300 rounded px-2.5 py-1 cursor-pointer text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                              >
+                                {restoringId === p.id ? "RESTORING…" : "↩ RESTORE"}
+                              </button>
+                              <button
+                                onClick={() => { setDeleteTarget(p); setActionError(null); }}
+                                title="Permanently delete — cannot be undone"
+                                className="bg-white border border-gray-200 rounded px-2.5 py-1 cursor-pointer text-[11px] font-semibold text-brand hover:bg-red-50 hover:border-brand transition-colors whitespace-nowrap"
+                              >
+                                🗑 DELETE
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => { setArchiveTarget(p); setArchiveReason(""); setActionError(null); }}
+                                title="Archive project — reversible"
+                                className="bg-white border border-gray-300 rounded px-2.5 py-1 cursor-pointer text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                              >
+                                🗄 ARCHIVE
+                              </button>
+                              <button className="bg-white border border-gray-200 rounded px-2 py-1 cursor-pointer text-sm hover:bg-gray-50 transition-colors">⋮</button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -258,7 +372,13 @@ export default function AdminDashboard() {
               </table>
             </div>
             <div className="px-5 py-3.5 flex flex-col sm:flex-row gap-3 justify-between items-center border-t border-gray-50">
-              <span className="text-[12px] text-gray-400">Showing 1–{filtered.length} of {projects.length} projects</span>
+              {/* Counted within the bin being viewed. Against the raw projects.length it
+                  read "1–1 of 6" while the Total Projects card said 5, because that card
+                  excludes archived and this did not. */}
+              <span className="text-[12px] text-gray-400">
+                Showing 1–{filtered.length} of {showArchived ? archivedCount : liveProjects.length}
+                {showArchived ? " archived projects" : " projects"}
+              </span>
               <div className="flex gap-2">
                 {["Prev", "Next"].map(l => (
                   <button key={l} className="bg-white border border-gray-200 rounded-md px-4 py-1.5 text-[12px] text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">{l}</button>
@@ -270,22 +390,39 @@ export default function AdminDashboard() {
       </div>
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {deleteTarget && (
+      {/* Archive Confirmation Modal — the ordinary "take it down" action. */}
+      {archiveTarget && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onClick={() => setDeleteTarget(null)}
+          onClick={closeModals}
         >
           <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-[400px] p-6"
+            className="bg-white rounded-xl shadow-2xl w-full max-w-[440px] p-6"
             onClick={e => e.stopPropagation()}
           >
-            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Delete Project</h2>
-            <p className="text-[14px] text-gray-500 leading-relaxed mb-6">
-              Are you sure you want to delete{" "}
-              <span className="font-bold text-gray-900">"{deleteTarget.title}"</span>?{" "}
-              This action is <span className="font-semibold text-gray-700">permanent</span> and cannot be undone.
-              {" "}Its investments, comments and updates go with it.
+            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Archive Project</h2>
+            <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
+              <span className="font-bold text-gray-900">"{archiveTarget.title}"</span> will be
+              hidden from Discover and stop accepting investments and comments. Nothing is
+              deleted — you can restore it from the{" "}
+              <span className="font-semibold text-gray-700">Archived</span> filter, and it will
+              come back as <span className="font-semibold text-gray-700">{archiveTarget.status}</span>.
+            </p>
+
+            <label className="block text-[12px] font-bold text-gray-500 tracking-wide mb-1.5">
+              REASON
+            </label>
+            <textarea
+              value={archiveReason}
+              onChange={e => setArchiveReason(e.target.value)}
+              placeholder="Why is this being archived? The creator will see this."
+              rows={3}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none resize-y focus:border-gray-400 transition-colors mb-1"
+            />
+            {/* The creator cannot undo an admin's archive, so the reason is the only
+                thing telling them what happened. Required, not optional. */}
+            <p className="text-[11px] text-gray-400 mb-4">
+              Required — {archiveTarget.creator} cannot restore this themselves.
             </p>
 
             {actionError && (
@@ -296,22 +433,74 @@ export default function AdminDashboard() {
 
             <div className="flex justify-end gap-3">
               <button
-                onClick={() => { setDeleteTarget(null); setActionError(null); }}
-                disabled={deleting}
+                onClick={closeModals}
+                disabled={busy}
                 className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
-                onClick={confirmDelete}
-                disabled={deleting}
+                onClick={confirmArchive}
+                disabled={busy}
                 className={`border-none rounded-md px-5 py-2 text-[13px] font-bold transition-colors ${
-                  deleting
+                  busy
                     ? "bg-gray-200 text-gray-400 cursor-not-allowed"
                     : "bg-brand hover:bg-red-800 text-white cursor-pointer"
                 }`}
               >
-                {deleting ? "Deleting…" : "Delete"}
+                {busy ? "Archiving…" : "Archive"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permanent Delete Modal — only reachable from the Archived bin. */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={closeModals}
+        >
+          <div
+            className="bg-white rounded-xl shadow-2xl w-full max-w-[420px] p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Delete Permanently</h2>
+            <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
+              <span className="font-bold text-gray-900">"{deleteTarget.title}"</span> will be
+              erased from the database. This is{" "}
+              <span className="font-semibold text-gray-700">permanent and cannot be undone</span> —
+              its comments and updates go with it.
+            </p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-[12px] text-amber-800 leading-relaxed mb-4">
+              It is already archived, so nobody can see it. Leave it here unless you are
+              certain it should not exist at all.
+            </div>
+
+            {actionError && (
+              <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-3 py-2 mb-4">
+                {actionError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={closeModals}
+                disabled={busy}
+                className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Keep it
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={busy}
+                className={`border-none rounded-md px-5 py-2 text-[13px] font-bold transition-colors ${
+                  busy
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-brand hover:bg-red-800 text-white cursor-pointer"
+                }`}
+              >
+                {busy ? "Deleting…" : "Delete forever"}
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
@@ -13,6 +14,47 @@ const DEPT_STYLE = {
   Design: "bg-purple-700 text-white",
   Business: "bg-yellow-800 text-white",
 };
+
+// The moderation verdict, said out loud on every card.
+//
+// `toCreatorProject` renames APPROVED to "Active" — that is the funding-campaign framing.
+// What a creator actually needs on this page is the admin's decision, so the badge says
+// APPROVED instead. "Active Funding" in the stats above keeps the old wording, since
+// there it really is describing a running campaign.
+//
+// REJECTED previously rendered NOTHING: the card body branched on Active / Draft /
+// Pending Review and a rejected project matched none of them, so it sat in the list as a
+// blank card indistinguishable from a loading one — which is why it looked like rejected
+// projects had silently disappeared. They never left; they just stopped saying anything.
+const STATUS_BADGE = {
+  Active: { label: "APPROVED", className: "text-green-700 bg-green-50 border-green-200" },
+  "Pending Review": { label: "PENDING REVIEW", className: "text-amber-700 bg-amber-50 border-amber-200" },
+  Rejected: { label: "REJECTED", className: "text-red-700 bg-red-50 border-red-200" },
+  Draft: { label: "DRAFT", className: "text-gray-500 bg-gray-50 border-gray-200" },
+};
+
+function StatusBadge({ status }) {
+  // An unmapped status still gets a badge rather than silently rendering nothing —
+  // that silence is the bug this exists to fix.
+  const badge = STATUS_BADGE[status] || {
+    label: String(status || "UNKNOWN").toUpperCase(),
+    className: "text-gray-500 bg-gray-50 border-gray-200",
+  };
+
+  return (
+    <span className={`text-[10px] font-bold border rounded-sm px-2 py-1 shrink-0 whitespace-nowrap ${badge.className}`}>
+      {badge.label}
+    </span>
+  );
+}
+
+// The selected chip is derived from state rather than stored, so it cannot point at a
+// chip that no longer exists — restoring the last archived project removes the ARCHIVED
+// chip, and a stored "archived" would then show an empty list with nothing selected.
+function activeTabFor(tab, archivedCount) {
+  if (tab === "archived" && archivedCount === 0) return "all";
+  return tab;
+}
 
 function StatCard({ label, value, icon }) {
   return (
@@ -38,11 +80,15 @@ function StatCard({ label, value, icon }) {
  * `sm:min-h-*` matters: on desktop the image is `h-auto` and stretches to the row, so
  * without a floor the shorter pending body would pull the image up again.
  */
-function ProjectRowCard({ project, onEdit, onUpdate, onDetails }) {
-  const isActive = project.status === "Active";
+function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRestore, onResubmit, canRestore, restoring, resubmitting }) {
+  // An archived project keeps its verdict ("Active", "Pending Review"), so the funding
+  // block below must not read as a live campaign — the archived branch takes over.
+  const isArchived = Boolean(project.archived);
+  const isActive = !isArchived && project.status === "Active";
+  const isRejected = !isArchived && project.status === "Rejected";
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div className={`bg-white border rounded-xl overflow-hidden ${isArchived ? "border-amber-200" : "border-gray-200"}`}>
       <div className="grid grid-cols-1 sm:grid-cols-[240px_1fr] sm:min-h-[215px]">
         <div className="h-44 sm:h-auto bg-gray-100">
           {project.img ? (
@@ -61,14 +107,45 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails }) {
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm shrink-0 ${DEPT_STYLE[project.dept] || "bg-gray-200 text-gray-600"}`}>
               {project.dept.toUpperCase()}
             </span>
-            {isActive && (
-              <span className="text-[15px] font-extrabold text-brand shrink-0">{project.pct}%</span>
-            )}
+            {/* The verdict badge is ALWAYS here — that is the whole point. Archived is a
+                separate axis, so an archived project shows both: what the admin decided,
+                and the fact that it is currently put away. */}
+            <div className="flex items-center gap-2 shrink-0">
+              {isActive && <span className="text-[15px] font-extrabold text-brand">{project.pct}%</span>}
+              <StatusBadge status={project.status} />
+              {isArchived && (
+                <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-2 py-1 whitespace-nowrap">
+                  ARCHIVED
+                </span>
+              )}
+            </div>
           </div>
 
           <h3 className="text-[17px] font-bold text-gray-900 mb-3">{project.title}</h3>
 
-          {isActive ? (
+          {isArchived ? (
+            <div className="bg-amber-50 border border-amber-100 rounded-lg px-3.5 py-3 text-[12px] text-amber-900 leading-relaxed mb-3">
+              {canRestore ? (
+                <>
+                  You archived this project{project.archivedAt && ` on ${project.archivedAt}`}. It is
+                  hidden from Discover and cannot be edited. Restore it to bring it back as{" "}
+                  <strong>{project.status}</strong>.
+                </>
+              ) : (
+                <>
+                  {/* A creator cannot undo an admin's archive — the reason is the only
+                      thing that tells them what happened, which is why the backend
+                      requires it in that case. */}
+                  Archived by <strong>{project.archivedByName || "an administrator"}</strong>
+                  {project.archivedAt && ` on ${project.archivedAt}`}. Only an administrator can
+                  restore it.
+                  {project.archiveReason && (
+                    <div className="mt-1.5 italic">Reason: {project.archiveReason}</div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : isActive ? (
             <>
               <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
                 <div className="h-full bg-brand rounded-full" style={{ width: `${project.pct}%` }} />
@@ -96,28 +173,101 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails }) {
                   Your project is currently being reviewed by the RMIT {project.dept} Department board. You will receive an update within 3-5 business days.
                 </div>
               )}
+              {/* Rejected had no branch at all, so the card body was empty. It now states
+                  the verdict, quotes the reviewer's note when there is one, and points at
+                  the way forward — edit, then RESUBMIT below. */}
+              {project.status === "Rejected" && (
+                <div className="bg-red-50 border border-red-100 rounded-lg px-3.5 py-3 text-[12px] text-red-800 leading-relaxed mb-3">
+                  This project was not approved by the RMIT {project.dept} Department board, so it
+                  is not listed on Discover and cannot receive investments.
+                  {project.reviewNote ? (
+                    <div className="mt-2 pl-3 border-l-2 border-red-300 italic">
+                      "{project.reviewNote}"
+                    </div>
+                  ) : (
+                    // The reviewer can reject in one click from the queue without typing
+                    // anything, so an empty note is a normal state, not a missing value.
+                    <div className="mt-2 text-red-600">The board did not leave a note.</div>
+                  )}
+                  <div className="mt-2">
+                    Edit the project to address the feedback, then <strong>resubmit</strong> it for
+                    review.
+                  </div>
+                </div>
+              )}
             </>
           )}
 
+          {/* EDIT and UPDATE are gone while archived: the backend rejects both on an
+              archived project, and that refusal is exactly what keeps restoring safe
+              (nothing can change between archive and restore, so no re-approval).
+              Offering the buttons would only produce an error after the fact. */}
           <div className="border-t border-gray-100 pt-4 mt-auto flex flex-wrap gap-2.5">
-            <button
-              onClick={() => onEdit(project)}
-              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors flex items-center gap-1.5"
-            >
-              ✎ EDIT PROJECT
-            </button>
-            <button
-              onClick={() => onUpdate(project)}
-              className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-1.5"
-            >
-              ↑ UPDATE
-            </button>
-            <button
-              onClick={() => onDetails(project)}
-              className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
-            >
-              PROJECT DETAILS
-            </button>
+            {isArchived ? (
+              <>
+                {canRestore && (
+                  <button
+                    onClick={() => onRestore(project)}
+                    disabled={restoring}
+                    className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {restoring ? "RESTORING…" : "↩ RESTORE"}
+                  </button>
+                )}
+                <button
+                  onClick={() => onDetails(project)}
+                  className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  PROJECT DETAILS
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => onEdit(project)}
+                  className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors flex items-center gap-1.5"
+                >
+                  ✎ EDIT PROJECT
+                </button>
+                {/* No UPDATE on a rejected project. A project update is a public post on
+                    the project page, and a rejected project is not on Discover and has no
+                    backers — so it would be written for nobody, and would then surface
+                    with a misleading timestamp if the project were later approved. The
+                    backend refuses it too, so the button would only ever produce an error.
+                    RESUBMIT takes its place: without it a rejected project is a dead end,
+                    since the approval queue lists only PENDING. */}
+                {isRejected ? (
+                  <button
+                    onClick={() => onResubmit(project)}
+                    disabled={resubmitting}
+                    className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {resubmitting ? "RESUBMITTING…" : "↻ RESUBMIT FOR REVIEW"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => onUpdate(project)}
+                    className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-1.5"
+                  >
+                    ↑ UPDATE
+                  </button>
+                )}
+                <button
+                  onClick={() => onDetails(project)}
+                  className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  PROJECT DETAILS
+                </button>
+                {/* Replaces nothing — a creator previously had no way to take their own
+                    project down at all, short of asking an admin to delete it. */}
+                <button
+                  onClick={() => onArchive(project)}
+                  className="bg-white border border-gray-300 text-gray-500 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 hover:text-gray-700 transition-colors ml-auto"
+                >
+                  🗄 ARCHIVE
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -138,31 +288,134 @@ export default function CreatorMyProjects() {
   // without this there is no sign anything happened — the update lives on the project
   // page, not on this one.
   const [postedFor, setPostedFor] = useState(null);
+  // "all" | "Active" | "Pending Review" | "Rejected" | "archived".
+  // The first four filter the live list by the admin's verdict; "archived" is the
+  // separate visibility axis and swaps the list out entirely, which is why it shares this
+  // one control rather than sitting in a second row — a project is in exactly one of
+  // these buckets at a time from this page's point of view.
+  const [tab, setTab] = useState("all");
+  const [archiveTarget, setArchiveTarget] = useState(null);
+  const [archiveReason, setArchiveReason] = useState("");
+  const [archiving, setArchiving] = useState(false);
+  const [restoringId, setRestoringId] = useState(null);
+  const [resubmittingId, setResubmittingId] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // GET /api/projects/my — the signed-in creator's own projects.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
+  // GET /api/projects/my — the signed-in creator's own projects, archived included.
+  // Refetched after archive/restore rather than patched locally: archived_by_name comes
+  // from a join that the mutation response does not carry.
+  // Nothing here sets state before the first `await`: `loading` already starts true, so
+  // the effect below never triggers a synchronous cascading render
+  // (react-hooks/set-state-in-effect). Keep it that way if you edit this.
+  const loadProjects = useCallback(async () => {
+    try {
+      const rows = await projectApi.getMyProjects();
+      setProjects((rows || []).map(toCreatorProject));
       setLoadError(null);
-      try {
-        const rows = await projectApi.getMyProjects();
-        if (!cancelled) setProjects((rows || []).map(toCreatorProject));
-      } catch (err) {
-        if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load your projects");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
+    } catch (err) {
+      setLoadError(err.response?.data?.message || err.message || "Could not load your projects");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const totalProjects = projects.length;
-  const activeFunding = projects.filter(p => p.status === "Active").length;
-  const totalRaised = projects.reduce((sum, p) => {
+  // Wrapped in an async IIFE, matching every other fetch effect in the codebase:
+  // calling loadProjects() bare here trips react-hooks/set-state-in-effect, which reads
+  // the call graph and sees the setStates inside it.
+  useEffect(() => { (async () => { await loadProjects(); })(); }, [loadProjects]);
+
+  const liveProjects = projects.filter(p => !p.archived);
+  const archivedProjects = projects.filter(p => p.archived);
+  // Derived, not stored: restoring the LAST archived project hides the Archived chip, and
+  // a stored tab would leave you stranded on an empty list with no way back. Falling back
+  // here fixes that without an effect that fights the user's own clicks.
+  const activeTab = activeTabFor(tab, archivedProjects.length);
+
+  const shown =
+    activeTab === "archived"
+      ? archivedProjects
+      : activeTab === "all"
+        ? liveProjects
+        : liveProjects.filter(p => p.status === activeTab);
+
+  // Only the statuses that actually exist get a chip. A creator with nothing rejected
+  // should not be looking at a permanent "REJECTED (0)".
+  const filterChips = [
+    { id: "all", label: "ALL", count: liveProjects.length },
+    ...["Active", "Pending Review", "Rejected", "Draft"]
+      .map(status => ({
+        id: status,
+        label: (STATUS_BADGE[status]?.label) || status.toUpperCase(),
+        count: liveProjects.filter(p => p.status === status).length,
+      }))
+      .filter(chip => chip.count > 0),
+    ...(archivedProjects.length > 0
+      ? [{ id: "archived", label: "ARCHIVED", count: archivedProjects.length }]
+      : []),
+  ];
+
+  // A creator may only undo an archive they performed themselves. If an admin archived
+  // the project, archived_by is the admin's id and the backend refuses the restore — so
+  // the button is not offered either.
+  const canRestore = (p) => p.archivedBy != null && p.archivedBy === user?.id;
+
+  const handleArchive = async () => {
+    setArchiving(true);
+    setActionError(null);
+    try {
+      await projectApi.archiveProject(archiveTarget.id, archiveReason.trim());
+      await loadProjects();
+      setArchiveTarget(null);
+      setArchiveReason("");
+    } catch (err) {
+      setActionError(
+        err.response?.data?.message || err.message || "Could not archive this project"
+      );
+    } finally {
+      setArchiving(false);
+    }
+  };
+
+  // Back into the approval queue after a revision. The backend clears review_note and
+  // sets the status to PENDING, so the card re-renders as "Pending Review" — that visible
+  // change is the confirmation, no toast needed.
+  const handleResubmit = async (project) => {
+    setResubmittingId(project.id);
+    setLoadError(null);
+    try {
+      await projectApi.resubmitProject(project.id);
+      await loadProjects();
+    } catch (err) {
+      setLoadError(
+        err.response?.data?.message || err.message || "Could not resubmit this project"
+      );
+    } finally {
+      setResubmittingId(null);
+    }
+  };
+
+  const handleRestore = async (project) => {
+    setRestoringId(project.id);
+    setLoadError(null);
+    try {
+      await projectApi.restoreProject(project.id);
+      await loadProjects();
+    } catch (err) {
+      setLoadError(
+        err.response?.data?.message || err.message || "Could not restore this project"
+      );
+    } finally {
+      setRestoringId(null);
+    }
+  };
+
+  // Stats describe what you are actually running, so archived projects are excluded —
+  // an archived project raises nothing and is not "active funding".
+  const totalProjects = liveProjects.length;
+  const activeFunding = liveProjects.filter(p => p.status === "Active").length;
+  const totalRaised = liveProjects.reduce((sum, p) => {
     if (p.status === "Active") {
       // toCreatorProject formats this as "10,625 CC", so strip everything that is not
       // a digit or a decimal point rather than just "$" and ",".
@@ -211,6 +464,26 @@ export default function CreatorMyProjects() {
         <StatCard label="TOTAL RAISED" value={`${totalRaised.toLocaleString()} CC`} icon="💳" />
       </div>
 
+      {/* Filter by the admin's verdict, plus the archive bin. Only rendered once there is
+          more than one bucket to choose between — a lone "ALL (3)" chip is just noise. */}
+      {filterChips.length > 1 && (
+        <div className="flex flex-wrap gap-2 mb-5">
+          {filterChips.map(chip => (
+            <button
+              key={chip.id}
+              onClick={() => setTab(chip.id)}
+              className={`rounded-md px-3.5 py-2 text-[12px] font-bold tracking-wide cursor-pointer transition-colors border ${
+                activeTab === chip.id
+                  ? "bg-brand text-white border-brand"
+                  : "bg-white text-gray-500 border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {chip.label} ({chip.count})
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading && <div className="text-[13px] text-gray-400 py-10 text-center">Loading your projects…</div>}
       {!loading && loadError && (
         <div className="text-[13px] text-brand py-10 text-center">
@@ -222,15 +495,30 @@ export default function CreatorMyProjects() {
           You have not created any projects yet.
         </div>
       )}
+      {!loading && !loadError && projects.length > 0 && shown.length === 0 && (
+        <div className="text-[13px] text-gray-400 py-10 text-center">
+          {activeTab === "archived"
+            ? "Nothing archived."
+            : activeTab === "all"
+              ? "All of your projects are archived."
+              : "No projects with this status."}
+        </div>
+      )}
 
       <div className="flex flex-col gap-5 lp-stagger">
-        {projects.map(p => (
+        {shown.map(p => (
           <ProjectRowCard
             key={p.id}
             project={p}
             onEdit={setEditTarget}
             onUpdate={setUpdateTarget}
             onDetails={proj => navigate(`/project/${proj.id}`)}
+            onArchive={proj => { setArchiveTarget(proj); setArchiveReason(""); setActionError(null); }}
+            onRestore={handleRestore}
+            onResubmit={handleResubmit}
+            canRestore={canRestore(p)}
+            restoring={restoringId === p.id}
+            resubmitting={resubmittingId === p.id}
           />
         ))}
       </div>
@@ -246,6 +534,67 @@ export default function CreatorMyProjects() {
           onClose={() => setUpdateTarget(null)}
           onPosted={() => setPostedFor(updateTarget.title)}
         />
+      )}
+
+      {/* Archive confirmation. Mounted only when there is a target, the same pattern as
+          EditProject and PostUpdateModal — that is also what resets the reason box
+          between projects, so it needs no effect. */}
+      {archiveTarget && (
+        <div
+          className="lp-overlay fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+          onClick={() => { setArchiveTarget(null); setActionError(null); }}
+        >
+          <div
+            className="lp-modal bg-white rounded-xl shadow-2xl w-full max-w-[440px] p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Archive Project</h2>
+            <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
+              <span className="font-bold text-gray-900">"{archiveTarget.title}"</span> will be
+              hidden from Discover and stop accepting investments and comments, and you will not
+              be able to edit it. Nothing is deleted — you can restore it yourself at any time,
+              and it comes back as <span className="font-semibold text-gray-700">{archiveTarget.status}</span>.
+            </p>
+
+            <label className="block text-[12px] font-bold text-gray-500 tracking-wide mb-1.5">
+              REASON <span className="font-medium text-gray-400">(optional)</span>
+            </label>
+            <textarea
+              value={archiveReason}
+              onChange={e => setArchiveReason(e.target.value)}
+              placeholder="A note to yourself about why you archived this."
+              rows={3}
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none resize-y focus:border-gray-400 transition-colors mb-4"
+            />
+
+            {actionError && (
+              <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-3 py-2 mb-4">
+                {actionError}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => { setArchiveTarget(null); setActionError(null); }}
+                disabled={archiving}
+                className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className={`border-none rounded-md px-5 py-2 text-[13px] font-bold transition-colors ${
+                  archiving
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-brand hover:bg-red-800 text-white cursor-pointer"
+                }`}
+              >
+                {archiving ? "Archiving…" : "Archive"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

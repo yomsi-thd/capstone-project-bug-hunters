@@ -187,13 +187,20 @@ export default function AdminApprovals() {
 
   // GET /api/admin/projects then filter to PENDING — there is no dedicated route for
   // the approval queue. TODO: ask for a ?status=PENDING filter.
+  // Archived projects are excluded: that route returns them too, and a PENDING project
+  // that has since been archived would otherwise sit here waiting for a verdict the
+  // backend now refuses, so APPROVE would just throw a 400 and look broken.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const rows = await adminApi.getAllProject();
         if (!cancelled) {
-          setProjects((rows || []).filter(r => r.status === "PENDING").map(toApprovalProject));
+          setProjects(
+            (rows || [])
+              .filter(r => r.status === "PENDING" && r.archived_at == null)
+              .map(toApprovalProject)
+          );
         }
       } catch (err) {
         if (!cancelled) {
@@ -257,12 +264,13 @@ export default function AdminApprovals() {
     }
   };
 
-  // The backend only has PATCH /projects/:id/reject — feedback has nowhere to go.
-  // TODO: ask for a feedback column or a review-notes table.
+  // The feedback typed in the review screen is now stored: it goes to
+  // projects.review_note and the creator reads it on their My Projects card. This box
+  // existed long before the column did, and everything typed into it used to be dropped.
   const handleRequestChanges = async (id, feedback) => {
     setActionError(null);
     try {
-      await projectApi.rejectProject(id);
+      await projectApi.rejectProject(id, feedback);
       setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Changes Requested", feedback } : p));
       setReviewTarget(null);
     } catch (err) {
@@ -546,9 +554,13 @@ export default function AdminApprovals() {
                             a mis-click is recoverable: a rejected project can still be
                             approved from here. Once the page reloads the queue only
                             fetches PENDING, and there would be no way back. */}
+                        {/* Quick reject, deliberately with no note — for obvious spam.
+                            To tell the creator WHY, open REVIEW and use the feedback box
+                            there; that text is stored on the project now. */}
                         {p.status !== "Changes Requested" && (
                           <button
                             onClick={() => handleRequestChanges(p.id, "")}
+                            title="Reject without feedback — use REVIEW to explain why"
                             className="bg-white border border-gray-300 text-gray-600 rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer hover:bg-red-50 hover:text-brand hover:border-red-200 transition-colors"
                           >
                             REJECT
