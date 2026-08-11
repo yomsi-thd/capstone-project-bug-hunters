@@ -15,7 +15,17 @@ export default function CommentList({
   isLoggedIn = false,
   onPost,
   error = null,
+  // Closes the thread to new posts for a reason OTHER than being signed out — today
+  // that is an archived project, whose comments the backend rejects. It is a separate
+  // prop rather than `isLoggedIn={isLoggedIn && !archived}` because the two states need
+  // different explanations: telling a signed-in reader to "sign in" would be a lie.
+  // Existing comments stay readable either way.
+  locked = false,
+  lockedMessage = "This discussion is closed.",
 }) {
+  // One flag for every "can this person post" check below, so the box, the button and
+  // the reply forms can never disagree about it.
+  const canPost = isLoggedIn && !locked;
   const [text, setText] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [posting, setPosting] = useState(false);
@@ -62,34 +72,34 @@ export default function CommentList({
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder="Ask a question or share your thoughts with the team..."
-          disabled={!isLoggedIn}
+          disabled={!canPost}
           style={{
             width: "100%", minHeight: "80px", border: "none",
             outline: "none", resize: "vertical", fontSize: "14px",
             color: "#333", lineHeight: 1.6, fontFamily: "inherit",
             background: "transparent", boxSizing: "border-box",
-            opacity: isLoggedIn ? 1 : 0.5,
+            opacity: canPost ? 1 : 0.5,
           }}
         />
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
           <button
             onClick={handlePost}
-            disabled={!isLoggedIn || !text.trim() || posting}
+            disabled={!canPost || !text.trim() || posting}
             style={{
-              background: isLoggedIn && text.trim() ? "var(--color-brand)" : "#ccc",
+              background: canPost && text.trim() ? "var(--color-brand)" : "#ccc",
               color: "#fff", border: "none", borderRadius: "5px",
               fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "8px 20px", cursor: isLoggedIn && text.trim() ? "pointer" : "not-allowed",
+              padding: "8px 20px", cursor: canPost && text.trim() ? "pointer" : "not-allowed",
               transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
             }}
             onMouseEnter={e => {
-              if (!isLoggedIn || !text.trim()) return;
+              if (!canPost || !text.trim()) return;
               e.currentTarget.style.background = "#aa0000";
               e.currentTarget.style.transform = "translateY(-1px)";
               e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = isLoggedIn && text.trim() ? "var(--color-brand)" : "#ccc";
+              e.currentTarget.style.background = canPost && text.trim() ? "var(--color-brand)" : "#ccc";
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
@@ -100,7 +110,13 @@ export default function CommentList({
         {error && (
           <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "8px" }}>{error}</div>
         )}
-        {!isLoggedIn && (
+        {/* `locked` is checked first: a signed-in reader on a closed thread must not be
+            told to sign in. */}
+        {locked ? (
+          <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px" }}>
+            {lockedMessage}
+          </div>
+        ) : !isLoggedIn && (
           <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px" }}>
             Sign in to join the discussion.
           </div>
@@ -118,7 +134,7 @@ export default function CommentList({
 
             {/* Replies are one level deep only — a reply has no Reply button of its
                 own, matching what CommentItem can render. */}
-            {isLoggedIn && (
+            {canPost && (
               replyTo === comment.id ? (
                 <div style={{ paddingLeft: "46px", marginTop: "12px" }}>
                   <textarea

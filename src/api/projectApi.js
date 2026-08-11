@@ -25,8 +25,19 @@ export const approveProject = async (id) => {
   return response.data;
 };
 
-export const rejectProject = async (id) => {
-  const response = await api.patch(`/projects/${id}/reject`);
+// `note` explains the rejection and is shown to the creator on their project card.
+// Optional — the queue's one-click REJECT sends none — but the review screen has always
+// collected one, and until `projects.review_note` existed it was silently discarded.
+export const rejectProject = async (id, note) => {
+  const response = await api.patch(`/projects/${id}/reject`, { note: note ?? "" });
+
+  return response.data;
+};
+
+// Puts a REJECTED project back into the approval queue after the creator has revised it,
+// clearing the old review note. Creator (or admin) only, and only from REJECTED.
+export const resubmitProject = async (id) => {
+  const response = await api.patch(`/projects/${id}/resubmit`);
 
   return response.data;
 };
@@ -43,6 +54,31 @@ export const updateProject = async (id, projectData) => {
   return response.data;
 };
 
+// Archive replaced delete as the everyday "remove this project" action (demo feedback,
+// 2026-08-11): nothing leaves the database on one click any more.
+// Allowed for the project's creator or an admin. `reason` is required by the backend
+// only when an admin archives someone else's project — they lock the creator out of
+// restoring it, so the creator is owed an explanation.
+export const archiveProject = async (id, reason) => {
+  const response = await api.patch(`/projects/${id}/archive`, {
+    reason: reason ?? "",
+  });
+
+  return response.data;
+};
+
+// Puts the project back at the status it already had — an APPROVED project returns to
+// Discover without going round the approval queue again. The backend refuses this for a
+// creator whose project was archived by an admin.
+export const restoreProject = async (id) => {
+  const response = await api.patch(`/projects/${id}/restore`);
+
+  return response.data;
+};
+
+// PERMANENT and not undoable — it also takes the project's comments and updates with it.
+// The backend accepts this from an ADMIN only, and only for an already-archived project,
+// so it is the second step of the bin rather than a button anyone can reach by accident.
 export const deleteProject = async (id) => {
   const response = await api.delete(`/projects/${id}`);
 

@@ -300,6 +300,11 @@ export default function ProjectDetail() {
       {/* Main content */}
       <div className="lp-reveal" style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "24px 16px" : "32px 40px" }}>
 
+        {/* An archived project stays readable rather than 404ing: the link may already
+            be shared, and a backer who funded it still reaches this page from My
+            Investments. It just goes read-only. */}
+        {p.archived && <ArchivedBanner p={p} isOwner={isOwner} />}
+
         {investError && (
           <div style={{
             background: "#fdecec", border: "1px solid #f5c2c2", borderRadius: "8px",
@@ -455,6 +460,10 @@ export default function ProjectDetail() {
                     isLoggedIn={isLoggedIn}
                     onPost={handlePostComment}
                     error={commentError}
+                    // The backend rejects comments on an archived project, so the box is
+                    // closed here rather than letting the post fail. Reading stays open.
+                    locked={p.archived}
+                    lockedMessage="This project has been archived. The discussion is closed."
                   />
                 </div>
               </div>
@@ -526,6 +535,43 @@ export default function ProjectDetail() {
   );
 }
 
+// Shown at the top of an archived project. Deliberately amber, not the brand red used
+// for errors — being archived is a state, not something that went wrong.
+// The owner gets a different second line: they are the only visitor who can act on it,
+// and where they act depends on who archived it (see CreatorMyProjects).
+function ArchivedBanner({ p, isOwner }) {
+  return (
+    <div style={{
+      background: "#fff8e6", border: "1px solid #f0d9a0", borderRadius: "8px",
+      padding: "14px 16px", marginBottom: "20px",
+      display: "flex", gap: "12px", alignItems: "flex-start",
+    }}>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a06a00" strokeWidth="2" style={{ flexShrink: 0, marginTop: "1px" }}>
+        <rect x="2" y="4" width="20" height="5" rx="1" /><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" /><line x1="10" y1="14" x2="14" y2="14" />
+      </svg>
+      <div style={{ fontSize: "13px", color: "#7a5200", lineHeight: 1.5 }}>
+        <strong>This project has been archived.</strong>{" "}
+        It is no longer listed on Discover and is not accepting investments or comments.
+        {p.archiveReason && (
+          <div style={{ marginTop: "4px" }}>
+            Reason: {p.archiveReason}
+          </div>
+        )}
+        {p.archivedByName && (
+          <div style={{ marginTop: "4px", color: "#96702a" }}>
+            Archived by {p.archivedByName}{p.archivedAt && ` on ${p.archivedAt}`}.
+          </div>
+        )}
+        {isOwner && (
+          <div style={{ marginTop: "6px" }}>
+            You can restore it from <strong>My Projects</strong> if you archived it yourself.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
   return (
     <div style={{
@@ -564,7 +610,23 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
         </div>
       </div>
 
-      {isOwner ? (
+      {/* Archived wins over both branches below. Even the owner gets no EDIT here: the
+          backend refuses to update an archived project (that refusal is what keeps
+          "restore needs no re-approval" honest), so offering the button would only
+          produce an error after the fact. Restoring happens in My Projects. */}
+      {p.archived ? (
+        <div style={{
+          background: "#f6f6f4", border: "1px dashed #d4d4d0", borderRadius: "6px",
+          padding: "14px", textAlign: "center",
+        }}>
+          <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em", color: "#8a8a85", marginBottom: "4px" }}>
+            ARCHIVED
+          </div>
+          <div style={{ fontSize: "12px", color: "#999", lineHeight: 1.5 }}>
+            This project is not accepting investments.
+          </div>
+        </div>
+      ) : isOwner ? (
         <>
           <button
             onClick={onEdit}

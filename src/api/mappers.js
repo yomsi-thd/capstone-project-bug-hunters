@@ -46,6 +46,25 @@ function formatDate(value) {
   });
 }
 
+// Archive is a SECOND axis, independent of `status`. A project can be APPROVED and
+// archived at the same time, which is why nothing here touches the status field.
+// "Archived" is `archived_at IS NOT NULL` on the row — there is no PUBLISHED/ARCHIVED
+// column — so the boolean is derived once here and every page reads `archived`.
+//
+// `archivedBy` stays the raw user id, not a name: CreatorMyProjects compares it to
+// user.id to decide whether the creator may restore (they may only undo their own
+// archive). `archivedByName` is the display string for the same person.
+function toArchiveFields(row) {
+  return {
+    // != null, not falsy — the value is a timestamp string, but be explicit.
+    archived: row.archived_at != null,
+    archivedAt: formatDate(row.archived_at),
+    archivedBy: row.archived_by ?? null,
+    archivedByName: row.archived_by_name || null,
+    archiveReason: row.archive_reason || null,
+  };
+}
+
 /** Project row -> card on Discover and the listing grids. */
 export function toCard(row) {
   if (!row) return null;
@@ -118,6 +137,11 @@ export function toDetail(row) {
     // Only the "VIEW ALL n COMMENTS" label; the rendered list comes from the separate
     // comments request.
     totalComments: toNumber(row.comments_count),
+
+    // GET /projects/:id still returns archived projects on purpose — the page renders
+    // read-only with a banner rather than 404ing, so a backer's existing investment
+    // and the shared link both keep working.
+    ...toArchiveFields(row),
   };
 }
 
@@ -165,6 +189,15 @@ export function toCreatorProject(row) {
     // overwrites these columns with whatever the request contains.
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
     solutionBullets: Array.isArray(row.solution_bullets) ? row.solution_bullets : [],
+
+    // Why the board rejected it, written by the admin. Only ever set while the project
+    // is REJECTED — approve and resubmit both clear the column — so the card can show it
+    // without checking the status first.
+    reviewNote: row.review_note || null,
+
+    // `status` above stays the moderation verdict. These describe visibility, and
+    // My Projects lists archived cards in their own tab rather than hiding them.
+    ...toArchiveFields(row),
   };
 }
 
@@ -181,6 +214,7 @@ export function toAdminProject(row) {
     raised: money(row.current_amount),
     goal: money(row.goal_amount),
     img: row.image_url || null,
+    ...toArchiveFields(row),
   };
 }
 
@@ -362,5 +396,9 @@ export function toInvestment(tx, project) {
     fundingProgress: project
       ? fundedPercent(project.current_amount, project.goal_amount)
       : 0,
+    // The backer keeps the card either way — archiving a project must not erase
+    // somebody's spend history — so it is badged rather than dropped. `project` is
+    // undefined when the row's project was permanently deleted, hence the guard.
+    archived: project?.archived_at != null,
   };
 }

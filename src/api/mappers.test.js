@@ -36,6 +36,19 @@ function projectRow(overrides = {}) {
   };
 }
 
+// The same row after an admin archived it. `status` is deliberately still APPROVED —
+// archiving does not touch the moderation verdict, which is what lets restore put the
+// project straight back on Discover without a second approval.
+function archivedRow(overrides = {}) {
+  return projectRow({
+    archived_at: "2026-08-11T04:20:00.000Z",
+    archived_by: 9,
+    archived_by_name: "Admin Nguyen",
+    archive_reason: "Duplicate submission",
+    ...overrides,
+  });
+}
+
 describe("toNumber", () => {
   it("parses the strings Postgres returns for numeric columns", () => {
     expect(toNumber("5000.00")).toBe(5000);
@@ -401,5 +414,74 @@ describe("toInvestment", () => {
     expect(inv.tag).toBe("UNCATEGORIZED");
     expect(inv.fundingProgress).toBe(0);
     expect(inv.investedAmount).toBe(500);
+    expect(inv.archived).toBe(false);
+  });
+
+  it("badges an investment in an archived project instead of dropping it", () => {
+    // Archiving must never erase somebody's spend history — the card stays, marked.
+    const inv = toInvestment(tx, archivedRow());
+    expect(inv.archived).toBe(true);
+    expect(inv.investedAmount).toBe(500);
+    expect(inv.title).toBe("Autonomous Swarm Drones");
+  });
+});
+
+// The archive columns, added 2026-08-11 when delete was replaced by a two-step bin.
+// The point of these is that archiving is a SECOND axis: it must never disturb the
+// moderation status, because restore relies on that status surviving untouched.
+describe("archive fields", () => {
+  it("reports a live project as not archived, with no stray metadata", () => {
+    for (const mapped of [toDetail(projectRow()), toCreatorProject(projectRow()), toAdminProject(projectRow())]) {
+      expect(mapped.archived).toBe(false);
+      expect(mapped.archivedBy).toBeNull();
+      expect(mapped.archivedByName).toBeNull();
+      expect(mapped.archiveReason).toBeNull();
+      expect(mapped.archivedAt).toBe("");
+    }
+  });
+
+  it("carries who archived it, when and why", () => {
+    const d = toDetail(archivedRow());
+    expect(d.archived).toBe(true);
+    expect(d.archivedBy).toBe(9);
+    expect(d.archivedByName).toBe("Admin Nguyen");
+    expect(d.archiveReason).toBe("Duplicate submission");
+    expect(d.archivedAt).toMatch(/Aug \d{2}, 2026/);
+  });
+
+  it("keeps archivedBy as the raw id, since CreatorMyProjects compares it to user.id", () => {
+    // A creator may only restore an archive they performed themselves. That check is
+    // `archivedBy === user.id`, so this must stay a number and never become a name.
+    const c = toCreatorProject(archivedRow({ archived_by: 14 }));
+    expect(c.archivedBy).toBe(14);
+    expect(typeof c.archivedBy).toBe("number");
+  });
+
+  it("leaves the moderation status alone — archived is a separate axis", () => {
+    // The whole reason restore needs no re-approval: `status` survives the round trip.
+    expect(toDetail(archivedRow()).status).toBe("APPROVED");
+    expect(toCreatorProject(archivedRow()).status).toBe("Active");
+    expect(toAdminProject(archivedRow()).status).toBe("Active");
+    expect(toAdminProject(archivedRow({ status: "PENDING" })).status).toBe("Pending");
+  });
+
+  it("carries the reviewer's rejection note to the creator's card", () => {
+    const c = toCreatorProject(projectRow({ status: "REJECTED", review_note: "Goal is unrealistic." }));
+    expect(c.status).toBe("Rejected");
+    expect(c.reviewNote).toBe("Goal is unrealistic.");
+  });
+
+  it("maps an absent or empty review note to null, not an empty string", () => {
+    // The queue's one-click REJECT stores no note, so this is a normal state — the card
+    // branches on it to say "The board did not leave a note."
+    expect(toCreatorProject(projectRow({ status: "REJECTED" })).reviewNote).toBeNull();
+    expect(toCreatorProject(projectRow({ status: "REJECTED", review_note: "" })).reviewNote).toBeNull();
+  });
+
+  it("survives a row whose archiver was deleted (archived_by is ON DELETE SET NULL)", () => {
+    const d = toDetail(archivedRow({ archived_by: null, archived_by_name: null }));
+    expect(d.archived).toBe(true);
+    expect(d.archivedBy).toBeNull();
+    expect(d.archivedByName).toBeNull();
   });
 });

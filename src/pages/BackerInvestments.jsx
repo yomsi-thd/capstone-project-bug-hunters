@@ -51,7 +51,21 @@ function InvestmentCard({ investment, isMobile }) {
           <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#111" }}>
             {investment.title}
           </h3>
-          <Tag label={investment.tag} />
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
+            {/* The project was archived after this investment. The card stays — nobody's
+                spend history disappears because a creator or admin tidied up — but it is
+                marked so the funding bar below is not read as a live campaign. */}
+            {investment.archived && (
+              <span style={{
+                fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
+                color: "#7a5200", background: "#fff8e6", border: "1px solid #f0d9a0",
+                borderRadius: "4px", padding: "3px 7px", whiteSpace: "nowrap",
+              }}>
+                ARCHIVED
+              </span>
+            )}
+            <Tag label={investment.tag} />
+          </div>
         </div>
 
         <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#777", lineHeight: 1.6 }}>
