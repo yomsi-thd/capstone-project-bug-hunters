@@ -257,7 +257,8 @@ CREATE INDEX idx_comments_project
 --    confusing when reading errors.
 --
 -- 6. Reward tiers have no table at all. CreateProject still lets a creator type
---    them and drops them on submit — the last place the app loses user input.
+--    them and drops them on submit — one of the two remaining places the app
+--    loses user input (the other is the video, item 7).
 --    Suggested shape:
 --      CREATE TABLE project_tiers (
 --        id          SERIAL PRIMARY KEY,
@@ -267,8 +268,9 @@ CREATE INDEX idx_comments_project
 --        description TEXT
 --      );
 --
--- 7. There is nowhere to store the video the create wizard REQUIRES, nor the
---    feedback an admin types when rejecting a project. Both are collected and
---    thrown away:
---      ALTER TABLE projects ADD COLUMN video_url   TEXT;
---      ALTER TABLE projects ADD COLUMN review_note TEXT;
+-- 7. There is nowhere to store the video the create wizard REQUIRES. It is
+--    collected and thrown away:
+--      ALTER TABLE projects ADD COLUMN video_url TEXT;
+--
+--    (The admin's rejection feedback used to be listed here too. `review_note`
+--     exists as of 2026-08-11 and is declared in the projects table above.)
