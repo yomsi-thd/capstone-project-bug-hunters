@@ -211,7 +211,7 @@ export default function Header(props = {}) {
             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
               <Avatar userName={userName} />
               <Link
-                to="/dashboard"
+                to="/account"
                 style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500, transition: "color 0.15s" }}
                 onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
                 onMouseLeave={e => e.currentTarget.style.color = "#333"}
@@ -373,7 +373,7 @@ export default function Header(props = {}) {
                 >START A PROJECT</Link>
               )}
               <Link
-                to="/dashboard" onClick={() => setMenuOpen(false)}
+                to="/account" onClick={() => setMenuOpen(false)}
                 style={{
                   display: "block", textDecoration: "none", padding: "10px 4px",
                   fontSize: "14px", color: "#333", borderBottom: "1px solid #f5f5f5",

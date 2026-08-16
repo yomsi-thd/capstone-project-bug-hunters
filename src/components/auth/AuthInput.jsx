@@ -2,6 +2,7 @@ import { useState } from "react";
 
 export default function AuthInput({
   label, type = "text", value, onChange, placeholder, error, rightSlot,
+  disabled = false,
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const isPassword = type === "password";
@@ -23,13 +24,15 @@ export default function AuthInput({
           value={value}
           onChange={onChange}
           placeholder={placeholder}
+          disabled={disabled}
           style={{
             width: "100%", boxSizing: "border-box",
             border: `1px solid ${error ? "var(--color-brand)" : "#ddd"}`,
             borderRadius: "7px", padding: isPassword ? "12px 42px 12px 14px" : "12px 14px",
-            fontSize: "14px", color: "#222", outline: "none",
+            fontSize: "14px", color: disabled ? "#999" : "#222", outline: "none",
             transition: "border-color 0.15s, box-shadow 0.15s",
-            background: "#fafafa",
+            background: disabled ? "#f1f1ef" : "#fafafa",
+            cursor: disabled ? "not-allowed" : "text",
           }}
         />
         {isPassword && (

@@ -173,6 +173,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Merge a patch into the signed-in user. The Account page calls this after saving
+  // the profile so the Header shows the new name straight away — without it the old
+  // name survives until the next sign-in, because the session is restored from
+  // localStorage rather than refetched. The effect above persists the result.
+  const updateUser = useCallback((patch) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   const logout = useCallback(() => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
     // Revoke the refresh token server-side, but never block the client-side logout.
@@ -204,8 +212,9 @@ export function AuthProvider({ children }) {
       login,
       logout,
       refreshBalance,
+      updateUser,
     };
-  }, [user, login, logout, refreshBalance]);
+  }, [user, login, logout, refreshBalance, updateUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -1,6 +1,7 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
+import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import RequireAccess from "./components/auth/RequireAccess";
 import CreatorDashboard from "./pages/CreatorDashboard";
 import CreatorMyProjects from "./pages/CreatorMyProjects";
@@ -10,7 +11,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ProjectDetail from "./pages/ProjectDetail";
 import CreateProject from "./pages/CreateProject";
-import Dashboard from "./pages/Dashboard";
+import Account from "./pages/Account";
 import BackerInvestments from "./pages/BackerInvestments";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
@@ -21,6 +22,11 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* Inside the router on purpose: RouteErrorBoundary keys itself on the pathname,
+            so navigating away from a crashed page rebuilds the boundary and the app
+            recovers by itself. Outside the router it would hold the error state forever
+            and F5 would be the only way out — most of what it exists to prevent. */}
+        <RouteErrorBoundary>
         <Routes>
         {/* ── Public ── */}
         <Route path="/" element={<Discover />} />
@@ -55,14 +61,22 @@ function App() {
           <RequireAccess permission="isAdmin"><AdminApprovals /></RequireAccess>
         } />
 
-        {/* Target of the "Account" link in both headers. Still a placeholder page.
-            TODO: build it on GET/PUT /api/users/profile + PUT /api/users/change-password. */}
-        <Route path="/dashboard" element={
-          <RequireAccess><Dashboard /></RequireAccess>
+        {/* Target of the "Account" link in the Header. Guarded with no permission:
+            any signed-in user has an account, whatever their roles. */}
+        <Route path="/account" element={
+          <RequireAccess><Account /></RequireAccess>
         } />
+
+        {/* This page used to live at /dashboard, which read as a fourth dashboard next
+            to the creator and admin ones; it was renamed to /account on 2026-08-16 to
+            match its own nav label. Nothing links to the old path any more — the
+            redirect is only so a bookmark from an earlier demo does not land on the
+            bare 404 page. Safe to delete once nobody is running an old build. */}
+        <Route path="/dashboard" element={<Navigate to="/account" replace />} />
 
         <Route path="*" element={<NotFound />} />
         </Routes>
+        </RouteErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
   );

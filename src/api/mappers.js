@@ -270,6 +270,30 @@ export function toCreatorRequest(row) {
   };
 }
 
+/**
+ * The signed-in user's own row (GET /users/profile) -> the Account page.
+ *
+ * `name`, `email` and `title` are bound to controlled <input>s, so a missing column
+ * becomes `""` and never `null` — `null` would make the input uncontrolled and React
+ * would warn the first time the user typed. `toCreatorProject` does the same for the
+ * story fields, and for the same reason.
+ */
+export function toProfile(row) {
+  if (!row) return null;
+  return {
+    id: row.id ?? null,
+    name: row.full_name ?? "",
+    email: row.email ?? "",
+    // Academic affiliation shown under the creator's name on a project page.
+    title: row.title ?? "",
+    // users.created_at is a bare TIMESTAMP, so it reads back shifted by the DB's
+    // offset (BACKEND-REVIEW-FOR-HIEU-2 §4e). Only the date is rendered, which hides
+    // the error except for accounts created between midnight and 07:00.
+    joinedOn: formatDate(row.created_at),
+    isActive: row.is_active !== false,
+  };
+}
+
 /** User row -> table in AdminUserManagement. */
 export function toAdminUser(row) {
   const roles = Array.isArray(row.roles) ? row.roles : [];
