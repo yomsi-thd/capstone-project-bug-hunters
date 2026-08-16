@@ -9,6 +9,7 @@ import {
   toAdminProject,
   toApprovalProject,
   toAdminUser,
+  toProfile,
   toInvestment,
   toProjectUpdate,
   toCommentThread,
@@ -385,6 +386,50 @@ describe("toAdminUser", () => {
     expect(toAdminUser(userRow({ is_active: true })).status).toBe("Active");
     expect(toAdminUser(userRow({ is_active: false })).status).toBe("Inactive");
     expect(toAdminUser(userRow({ is_active: false })).isActive).toBe(false);
+  });
+});
+
+describe("toProfile", () => {
+  const profileRow = (overrides = {}) => ({
+    id: 21,
+    full_name: "Test Student",
+    email: "TestStudent@test.com",
+    title: "Final-year student, School of Engineering",
+    is_active: true,
+    created_at: "2026-07-14T03:20:00.000Z",
+    ...overrides,
+  });
+
+  it("maps the row onto the Account page's shape", () => {
+    const p = toProfile(profileRow());
+    expect(p.id).toBe(21);
+    expect(p.name).toBe("Test Student");
+    expect(p.email).toBe("TestStudent@test.com");
+    expect(p.title).toBe("Final-year student, School of Engineering");
+    expect(p.joinedOn).toBeTruthy();
+  });
+
+  // The three text fields are bound to controlled inputs, so null would make them
+  // uncontrolled and React would warn as soon as the user typed.
+  it("turns missing text columns into empty strings, never null", () => {
+    const p = toProfile(profileRow({ title: null, full_name: null, email: null }));
+    expect(p.title).toBe("");
+    expect(p.name).toBe("");
+    expect(p.email).toBe("");
+  });
+
+  it("returns null for a missing row rather than an empty object", () => {
+    expect(toProfile(null)).toBeNull();
+    expect(toProfile(undefined)).toBeNull();
+  });
+
+  it("leaves the join date empty when the column is null", () => {
+    expect(toProfile(profileRow({ created_at: null })).joinedOn).toBe("");
+  });
+
+  it("treats a missing is_active as active", () => {
+    expect(toProfile(profileRow({ is_active: undefined })).isActive).toBe(true);
+    expect(toProfile(profileRow({ is_active: false })).isActive).toBe(false);
   });
 });
 

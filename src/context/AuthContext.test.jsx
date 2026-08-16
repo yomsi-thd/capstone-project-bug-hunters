@@ -122,6 +122,33 @@ describe("AuthContext", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  // The Account page saves the profile and then calls updateUser, so the Header shows
+  // the new name without a sign-out. The session is restored from localStorage rather
+  // than refetched, so the patch has to reach storage too.
+  it("merges a patch into the signed-in user and persists it", async () => {
+    const { result } = renderAuth();
+    await login(result, "student1", "student1@");
+
+    act(() => {
+      result.current.updateUser({ name: "Renamed Student", username: "new@test.com" });
+    });
+
+    expect(result.current.user.name).toBe("Renamed Student");
+    expect(result.current.user.username).toBe("new@test.com");
+    // Untouched fields survive the merge — a patch must not wipe the roles.
+    expect(result.current.roles).toEqual(["backer", "creator"]);
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).name).toBe("Renamed Student");
+  });
+
+  it("ignores an updateUser patch while logged out", () => {
+    const { result } = renderAuth();
+    act(() => {
+      result.current.updateUser({ name: "Nobody" });
+    });
+    expect(result.current.user).toBeNull();
+    expect(result.current.isLoggedIn).toBe(false);
+  });
+
   it("restores a persisted session on mount", () => {
     localStorage.setItem(
       STORAGE_KEY,
