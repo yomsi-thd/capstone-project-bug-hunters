@@ -5,7 +5,7 @@ async function deactivateUser(req, res) {
 
     try {
 
-        const user = await adminService.deactivateUser(req.params.id);
+        const user = await adminService.deactivateUser(req.params.id, req.user.id);
 
         res.status(200).json({
             message: "User deactivated successfully",
@@ -113,7 +113,10 @@ async function getAllProjects(req, res) {
 
 async function getProjectById(req, res) {
     try {
-        const project = await projectService.getProjectById(req.params.id);
+        // Passing req.user matters: getProjectById hides unapproved projects from
+        // anyone who is not the creator or an admin, and reviewing a PENDING project is
+        // the entire point of this route. This one is already behind authorize("ADMIN").
+        const project = await projectService.getProjectById(req.params.id, req.user);
 
         res.status(200).json(project);
     } catch (error) {

@@ -2,12 +2,19 @@ const pool = require("../config/db");
 const userRepository = require("../repositories/userRepository");
 const creatorRequestRepository = require("../repositories/creatorRequestRepository");
 
-async function deactivateUser(userId) {
+async function deactivateUser(userId, actingAdminId) {
 
     const user = await userRepository.findById(userId);
 
     if (!user) {
         throw new Error("User not found");
+    }
+
+    // Same rule as updateUserRoles refusing to strip your own ADMIN role: authenticate
+    // rejects an inactive account, so an admin who deactivates themselves is signed out
+    // on their next request with no route left to undo it.
+    if (Number(userId) === Number(actingAdminId)) {
+        throw new Error("You cannot deactivate your own account.");
     }
 
     if (!user.is_active) {
