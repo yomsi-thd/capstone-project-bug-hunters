@@ -9,6 +9,7 @@ import {
   toAdminProject,
   toApprovalProject,
   toAdminUser,
+  toBacker,
   toProfile,
   toInvestment,
   toProjectUpdate,
@@ -123,7 +124,18 @@ describe("toCard", () => {
       status: "APPROVED",
       ownerId: 14,
       createdAt: "2026-08-05T02:45:00.000Z",
+      // Null here because projectRow() has no end_date — Discover's "Ending soon"
+      // sort pushes those to the back rather than treating them as ending today.
+      daysLeft: null,
     });
+  });
+
+  it("carries daysLeft so Discover can sort by which campaign closes first", () => {
+    const future = new Date(Date.now() + 5 * 86_400_000).toISOString();
+    expect(toCard(projectRow({ end_date: future })).daysLeft).toBe(5);
+    // A closed campaign is 0, not a negative number.
+    const past = new Date(Date.now() - 3 * 86_400_000).toISOString();
+    expect(toCard(projectRow({ end_date: past })).daysLeft).toBe(0);
   });
 
   it("uppercases the tag so TAG_COLORS can key on it", () => {
@@ -321,6 +333,59 @@ describe("toCreatorProject", () => {
     expect(p.funding).toBe("Lab time");
     expect(toCreatorProject(projectRow()).solution).toBe("");
   });
+
+  it("carries the backer and comment counts the creator dashboard totals up", () => {
+    // GET /projects/my started returning both on 2026-08-18; before that the dashboard
+    // showed "—" in every stat card.
+    const p = toCreatorProject(projectRow({ backers_count: 3, comments_count: 7 }));
+    expect(p.backers).toBe(3);
+    expect(p.commentsCount).toBe(7);
+  });
+
+  it("keeps a real zero as 0 and a missing count as null", () => {
+    // The check has to be `== null`, not falsy: a project nobody has backed yet has 0
+    // backers, and rendering that as "—" would read as "we don't know".
+    const none = toCreatorProject(projectRow({ backers_count: 0, comments_count: 0 }));
+    expect(none.backers).toBe(0);
+    expect(none.commentsCount).toBe(0);
+
+    const missing = toCreatorProject(projectRow());
+    expect(missing.backers).toBeNull();
+    expect(missing.commentsCount).toBeNull();
+  });
+});
+
+describe("toBacker", () => {
+  const backerRow = (overrides = {}) => ({
+    user_id: 31,
+    full_name: "Priya Sharma",
+    // SUM()::int comes back as a number, but COUNT/SUM over numeric would be a string —
+    // the same node-postgres trap the amounts have, so the mapper coerces anyway.
+    total_amount: 750,
+    project_count: 2,
+    last_invested_at: "2026-08-14T09:15:00.000Z",
+    ...overrides,
+  });
+
+  it("formats the total in Class Coins, never dollars", () => {
+    const b = toBacker(backerRow({ total_amount: 1250 }));
+    expect(b.amount).toBe("1,250 CC");
+    expect(b.amount).not.toContain("$");
+  });
+
+  it("coerces a string total, the way node-postgres returns numerics", () => {
+    expect(toBacker(backerRow({ total_amount: "750" })).amountValue).toBe(750);
+  });
+
+  it("names the person, falling back to the id if the row lost its join", () => {
+    expect(toBacker(backerRow()).name).toBe("Priya Sharma");
+    expect(toBacker(backerRow({ full_name: null })).name).toBe("Backer #31");
+  });
+
+  it("pluralises the project count", () => {
+    expect(toBacker(backerRow({ project_count: 1 })).projectsLabel).toBe("1 project");
+    expect(toBacker(backerRow({ project_count: 2 })).projectsLabel).toBe("2 projects");
+  });
 });
 
 describe("toAdminProject", () => {
@@ -382,6 +447,20 @@ describe("toAdminUser", () => {
     expect(toAdminUser(userRow({ roles: undefined })).role).toBe("—");
   });
 
+  it("also hands back the raw uppercase roles the edit checkboxes bind to", () => {
+    // `role` above is a display string; PATCH /admin/users/:id/roles wants the array.
+    expect(toAdminUser(userRow()).roles).toEqual(["ADMIN", "BACKER"]);
+    expect(toAdminUser(userRow({ roles: undefined })).roles).toEqual([]);
+  });
+
+  it("invents no student id and no project assignment", () => {
+    // Both used to be filled in — studentId was "#15" and project was always
+    // "Unassigned" — which put numbers on screen that exist nowhere in the database.
+    const u = toAdminUser(userRow());
+    expect(u.studentId).toBeUndefined();
+    expect(u.project).toBeUndefined();
+  });
+
   it("maps the is_active boolean onto the two statuses the API can express", () => {
     expect(toAdminUser(userRow({ is_active: true })).status).toBe("Active");
     expect(toAdminUser(userRow({ is_active: false })).status).toBe("Inactive");
@@ -433,18 +512,29 @@ describe("toProfile", () => {
   });
 });
 
+// GET /classcoins/investments returns one row per PROJECT, already grouped and joined —
+// it replaced "read every transaction, then fetch each project" on 2026-08-18. So this
+// mapper takes one row, not a (transaction, project) pair.
 describe("toInvestment", () => {
-  const tx = {
-    id: 1,
-    classcoin_id: 4,
+  const investmentRow = (overrides = {}) => ({
     project_id: 4,
-    type: "INVEST",
-    amount: 500,
-    created_at: "2026-08-05T02:46:36.210Z",
-  };
+    title: "Autonomous Swarm Drones",
+    description: "Coordinated drones for disaster mapping.",
+    category: "ENGINEERING",
+    image_url: "https://example.test/drone.jpg",
+    current_amount: "500.00",
+    goal_amount: "15000.00",
+    status: "APPROVED",
+    archived_at: null,
+    invested_amount: 500,
+    investment_count: 1,
+    first_invested_at: "2026-08-05T02:46:36.210Z",
+    last_invested_at: "2026-08-05T02:46:36.210Z",
+    ...overrides,
+  });
 
-  it("merges a transaction with its project", () => {
-    const inv = toInvestment(tx, projectRow());
+  it("maps a grouped row onto the investment card", () => {
+    const inv = toInvestment(investmentRow());
     expect(inv.projectId).toBe(4);
     expect(inv.title).toBe("Autonomous Swarm Drones");
     expect(inv.investedAmount).toBe(500);
@@ -452,22 +542,31 @@ describe("toInvestment", () => {
     expect(inv.investmentDate).toMatch(/Aug \d{2}, 2026/);
   });
 
-  it("still renders when the project is gone", () => {
-    // GET /projects/:id can 404 for a deleted project; the card must not blow up.
-    const inv = toInvestment(tx, null);
-    expect(inv.title).toBe("Project #4");
-    expect(inv.tag).toBe("UNCATEGORIZED");
-    expect(inv.fundingProgress).toBe(0);
-    expect(inv.investedAmount).toBe(500);
-    expect(inv.archived).toBe(false);
+  it("totals repeat investments into one card and counts them", () => {
+    // The old page rendered one card per transaction, so backing the same project
+    // three times produced three cards that looked identical.
+    const inv = toInvestment(investmentRow({ invested_amount: 900, investment_count: 3 }));
+    expect(inv.investedAmount).toBe(900);
+    expect(inv.investmentCount).toBe(3);
+  });
+
+  it("uppercases the tag and survives a missing category", () => {
+    expect(toInvestment(investmentRow({ category: "Education" })).tag).toBe("EDUCATION");
+    expect(toInvestment(investmentRow({ category: null })).tag).toBe("UNCATEGORIZED");
   });
 
   it("badges an investment in an archived project instead of dropping it", () => {
     // Archiving must never erase somebody's spend history — the card stays, marked.
-    const inv = toInvestment(tx, archivedRow());
+    const inv = toInvestment(investmentRow({ archived_at: "2026-08-11T10:00:00.000Z" }));
     expect(inv.archived).toBe(true);
     expect(inv.investedAmount).toBe(500);
     expect(inv.title).toBe("Autonomous Swarm Drones");
+  });
+
+  it("coerces the numeric strings node-postgres hands back", () => {
+    const inv = toInvestment(investmentRow({ invested_amount: "750", current_amount: "7500.00" }));
+    expect(inv.investedAmount).toBe(750);
+    expect(inv.fundingProgress).toBe(50);
   });
 });
 

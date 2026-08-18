@@ -19,6 +19,15 @@ export const getMyProjects = async () => {
   return response.data;
 };
 
+// Everyone who has invested in any project the signed-in creator owns, biggest first.
+// Grouped per person, not per transaction. Requires a token; the creator is read from
+// it, so there is no id to pass.
+export const getMyBackers = async () => {
+  const response = await api.get("/projects/my/backers");
+
+  return response.data;
+};
+
 export const approveProject = async (id) => {
   const response = await api.patch(`/projects/${id}/approve`);
 

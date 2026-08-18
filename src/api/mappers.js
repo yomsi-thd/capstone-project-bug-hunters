@@ -79,6 +79,10 @@ export function toCard(row) {
     status: row.status,
     ownerId: row.creator_id,
     createdAt: row.created_at,
+    // Feeds Discover's "Ending soon" sort. Null for anything created before
+    // 2026-08-06, when createProject started writing start_date/end_date — those sort
+    // to the back rather than being mistaken for campaigns closing today.
+    daysLeft: daysLeftFrom(row.end_date),
   };
 }
 
@@ -118,6 +122,10 @@ export function toDetail(row) {
 
     img: row.image_url || null,
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
+    // The pitch video, added to `projects` on 2026-08-18. A LINK, never a file — the
+    // wizard's file-upload branch was removed with it. Null for every project created
+    // before that date, so the page renders the section only when there is one.
+    videoUrl: row.video_url || null,
 
     // `description` is the short blurb (also the Discover card text); the three story
     // fields below are the long form, added to `projects` on 2026-08-06. They stay
@@ -189,11 +197,21 @@ export function toCreatorProject(row) {
     // overwrites these columns with whatever the request contains.
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
     solutionBullets: Array.isArray(row.solution_bullets) ? row.solution_bullets : [],
+    // Bound to an <input value=…> in EditProject, so "" and never null — the same
+    // reason the story fields above pass "" through.
+    videoUrl: row.video_url || "",
 
     // Why the board rejected it, written by the admin. Only ever set while the project
     // is REJECTED — approve and resubmit both clear the column — so the card can show it
     // without checking the status first.
     reviewNote: row.review_note || null,
+
+    // Added to GET /projects/my on 2026-08-18 so CreatorDashboard can total them from
+    // the list it already fetches. `== null` and not a falsy check: a project nobody
+    // has backed yet has 0 backers, and showing "—" for that would read as "unknown"
+    // rather than "none".
+    backers: row.backers_count == null ? null : toNumber(row.backers_count),
+    commentsCount: row.comments_count == null ? null : toNumber(row.comments_count),
 
     // `status` above stays the moderation verdict. These describe visibility, and
     // My Projects lists archived cards in their own tab rather than hiding them.
@@ -294,24 +312,50 @@ export function toProfile(row) {
   };
 }
 
-/** User row -> table in AdminUserManagement. */
+/**
+ * User row -> table in AdminUserManagement.
+ *
+ * There used to be a `studentId` of `#${row.id}` and a `project` of "Unassigned" here.
+ * Neither exists in the database — `users` has no student id, and nothing in this
+ * listing links a user to a project — so both were invented values shown as fact. They
+ * are gone, and the table now shows the email and the roles instead, which are real.
+ */
 export function toAdminUser(row) {
   const roles = Array.isArray(row.roles) ? row.roles : [];
   return {
     id: row.id,
     name: row.full_name,
-    // TODO: the users table has no rmit_id / student id column.
-    studentId: `#${row.id}`,
-    // TODO: the backend does not link a user to a project in this listing.
-    project: "Unassigned",
-    projectColor: "bg-gray-400",
     // The backend only has a boolean is_active — no "Pending" / "Suspended".
     status: row.is_active ? "Active" : "Inactive",
+    // Two shapes of the same fact, on purpose: `role` is the display string in the
+    // table, `roles` is what the edit checkboxes bind to and what
+    // PATCH /admin/users/:id/roles takes back.
     role: roles.length
       ? roles.map(r => r.charAt(0) + r.slice(1).toLowerCase()).join(", ")
       : "—",
+    roles,
     email: row.email,
     isActive: !!row.is_active,
+  };
+}
+
+/**
+ * One row of GET /projects/my/backers -> a line in the creator dashboard's backer list.
+ *
+ * The row is already grouped per person by SQL, so this is only formatting. `amount` is
+ * the string the list renders and `amountValue` the number it sorts/among-totals with —
+ * the pages that had only the formatted string ended up parsing digits back out of it.
+ */
+export function toBacker(row) {
+  const projects = toNumber(row.project_count);
+  return {
+    id: row.user_id,
+    name: row.full_name || `Backer #${row.user_id}`,
+    amount: money(row.total_amount),
+    amountValue: toNumber(row.total_amount),
+    projects,
+    projectsLabel: `${projects} ${projects === 1 ? "project" : "projects"}`,
+    lastInvested: formatDate(row.last_invested_at),
   };
 }
 
@@ -404,25 +448,35 @@ export function toProjectUpdate(row) {
 }
 
 /**
- * One ClassCoin transaction plus its project -> card on My Investments.
- * `project` may be null if the project was deleted.
+ * One row of GET /classcoins/investments -> a card on My Investments.
+ *
+ * The row is one PROJECT, not one transaction: the query groups by project and sums the
+ * amounts, so investing three times in the same project is a single card for 900 CC
+ * rather than three cards for 300 that look like duplicates. It arrives already joined,
+ * which is what removed the old "fetch each project separately" N+1 — and why there is
+ * no "project is missing" branch here: a transaction whose project was permanently
+ * deleted carries project_id = NULL and never survives the join.
  */
-export function toInvestment(tx, project) {
+export function toInvestment(row) {
   return {
-    id: tx.id,
-    projectId: tx.project_id,
-    title: project?.title ?? `Project #${tx.project_id}`,
-    tag: toTag(project?.category),
-    desc: project?.description ?? "",
-    img: project?.image_url || null,
-    investedAmount: toNumber(tx.amount),
-    investmentDate: formatDate(tx.created_at),
-    fundingProgress: project
-      ? fundedPercent(project.current_amount, project.goal_amount)
-      : 0,
+    // One card per project now, so the project id is the identity.
+    id: row.project_id,
+    projectId: row.project_id,
+    title: row.title,
+    tag: toTag(row.category),
+    desc: row.description ?? "",
+    img: row.image_url || null,
+    investedAmount: toNumber(row.invested_amount),
+    // How many separate times they invested. 1 for most cards, which is why the UI
+    // only mentions it above 1.
+    investmentCount: toNumber(row.investment_count),
+    // The most recent one — that is what "when did I back this" means on a card that
+    // now covers several.
+    investmentDate: formatDate(row.last_invested_at),
+    firstInvestmentDate: formatDate(row.first_invested_at),
+    fundingProgress: fundedPercent(row.current_amount, row.goal_amount),
     // The backer keeps the card either way — archiving a project must not erase
-    // somebody's spend history — so it is badged rather than dropped. `project` is
-    // undefined when the row's project was permanently deleted, hence the guard.
-    archived: project?.archived_at != null,
+    // somebody's spend history — so it is badged rather than dropped.
+    archived: row.archived_at != null,
   };
 }
