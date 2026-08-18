@@ -22,6 +22,13 @@ async function getTransactions(userId) {
     return await classCoinRepository.getTransactions(classCoin.id);
 }
 
+// The user's investments, one row per project. Unlike getTransactions above this does
+// NOT need the wallet first — the query joins through classcoins itself — so a user who
+// somehow has no wallet row gets an empty list rather than a 404.
+async function getMyInvestments(userId) {
+    return await classCoinRepository.getInvestmentsByUser(userId);
+}
+
 // Add ClassCoins
 async function addCoins(userId, amount) {
     const classCoin = await classCoinRepository.getBalance(userId);
@@ -71,6 +78,7 @@ async function deductCoins(userId, amount) {
 module.exports = {
     getClassCoin,
     getTransactions,
+    getMyInvestments,
     addCoins,
     deductCoins,
 };

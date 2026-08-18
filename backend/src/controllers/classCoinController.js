@@ -26,6 +26,19 @@ async function getTransactions(req, res) {
     }
 }
 
+// One row per project this user has invested in, for My Investments.
+async function getMyInvestments(req, res) {
+    try {
+        const investments = await classCoinService.getMyInvestments(req.user.id);
+
+        res.status(200).json(investments);
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
 // Add ClassCoins (Development/Admin)
 async function addCoins(req, res) {
     try {
@@ -71,6 +84,7 @@ async function deductCoins(req, res) {
 module.exports = {
     getClassCoin,
     getTransactions,
+    getMyInvestments,
     addCoins,
     deductCoins
 };

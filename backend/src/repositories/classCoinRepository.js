@@ -109,11 +109,54 @@ async function getTransactions(classcoinId) {
     return result.rows;
 }
 
+// Everything this user has invested, GROUPED BY PROJECT and joined to the project row.
+//
+// Two problems in one query. My Investments used to read the raw transaction list and
+// then call GET /projects/:id once per row (an N+1), and it listed one card per
+// TRANSACTION — so backing the same project three times produced three identical-looking
+// cards. One row per project, with the total and the number of times, is what the page
+// actually wants to show.
+//
+// The JOIN drops transactions whose project was permanently deleted (project_id is
+// ON DELETE SET NULL), which matches what the page did with them before: skip.
+// Archived projects are kept on purpose — a backer's spend history must survive a
+// project being hidden — and archived_at rides along so the card can badge it.
+async function getInvestmentsByUser(userId) {
+    const result = await pool.query(
+        `
+        SELECT p.id             AS project_id,
+               p.title,
+               p.description,
+               p.category,
+               p.image_url,
+               p.current_amount,
+               p.goal_amount,
+               p.status,
+               p.archived_at,
+               SUM(ct.amount)::int AS invested_amount,
+               COUNT(*)::int       AS investment_count,
+               MIN(ct.created_at)  AS first_invested_at,
+               MAX(ct.created_at)  AS last_invested_at
+        FROM classcoin_transactions ct
+        JOIN classcoins c ON c.id = ct.classcoin_id
+        JOIN projects   p ON p.id = ct.project_id
+        WHERE c.user_id = $1
+          AND ct.type = 'INVEST'
+        GROUP BY p.id
+        ORDER BY MAX(ct.created_at) DESC;
+        `,
+        [userId]
+    );
+
+    return result.rows;
+}
+
 module.exports = {
     createClassCoin,
     getBalance,
     deductBalance,
     addBalance,
     createTransaction,
-    getTransactions
+    getTransactions,
+    getInvestmentsByUser
 };

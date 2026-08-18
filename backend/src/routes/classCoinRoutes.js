@@ -18,6 +18,14 @@ router.get(
     classCoinController.getTransactions
 );
 
+// My Investments: one row per project, already joined to it. Replaces the page's old
+// "read every transaction, then fetch each project" loop.
+router.get(
+    "/investments",
+    authenticate,
+    classCoinController.getMyInvestments
+);
+
 // Add ClassCoins
 router.post(
     "/add",
