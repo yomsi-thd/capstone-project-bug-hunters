@@ -3,14 +3,17 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
 import * as projectApi from "../api/projectApi";
-import { toNumber, fundedPercent } from "../api/mappers";
+import { toNumber, fundedPercent, toBacker } from "../api/mappers";
 
 export default function CreatorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // There is no stats endpoint — totals are summed client-side from GET /projects/my.
+  // There is no stats endpoint — totals are summed client-side from GET /projects/my,
+  // which since 2026-08-18 also carries backers_count and comments_count per project.
   // TODO: ask for an aggregate endpoint once a creator can have many projects.
-  const [totals, setTotals] = useState({ raised: 0, goal: 0, count: 0 });
+  const [totals, setTotals] = useState({ raised: 0, goal: 0, count: 0, backers: 0, comments: 0 });
+  // Projects that have comments, busiest first — the "Community Discussions" panel.
+  const [discussions, setDiscussions] = useState([]);
   const [statsError, setStatsError] = useState(null);
 
   useEffect(() => {
@@ -19,14 +22,46 @@ export default function CreatorDashboard() {
       try {
         const rows = await projectApi.getMyProjects();
         if (cancelled) return;
+        const list = rows || [];
         setTotals({
-          raised: (rows || []).reduce((s, r) => s + toNumber(r.current_amount), 0),
-          goal: (rows || []).reduce((s, r) => s + toNumber(r.goal_amount), 0),
-          count: (rows || []).length,
+          raised: list.reduce((s, r) => s + toNumber(r.current_amount), 0),
+          goal: list.reduce((s, r) => s + toNumber(r.goal_amount), 0),
+          count: list.length,
+          // Summed across projects, so one person who backed two of them counts twice.
+          // The stat is labelled "backers across projects" for exactly that reason.
+          backers: list.reduce((s, r) => s + toNumber(r.backers_count), 0),
+          comments: list.reduce((s, r) => s + toNumber(r.comments_count), 0),
         });
+        setDiscussions(
+          list
+            .filter(r => toNumber(r.comments_count) > 0)
+            .sort((a, b) => toNumber(b.comments_count) - toNumber(a.comments_count))
+            .map(r => ({ id: r.id, title: r.title, comments: toNumber(r.comments_count) }))
+        );
       } catch (err) {
         if (!cancelled) {
           setStatsError(err.response?.data?.message || err.message || "Could not load your project stats");
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Loaded separately from the projects above: a failure here must leave the funding
+  // totals on screen rather than blanking the page, the same split ProjectDetail uses
+  // for its updates tab.
+  const [backers, setBackers] = useState([]);
+  const [backersError, setBackersError] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getMyBackers();
+        if (!cancelled) setBackers((rows || []).map(toBacker));
+      } catch (err) {
+        if (!cancelled) {
+          setBackersError(err.response?.data?.message || err.message || "Could not load your backers");
         }
       }
     })();
@@ -92,56 +127,107 @@ export default function CreatorDashboard() {
               </div>
             </div>
 
-            {/* Stat cards */}
+            {/* Stat cards.
+                The PAGE VIEWS card that used to sit below was removed: nothing in the
+                system records a view, so it could only ever read "—". */}
             <div className="flex flex-col sm:flex-row lg:flex-col gap-4">
               <div className="bg-white border border-gray-200 rounded-xl p-5 flex-1">
                 <div className="flex justify-between items-start mb-2">
-                  <div className="text-[11px] font-bold text-gray-400 tracking-widest">TOTAL BACKERS</div>
+                  <div className="text-[11px] font-bold text-gray-400 tracking-widest">BACKERS ACROSS PROJECTS</div>
                   <span className="text-gray-300 text-lg">👥</span>
                 </div>
-                {/* TODO: the backend does not count investors. */}
-                <div className="text-[28px] font-extrabold text-gray-900">—</div>
-                <div className="text-[12px] text-gray-400 mt-0.5">Not provided by the API yet</div>
+                <div className="text-[28px] font-extrabold text-gray-900">{totals.backers}</div>
+                {/* Not "total backers": the counts are per project and summed, so one
+                    person who backed two of them is counted twice. The list below is
+                    grouped per person and is where the true headcount is. */}
+                <div className="text-[12px] text-gray-400 mt-0.5">
+                  Counted once per project backed
+                </div>
               </div>
               <div className="bg-white border border-gray-200 rounded-xl p-5 flex-1">
                 <div className="flex justify-between items-start mb-2">
-                  <div className="text-[11px] font-bold text-gray-400 tracking-widest">PAGE VIEWS</div>
-                  <span className="text-gray-300 text-lg">👁</span>
+                  <div className="text-[11px] font-bold text-gray-400 tracking-widest">COMMENTS</div>
+                  <span className="text-gray-300 text-lg">💬</span>
                 </div>
-                {/* TODO: no analytics — the backend does not record page views. */}
-                <div className="text-[28px] font-extrabold text-gray-900">—</div>
-                <div className="text-[12px] text-gray-400 mt-0.5">No analytics endpoint yet</div>
+                <div className="text-[28px] font-extrabold text-gray-900">{totals.comments}</div>
+                <div className="text-[12px] text-gray-400 mt-0.5">
+                  Across all {totals.count} of your {totals.count === 1 ? "project" : "projects"}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom row */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lp-stagger">
+          {/* Bottom row. `items-start` so each panel is only as tall as its own
+              content — the two lists have very different lengths, and a stretched
+              Discussions card left half a panel of white space that read as a
+              failed load rather than as "that is all of them". */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start lp-stagger">
             {/* Discussions */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Community Discussions</h3>
-              <p className="text-[12px] text-gray-400 mb-4">Most active threads requiring your attention.</p>
-              {/* TODO: the backend has no comments / discussions table. */}
-              <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
-                No discussions — the API has no comments table yet.
-              </div>
+              <p className="text-[12px] text-gray-400 mb-4">Your projects with the most to read, busiest first.</p>
+              {discussions.length > 0 ? (
+                <div className="flex flex-col">
+                  {discussions.map((d, i) => (
+                    <button
+                      key={d.id}
+                      onClick={() => navigate(`/project/${d.id}`)}
+                      className={`flex items-center justify-between gap-3 text-left bg-transparent border-none cursor-pointer px-1 py-2.5 hover:text-brand transition-colors ${
+                        i < discussions.length - 1 ? "border-b border-gray-100" : ""
+                      }`}
+                    >
+                      <span className="text-[13px] font-semibold text-gray-800 truncate">{d.title}</span>
+                      <span className="text-[12px] text-gray-400 shrink-0">
+                        {d.comments} {d.comments === 1 ? "comment" : "comments"} ›
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+                  Nobody has commented on your projects yet.
+                </div>
+              )}
             </div>
 
-            {/* Backer Tiers */}
+            {/* Backers.
+                This panel used to be "Backer Tiers — distribution of funds across
+                defined reward levels", which needs three things that do not exist: a
+                project_tiers table, a tier choice in the invest modal, and a tier_id on
+                the transaction. Without the middle one no amount of tier data would say
+                which Class Coins belong to which tier. The half that IS real — who put
+                money in — is what the panel shows now, and it absorbed the separate
+                "RECENT BACKERS" block that sat underneath saying the same thing. */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h3 className="text-[15px] font-bold text-gray-900 mb-1">Backer Tiers</h3>
-              <p className="text-[12px] text-gray-400 mb-4">Distribution of funds across defined reward levels.</p>
-              {/* TODO: the backend has no reward tiers table. */}
-              <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
-                No reward tiers — the API has no tiers table yet.
-              </div>
-              <div className="mt-4 pt-3 border-t border-gray-100">
-                <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-2">RECENT BACKERS</div>
-                {/* TODO: the backend does not expose who invested in a project. */}
-                <div className="text-[11px] text-gray-400">
-                  The API does not expose who backed a project yet.
+              <h3 className="text-[15px] font-bold text-gray-900 mb-1">Your Backers</h3>
+              <p className="text-[12px] text-gray-400 mb-4">Everyone who has invested in your projects, most first.</p>
+              {backersError ? (
+                <div className="text-[12px] text-brand bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                  {backersError}
                 </div>
-              </div>
+              ) : backers.length > 0 ? (
+                <div className="flex flex-col">
+                  {backers.map((b, i) => (
+                    <div
+                      key={b.id}
+                      className={`flex items-center gap-3 py-2.5 ${i < backers.length - 1 ? "border-b border-gray-100" : ""}`}
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-500 shrink-0">
+                        {b.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-semibold text-gray-800 truncate">{b.name}</div>
+                        <div className="text-[11px] text-gray-400">{b.projectsLabel} · {b.lastInvested}</div>
+                      </div>
+                      <div className="text-[13px] font-bold text-brand shrink-0">{b.amount}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-6 text-center">
+                  No investments yet. They appear here as soon as somebody backs a project.
+                </div>
+              )}
             </div>
           </div>
         </main>
