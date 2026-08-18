@@ -1,22 +1,48 @@
+import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 import { AuthProvider } from "./context/AuthContext";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import RequireAccess from "./components/auth/RequireAccess";
-import CreatorDashboard from "./pages/CreatorDashboard";
-import CreatorMyProjects from "./pages/CreatorMyProjects";
 
+// Discover is the landing page at "/", so it is imported eagerly — lazy-loading the
+// first thing every visitor sees would only add a spinner to the very request that
+// decides how fast the app feels.
 import Discover from "./pages/Discover";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ProjectDetail from "./pages/ProjectDetail";
-import CreateProject from "./pages/CreateProject";
-import Account from "./pages/Account";
-import BackerInvestments from "./pages/BackerInvestments";
-import AdminDashboard from "./pages/AdminDashboard";
-import NotFound from "./pages/NotFound";
-import AdminUserManagement from "./pages/AdminUserManagement";
-import AdminApprovals from "./pages/AdminApprovals";
+
+// Everything else is split out. One bundle held all 12 pages (529 kB, past Vite's own
+// warning threshold), which meant a signed-out visitor downloaded the whole admin area
+// and the 5-step create wizard to read one project page.
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const BackerInvestments = lazy(() => import("./pages/BackerInvestments"));
+const Account = lazy(() => import("./pages/Account"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+
+const CreatorDashboard = lazy(() => import("./pages/CreatorDashboard"));
+const CreatorMyProjects = lazy(() => import("./pages/CreatorMyProjects"));
+const CreateProject = lazy(() => import("./pages/CreateProject"));
+
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminUserManagement = lazy(() => import("./pages/AdminUserManagement"));
+const AdminApprovals = lazy(() => import("./pages/AdminApprovals"));
+
+// Shown while a route's chunk downloads. Deliberately plain: a skeleton of a page we do
+// not know the shape of yet would flash a layout that is about to be replaced. On a
+// local network this is usually invisible.
+function RouteFallback() {
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#f7f7f5",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif",
+      fontSize: "13px", fontWeight: 600, letterSpacing: "0.06em", color: "#999",
+    }}>
+      LOADING…
+    </div>
+  );
+}
 
 function App() {
   return (
@@ -27,6 +53,10 @@ function App() {
             recovers by itself. Outside the router it would hold the error state forever
             and F5 would be the only way out — most of what it exists to prevent. */}
         <RouteErrorBoundary>
+        {/* Inside the boundary, not outside: a chunk that fails to download throws
+            during render, and the boundary is what turns that into the error screen
+            with a way out instead of a blank page. */}
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
         {/* ── Public ── */}
         <Route path="/" element={<Discover />} />
@@ -76,6 +106,7 @@ function App() {
 
         <Route path="*" element={<NotFound />} />
         </Routes>
+        </Suspense>
         </RouteErrorBoundary>
       </BrowserRouter>
     </AuthProvider>
