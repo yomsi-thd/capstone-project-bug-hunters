@@ -10,7 +10,7 @@ import {
 } from "../mock";
 
 // ── Project Review Page ──
-function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
+function ProjectReview({ project, onBack, onApprove, onReject }) {
   const [feedback, setFeedback] = useState("");
 
   return (
@@ -94,14 +94,23 @@ function ProjectReview({ project, onBack, onApprove, onRequestChanges }) {
                   >
                     ✓ APPROVE PROJECT
                   </button>
+                  {/* Was "REQUEST CHANGES" while the list row called the identical
+                      action "REJECT" (2026-08-18: settled on REJECT). Both call
+                      rejectProject and both land on status = REJECTED; the schema is
+                      CHECK (status IN ('PENDING','APPROVED','REJECTED')) with no
+                      CHANGES_REQUESTED, so the softer wording described a state that
+                      does not exist. The note below says what actually happens. */}
                   <button
-                    onClick={() => onRequestChanges(project.id, feedback)}
+                    onClick={() => onReject(project.id, feedback)}
                     className="bg-white border border-gray-300 text-gray-600 rounded-md px-5 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2"
                   >
-                    ↩ REQUEST CHANGES
+                    ✕ REJECT PROJECT
                   </button>
                 </div>
-                <p className="text-[11px] text-gray-300 max-w-[200px] text-right leading-relaxed">Approving this project will make it live and visible to potential backers on the RMIT ecosystem.</p>
+                <p className="text-[11px] text-gray-400 max-w-[230px] text-right leading-relaxed">
+                  Approving publishes the project to Discover. Rejecting sends it back to
+                  the creator with your feedback — they can revise it and resubmit.
+                </p>
               </div>
             </div>
           </div>
@@ -267,7 +276,7 @@ export default function AdminApprovals() {
   // The feedback typed in the review screen is now stored: it goes to
   // projects.review_note and the creator reads it on their My Projects card. This box
   // existed long before the column did, and everything typed into it used to be dropped.
-  const handleRequestChanges = async (id, feedback) => {
+  const handleReject = async (id, feedback) => {
     setActionError(null);
     try {
       await projectApi.rejectProject(id, feedback);
@@ -348,7 +357,7 @@ export default function AdminApprovals() {
             project={reviewTarget}
             onBack={() => setReviewTarget(null)}
             onApprove={handleApprove}
-            onRequestChanges={handleRequestChanges}
+            onReject={handleReject}
           />
         ) : (
           <main className="flex-1 p-4 md:p-9 overflow-y-auto">
@@ -559,7 +568,7 @@ export default function AdminApprovals() {
                             there; that text is stored on the project now. */}
                         {p.status !== "Changes Requested" && (
                           <button
-                            onClick={() => handleRequestChanges(p.id, "")}
+                            onClick={() => handleReject(p.id, "")}
                             title="Reject without feedback — use REVIEW to explain why"
                             className="bg-white border border-gray-300 text-gray-600 rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer hover:bg-red-50 hover:text-brand hover:border-red-200 transition-colors"
                           >

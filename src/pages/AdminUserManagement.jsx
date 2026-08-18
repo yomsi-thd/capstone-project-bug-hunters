@@ -3,28 +3,31 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
 import { toAdminUser } from "../api/mappers";
+import { useAuth } from "../context/AuthContext";
 import {
-  ADMIN_PROJECT_GROUPS as PROJECT_GROUPS,
   ADMIN_USER_NAV_ITEMS as NAV_ITEMS,
   ADMIN_USER_ROLES as ROLES,
-  ADMIN_USER_STATUSES as STATUSES,
 } from "../mock";
+
+// What each role actually unlocks, so an admin granting one can see the consequence
+// before ticking the box. Kept next to the modal rather than in mock/ because it is
+// prose about this screen, not configuration anything else reads.
+const ROLE_HINTS = {
+  ADMIN:   "Reviews and approves projects, manages every account. A superuser — this also grants everything CREATOR does.",
+  CREATOR: "Starts projects and posts updates on them.",
+  BACKER:  "Holds a Class Coin balance and can invest in projects.",
+};
 
 function getInitials(name) {
   return name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 }
 
+// users.is_active is a boolean, so these are the only two states that exist. The page
+// used to offer "Pending" and "Suspended" as well — neither the schema nor any endpoint
+// can express them.
 function StatusDot({ status }) {
-  const colors = {
-    Active:    "text-green-600",
-    Pending:   "text-yellow-500",
-    Suspended: "text-red-500",
-  };
-  const dots = {
-    Active:    "bg-green-500",
-    Pending:   "bg-yellow-400",
-    Suspended: "bg-red-500",
-  };
+  const colors = { Active: "text-green-600", Inactive: "text-gray-500" };
+  const dots = { Active: "bg-green-500", Inactive: "bg-gray-400" };
   return (
     <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${colors[status] || "text-gray-400"}`}>
       <span className={`w-1.5 h-1.5 rounded-full inline-block ${dots[status] || "bg-gray-300"}`} />
@@ -33,219 +36,150 @@ function StatusDot({ status }) {
   );
 }
 
-// ── Add New User Modal ──
-function AddUserModal({ onClose, onAdd }) {
-  const [form, setForm] = useState({ name: "", studentId: "", projectGroup: "Urban Tech Hub", role: "Student", email: "" });
-
-  const handleAdd = () => {
-    if (!form.name || !form.studentId) return;
-    onAdd({
-      id: Date.now(),
-      name: form.name,
-      studentId: form.studentId,
-      project: form.projectGroup !== "Unassigned" ? form.projectGroup.toUpperCase() : null,
-      projectColor: "bg-brand",
-      status: "Pending",
-      role: form.role,
-      email: form.email,
-    });
-    onClose();
-  };
-
+// The roles a user holds, in the table. Admin is the one worth spotting at a glance.
+function RoleBadges({ roles }) {
+  if (!roles.length) {
+    return <span className="text-[11px] text-gray-400 italic">No roles</span>;
+  }
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] p-6 md:p-7 overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-5">
-          <h2 className="text-[20px] font-bold text-gray-900">Add New User</h2>
-          <button onClick={onClose} className="bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer leading-none">×</button>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">FULL NAME</label>
-            <input
-              value={form.name}
-              onChange={e => setForm({ ...form, name: e.target.value })}
-              placeholder="e.g. Elena Draganov"
-              className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">STUDENT ID</label>
-            <input
-              value={form.studentId}
-              onChange={e => setForm({ ...form, studentId: e.target.value })}
-              placeholder="e.g. s3829104"
-              className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">PROJECT GROUP</label>
-              <select
-                value={form.projectGroup}
-                onChange={e => setForm({ ...form, projectGroup: e.target.value })}
-                className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors"
-              >
-                {PROJECT_GROUPS.map(g => <option key={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">ROLE</label>
-              <select
-                value={form.role}
-                onChange={e => setForm({ ...form, role: e.target.value })}
-                className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors"
-              >
-                {ROLES.map(r => <option key={r}>{r}</option>)}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">EMAIL ADDRESS</label>
-            <input
-              value={form.email}
-              onChange={e => setForm({ ...form, email: e.target.value })}
-              placeholder="student.name@student.rmit.edu.au"
-              className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors"
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors">CANCEL</button>
-          <button onClick={handleAdd} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors">ADD USER</button>
-        </div>
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {roles.map(role => (
+        <span
+          key={role}
+          className={`text-[10px] font-bold px-2.5 py-1 rounded-sm ${
+            role === "ADMIN" ? "bg-brand text-white" : "bg-gray-100 text-gray-600"
+          }`}
+        >
+          {role}
+        </span>
+      ))}
     </div>
   );
 }
 
-// ── Edit User Modal ──
-function EditUserModal({ user, onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: user.name,
-    studentId: user.studentId,
-    email: user.email,
-    role: user.role,
-    projectGroup: user.project ? user.project.split(" ").map(w => w[0] + w.slice(1).toLowerCase()).join(" ") : "Unassigned",
-    status: user.status,
-  });
+// ── Manage Access Modal ──
+//
+// Roles and the active flag are the ONLY things an admin can change about somebody
+// else. PUT /users/profile edits your OWN row and there is no admin equivalent, so the
+// name and the email are shown read-only here rather than as inputs that would collect
+// what you typed and then discard it — which is exactly what this modal used to do.
+//
+// Roles are checkboxes, not a dropdown: a user holds a SET of roles (the student
+// persona is CREATOR + BACKER), and a single-choice control cannot express that.
+function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave }) {
+  const [roles, setRoles] = useState(user.roles);
 
-  const handleSave = () => {
-    onSave({
-      ...user,
-      name: form.name,
-      studentId: form.studentId,
-      email: form.email,
-      role: form.role,
-      project: form.projectGroup !== "Unassigned" ? form.projectGroup.toUpperCase() : null,
-      status: form.status,
-    });
-    onClose();
+  // The backend refuses to let an admin drop their own ADMIN role, because doing so
+  // locks the whole team out of the admin area with no route left to undo it. The
+  // checkbox is disabled for the same reason — bouncing off a 400 after the click
+  // would teach the same rule far later.
+  const isSelf = user.id === currentUserId;
+
+  const toggle = (role) => {
+    if (isSelf && role === "ADMIN") return;
+    setRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
   };
 
+  const changed =
+    roles.length !== user.roles.length ||
+    roles.some(r => !user.roles.includes(r));
+
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[520px] overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={saving ? undefined : onClose}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex justify-between items-center px-7 py-5 border-b border-gray-100">
-          <h2 className="text-[18px] font-bold text-gray-900">Edit User Information</h2>
-          <button onClick={onClose} className="bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer leading-none">×</button>
+          <h2 className="text-[18px] font-bold text-gray-900">Manage Access</h2>
+          <button onClick={onClose} disabled={saving} className="bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer leading-none disabled:opacity-40">×</button>
         </div>
 
         <div className="px-7 py-5 flex flex-col gap-5">
-          {/* User Identity */}
+          {/* Identity — read-only on purpose, see the note above the component. */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-brand text-sm">🪪</span>
               <span className="text-[11px] font-bold text-gray-500 tracking-widest">USER IDENTITY</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">FULL NAME</label>
-                <input
-                  value={form.name}
-                  onChange={e => setForm({ ...form, name: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors bg-gray-50"
-                />
+            <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-[13px] font-bold text-gray-600 shrink-0">
+                {getInitials(user.name)}
               </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">RMIT ID</label>
-                <input
-                  value={form.studentId}
-                  onChange={e => setForm({ ...form, studentId: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors bg-gray-50"
-                />
+              <div className="min-w-0">
+                <div className="text-[13px] font-bold text-gray-900 truncate">{user.name}</div>
+                <div className="text-[12px] text-gray-500 truncate">{user.email}</div>
               </div>
             </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">EMAIL ADDRESS</label>
-              <input
-                value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors bg-gray-50"
-              />
-            </div>
+            <p className="text-[11px] text-gray-400 mt-2">
+              A person edits their own name, email and title on their Account page — there is
+              no endpoint for an admin to change them here.
+            </p>
           </div>
 
           <div className="border-t border-gray-100" />
 
-          {/* Role & Assignment */}
+          {/* Roles */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-brand text-sm">⚙️</span>
-              <span className="text-[11px] font-bold text-gray-500 tracking-widest">ROLE & ASSIGNMENT</span>
+              <span className="text-[11px] font-bold text-gray-500 tracking-widest">ROLES</span>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">USER ROLE</label>
-                <select
-                  value={form.role}
-                  onChange={e => setForm({ ...form, role: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-gray-50 focus:border-brand transition-colors"
-                >
-                  {ROLES.map(r => <option key={r}>{r}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">PROJECT GROUP ASSIGNMENT</label>
-                <select
-                  value={form.projectGroup}
-                  onChange={e => setForm({ ...form, projectGroup: e.target.value })}
-                  className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-gray-50 focus:border-brand transition-colors"
-                >
-                  {PROJECT_GROUPS.map(g => <option key={g}>{g}</option>)}
-                </select>
-              </div>
+            <div className="flex flex-col gap-2">
+              {ROLES.map(role => {
+                const checked = roles.includes(role);
+                const locked = isSelf && role === "ADMIN";
+                return (
+                  <label
+                    key={role}
+                    className={`flex items-start gap-3 border rounded-lg px-4 py-3 transition-colors ${
+                      locked ? "border-gray-200 bg-gray-50 cursor-not-allowed"
+                        : checked ? "border-brand bg-red-50/40 cursor-pointer"
+                        : "border-gray-200 hover:border-gray-300 cursor-pointer"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={locked || saving}
+                      onChange={() => toggle(role)}
+                      className="mt-0.5 accent-brand w-4 h-4 shrink-0"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[13px] font-bold text-gray-900">{role}</span>
+                      <span className="block text-[11px] text-gray-500 leading-relaxed">
+                        {ROLE_HINTS[role]}
+                        {locked && " — you cannot remove your own admin access."}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
             </div>
+
+            {roles.length === 0 && (
+              <p className="text-[12px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2 mt-3">
+                With no roles this account can still sign in, but every section of the site
+                will be empty for them. You can give the roles back from this same screen.
+              </p>
+            )}
           </div>
 
-          <div className="border-t border-gray-100" />
-
-          {/* Status Management */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-brand text-sm">⚡</span>
-              <span className="text-[11px] font-bold text-gray-500 tracking-widest">STATUS MANAGEMENT</span>
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-[13px] text-brand rounded-lg px-4 py-3">
+              {error}
             </div>
-            <div>
-              <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1.5">ACCOUNT STATUS</label>
-              <select
-                value={form.status}
-                onChange={e => setForm({ ...form, status: e.target.value })}
-                className="w-52 border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-gray-50 focus:border-brand transition-colors"
-              >
-                {STATUSES.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex justify-end gap-3 px-7 py-4 border-t border-gray-100">
-          <button onClick={onClose} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors">CANCEL CHANGES</button>
-          <button onClick={handleSave} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors">SAVE CHANGES</button>
+          <button onClick={onClose} disabled={saving} className="bg-white border border-gray-200 rounded-md px-5 py-2.5 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors disabled:opacity-50">CANCEL</button>
+          <button
+            onClick={() => onSave(roles)}
+            disabled={saving || !changed}
+            className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? "SAVING…" : "SAVE ROLES"}
+          </button>
         </div>
       </div>
     </div>
@@ -255,14 +189,18 @@ function EditUserModal({ user, onClose, onSave }) {
 // ── Main Page ──
 export default function AdminUserManagement() {
   const navigate = useNavigate();
+  const { user: signedInUser } = useAuth();
   const [activeNav, setActiveNav] = useState("users");
   const [users, setUsers] = useState([]);
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [search, setSearch] = useState("");
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [roleFilter, setRoleFilter] = useState("ALL");
   const [editTarget, setEditTarget] = useState(null);
-  const [removeTarget, setRemoveTarget] = useState(null);
+  // Errors from the role save belong inside the modal, next to the checkboxes that
+  // caused them — the page-level banner sits behind the overlay.
+  const [savingRoles, setSavingRoles] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // GET /api/admin/users
@@ -281,9 +219,6 @@ export default function AdminUserManagement() {
     return () => { cancelled = true; };
   }, []);
 
-  // Activating/deactivating is the ONLY user operation the backend supports.
-  // TODO: there is no route to change roles (userRepository has assignRole/removeRole
-  // but adminRoutes never exposes them), so Save in the Edit modal is local-only.
   const handleToggleActive = async (u) => {
     setActionError(null);
     try {
@@ -309,34 +244,43 @@ export default function AdminUserManagement() {
     }
   };
 
-  const filtered = users.filter(u =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.studentId.toLowerCase().includes(search.toLowerCase())
-  );
+  const query = search.trim().toLowerCase();
+  const filtered = users.filter(u => {
+    const matchesSearch =
+      !query ||
+      (u.name || "").toLowerCase().includes(query) ||
+      (u.email || "").toLowerCase().includes(query);
+    const matchesRole = roleFilter === "ALL" || u.roles.includes(roleFilter);
+    return matchesSearch && matchesRole;
+  });
 
-  // The backend has no admin create-user route. Sign-up goes through
-  // POST /auth/register and needs a password, so it cannot happen from this screen.
-  const handleAdd = () => {
-    setShowAddModal(false);
-    setActionError(
-      "The API has no admin create-user endpoint — new accounts must go through the Register page."
-    );
-  };
-
-  // Local state only: there is no route to change roles or edit another user's profile.
-  const handleSave = (updated) => {
-    setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
-    setActionError(
-      "Saved on screen only — the API has no endpoint to change another user's role or profile yet."
-    );
-  };
-
-  // The backend only has DELETE /users/profile (delete yourself), not delete-by-id.
-  const handleRemove = () => {
-    setRemoveTarget(null);
-    setActionError(
-      "The API cannot delete another user — deactivate the account instead."
-    );
+  // PATCH /admin/users/:id/roles REPLACES the whole set, so the modal hands back every
+  // role the user should end up with, not a delta. This is the only way to grant a role
+  // by hand — creator_requests only covers people who ticked the box at sign-up.
+  const handleSaveRoles = async (roles) => {
+    setSavingRoles(true);
+    setSaveError(null);
+    try {
+      const res = await adminApi.updateUserRoles(editTarget.id, roles);
+      // Trust the server's answer over the checkboxes — it uppercases and de-duplicates
+      // the set, and it is the one that decides what was actually stored. It replies
+      // { message, user }; is_active is not part of that update, so it is carried over.
+      // Only the role fields are taken from it: the reply is built around the update,
+      // so spreading it wholesale could blank a name or email it never carried.
+      const saved = toAdminUser({
+        id: editTarget.id,
+        roles: res?.user?.roles ?? roles,
+        is_active: editTarget.isActive,
+      });
+      setUsers(prev => prev.map(u =>
+        u.id === editTarget.id ? { ...u, role: saved.role, roles: saved.roles } : u
+      ));
+      setEditTarget(null);
+    } catch (err) {
+      setSaveError(err.response?.data?.message || err.message || "Could not update this user's roles");
+    } finally {
+      setSavingRoles(false);
+    }
   };
 
   return (
@@ -395,14 +339,11 @@ export default function AdminUserManagement() {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900 mb-1">User Management</h1>
-              <p className="text-[14px] text-gray-400 max-w-lg">Oversee academic participants, manage project group assignments, and monitor student engagement within the RMIT Launchpad incubator.</p>
+              <p className="text-[14px] text-gray-400 max-w-lg">Grant and revoke access for everyone on RMIT Launchpad, and deactivate accounts that should no longer sign in.</p>
             </div>
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors flex items-center gap-2 shrink-0 w-full sm:w-auto justify-center"
-            >
-              + ADD NEW USER
-            </button>
+            {/* There is no ADD NEW USER button: sign-up needs a password, so it goes
+                through POST /auth/register on the Register page and cannot happen from
+                here. The button used to open a full five-field form and then refuse. */}
           </div>
 
           {(loadError || actionError) && (
@@ -426,17 +367,20 @@ export default function AdminUserManagement() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search by name or student ID..."
+                placeholder="Search by name or email..."
                 className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
               />
             </div>
-            <select className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-500 bg-white outline-none w-full sm:w-auto">
-              <option>Filter by Project Group</option>
-              {PROJECT_GROUPS.map(g => <option key={g}>{g}</option>)}
-            </select>
-            <select className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-500 bg-white outline-none w-full sm:w-auto">
-              <option>Filter by Role</option>
-              {ROLES.map(r => <option key={r}>{r}</option>)}
+            {/* The "Filter by Project Group" select that used to sit here is gone with
+                the column it filtered — nothing links a user to a project. This one
+                filters for real. */}
+            <select
+              value={roleFilter}
+              onChange={e => setRoleFilter(e.target.value)}
+              className="border border-gray-200 rounded-md px-3 py-2 text-[13px] text-gray-600 bg-white outline-none w-full sm:w-auto"
+            >
+              <option value="ALL">All roles</option>
+              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
 
@@ -446,7 +390,7 @@ export default function AdminUserManagement() {
               <table className="w-full border-collapse min-w-[750px]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["User Identity", "Project Assignment", "Status", "Management Actions"].map(h => (
+                    {["User Identity", "Roles", "Status", "Management Actions"].map(h => (
                       <th key={h} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-wide text-left">{h}</th>
                     ))}
                   </tr>
@@ -460,66 +404,45 @@ export default function AdminUserManagement() {
                           <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-[12px] font-bold text-gray-600 shrink-0">
                             {getInitials(u.name)}
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <div className="text-[13px] font-bold text-gray-900">{u.name}</div>
-                            <div className="text-[11px] text-gray-400">ID: {u.studentId}</div>
+                            {/* The email, not an invented "ID: #12" — it is also the
+                                address this person signs in with. */}
+                            <div className="text-[11px] text-gray-400 truncate">{u.email}</div>
                           </div>
                         </div>
                       </td>
 
-                      {/* Project */}
+                      {/* Roles */}
                       <td className="px-5 py-3.5">
-                        {u.project ? (
-                          <div className="flex items-center gap-2">
-                            <span className="bg-brand text-white text-[10px] font-bold px-2.5 py-1 rounded-sm">{u.project}</span>
-                            <button
-                              onClick={() => setEditTarget(u)}
-                              className="text-[11px] text-brand font-semibold bg-transparent border-none cursor-pointer hover:underline flex items-center gap-1"
-                            >
-                              ✎ EDIT
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2.5 py-1 rounded-sm">UNASSIGNED</span>
-                            <button
-                              onClick={() => setEditTarget(u)}
-                              className="text-[11px] text-brand font-semibold bg-transparent border-none cursor-pointer hover:underline flex items-center gap-1"
-                            >
-                              ⊕ ASSIGN
-                            </button>
-                          </div>
-                        )}
+                        <RoleBadges roles={u.roles} />
                       </td>
 
                       {/* Status */}
                       <td className="px-5 py-3.5">
                         <StatusDot status={u.status} />
-                        {/* The only operation the backend supports on another user. */}
                         <button
                           onClick={() => handleToggleActive(u)}
-                          className="block mt-1 text-[11px] text-brand font-semibold bg-transparent border-none cursor-pointer hover:underline p-0"
+                          disabled={u.id === signedInUser?.id}
+                          title={u.id === signedInUser?.id ? "You cannot deactivate your own account." : undefined}
+                          className="block mt-1 text-[11px] text-brand font-semibold bg-transparent border-none cursor-pointer hover:underline p-0 disabled:text-gray-300 disabled:cursor-not-allowed disabled:no-underline"
                         >
                           {u.isActive ? "DEACTIVATE" : "ACTIVATE"}
                         </button>
                       </td>
 
                       {/* Actions */}
+                      {/* No REMOVE button: DELETE /users/profile only deletes YOURSELF,
+                          and deleting a user cascades away their projects, comments and
+                          funding history. Deactivating is the reversible equivalent and
+                          already sits in the Status column. */}
                       <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => setEditTarget(u)}
-                            className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:text-brand transition-colors"
-                          >
-                            ⚙ MANAGE
-                          </button>
-                          <button
-                            onClick={() => setRemoveTarget(u)}
-                            className="flex items-center gap-1.5 text-[12px] font-semibold text-brand bg-transparent border-none cursor-pointer hover:text-red-800 transition-colors"
-                          >
-                            🗑 REMOVE
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => { setSaveError(null); setEditTarget(u); }}
+                          className="flex items-center gap-1.5 text-[12px] font-semibold text-gray-600 bg-transparent border-none cursor-pointer hover:text-brand transition-colors"
+                        >
+                          ⚙ MANAGE ACCESS
+                        </button>
                       </td>
                     </tr>
                   )) : (
@@ -531,48 +454,29 @@ export default function AdminUserManagement() {
               </table>
             </div>
 
-            {/* Pagination */}
-            <div className="px-5 py-3.5 flex flex-col sm:flex-row gap-3 justify-between items-center border-t border-gray-100">
-              <span className="text-[12px] text-gray-400">Showing 1 to {filtered.length} of {users.length} students</span>
-              <div className="flex items-center gap-1">
-                <button className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-[12px] text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">PREVIOUS</button>
-                {[1, 2, 3].map(n => (
-                  <button key={n} className={`rounded-md w-8 h-8 text-[12px] font-semibold cursor-pointer border transition-colors ${n === 1 ? "bg-brand text-white border-brand" : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"}`}>{n}</button>
-                ))}
-                <button className="bg-white border border-gray-200 rounded-md px-3 py-1.5 text-[12px] text-gray-500 cursor-pointer hover:bg-gray-50 transition-colors">NEXT</button>
-              </div>
+            {/* The PREVIOUS / 1 2 3 / NEXT control that used to sit here was inert —
+                every page of the list is already on screen. The count stays. */}
+            <div className="px-5 py-3.5 border-t border-gray-100">
+              <span className="text-[12px] text-gray-400">
+                Showing {filtered.length} of {users.length} {users.length === 1 ? "account" : "accounts"}
+              </span>
             </div>
           </div>
         </main>
       </div>
       </div>
 
-      {/* Add New User Modal */}
-      {showAddModal && (
-        <AddUserModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />
-      )}
-
-      {/* Edit User Modal */}
+      {/* Manage Access Modal — mounted per open, so the checkboxes reset to the user
+          being edited without needing an effect to sync them. */}
       {editTarget && (
-        <EditUserModal user={editTarget} onClose={() => setEditTarget(null)} onSave={handleSave} />
-      )}
-
-      {/* Remove Confirmation Modal */}
-      {removeTarget && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setRemoveTarget(null)}>
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[400px] p-6" onClick={e => e.stopPropagation()}>
-            <h2 className="text-[18px] font-bold text-gray-900 mb-3">Remove User</h2>
-            <p className="text-[14px] text-gray-500 leading-relaxed mb-6">
-              Are you sure you want to remove{" "}
-              <span className="font-bold text-gray-900">{removeTarget.name}</span>?{" "}
-              This action is <span className="font-semibold text-gray-700">permanent</span> and cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button onClick={() => setRemoveTarget(null)} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[13px] text-gray-600 font-medium cursor-pointer hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleRemove} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2 text-[13px] font-bold cursor-pointer transition-colors">Remove</button>
-            </div>
-          </div>
-        </div>
+        <ManageAccessModal
+          user={editTarget}
+          currentUserId={signedInUser?.id}
+          saving={savingRoles}
+          error={saveError}
+          onClose={() => { setEditTarget(null); setSaveError(null); }}
+          onSave={handleSaveRoles}
+        />
       )}
     </div>
   );
