@@ -4,6 +4,7 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import CommentList from "../components/project/CommentList";
+import ProjectVideo from "../components/project/ProjectVideo";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
 import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
 import useBreakpoint from "../hooks/useBreakpoint";
@@ -348,12 +349,14 @@ export default function ProjectDetail() {
                 {p.creator?.name?.charAt(0) ?? "?"}
               </div>
               <div>
-                {/* TODO: no join to users — GET /projects/:id only returns creator_id. */}
+                {/* GET /projects/:id joins users for the name and title. Both fallbacks
+                    are only reachable when the creator's account was deleted, since
+                    projects.creator_id cascades — so in practice, never. */}
                 <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
                   {p.creator?.name ?? `Creator #${p.ownerId ?? "?"}`}
                 </div>
                 <div style={{ fontSize: "12px", color: "#888" }}>
-                  {p.creator?.role ?? "Creator details not provided by the API yet"}
+                  {p.creator?.role ?? "Creator"}
                 </div>
               </div>
             </div>
@@ -370,6 +373,11 @@ export default function ProjectDetail() {
                 <p style={{ fontSize: "15px", color: "#444", lineHeight: 1.8, margin: "0 0 28px" }}>
                   {p.about}
                 </p>
+
+                {/* The pitch video, directly under the opening blurb — the wizard has
+                    always required one, and until 2026-08-18 there was no column to put
+                    it in. Renders nothing for projects created before that. */}
+                <ProjectVideo url={p.videoUrl} />
 
                 {/* Challenge / Solution / Funding come from their own columns on
                     `projects` and are optional, so each section renders only when the
@@ -604,7 +612,9 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
           <div style={{ fontSize: "12px", color: "#888" }}>days to go</div>
         </div>
         <div>
-          {/* TODO: the backend does not count investors per project. */}
+          {/* backers_count on GET /projects/:id — DISTINCT wallets, not transactions.
+              "—" is for a row that predates the column, not for a real zero: the
+              mapper's check is `== null`, so nobody-yet renders as 0. */}
           <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.backers ?? "—"}</div>
           <div style={{ fontSize: "12px", color: "#888" }}>backers</div>
         </div>

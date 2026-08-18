@@ -8,6 +8,7 @@ import {
   EDIT_PROJECT_INITIAL_TEAM,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
+import { isLinkable } from "../components/project/videoUrl";
 
 // The three optional story sections ProjectDetail renders under the blurb. Kept in the
 // Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
@@ -71,6 +72,19 @@ function TabBasicInfo({ data, setData }) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* The video lives here rather than on the Media tab, for the same reason the
+          story fields do: Basic Info is the tab that actually saves. */}
+      <div className="border-t border-gray-100 pt-4">
+        <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Project Video URL</label>
+        <input
+          value={data.videoUrl}
+          onChange={e => setData({ ...data, videoUrl: e.target.value })}
+          placeholder="https://youtube.com/watch?v=..."
+          className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors"
+        />
+        <p className="text-[11px] text-gray-400 mt-1.5">YouTube and Vimeo links play on the project page; anything else is shown as a link.</p>
       </div>
     </div>
   );
@@ -239,8 +253,9 @@ export default function EditProject({ project, onClose }) {
           challenge: project.challenge || "",
           solution: project.solution || "",
           funding: project.funding || "",
+          videoUrl: project.videoUrl || "",
         }
-      : { ...EDIT_PROJECT_INITIAL_DATA, challenge: "", solution: "", funding: "" }
+      : { ...EDIT_PROJECT_INITIAL_DATA, challenge: "", solution: "", funding: "", videoUrl: "" }
   );
   const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
   const [tiers, setTiers] = useState(project?.tiers || MOCK_TIERS);
@@ -253,6 +268,15 @@ export default function EditProject({ project, onClose }) {
   const handleSave = async () => {
     if (!project?.id) {
       setSaveError("This modal was opened without a project, so there is nothing to save.");
+      return;
+    }
+    // Same rule the create wizard enforces. Without it, a creator could get past the
+    // wizard's check and then paste anything here — editing would be the way around it.
+    // Empty is allowed on this screen: the video is required to CREATE a project, but
+    // clearing it later is a deliberate choice, not a typo.
+    const videoUrl = basicData.videoUrl.trim();
+    if (videoUrl && !isLinkable(videoUrl)) {
+      setSaveError("That video link does not look like a web address — it should start with https://");
       return;
     }
     setSaving(true);
@@ -271,6 +295,7 @@ export default function EditProject({ project, onClose }) {
         challenge: basicData.challenge.trim(),
         solution: basicData.solution.trim(),
         funding_usage: basicData.funding.trim(),
+        video_url: videoUrl,
         // Echoed back unchanged: this modal has no editor for either yet, and the
         // service overwrites the column with whatever it is handed.
         gallery: project.gallery ?? [],
