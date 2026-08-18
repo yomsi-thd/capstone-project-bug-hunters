@@ -6,7 +6,6 @@ import Tag from "../components/project/Tag";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as classCoinApi from "../api/classCoinApi";
-import * as projectApi from "../api/projectApi";
 import { toInvestment } from "../api/mappers";
 
 function InvestmentCard({ investment, isMobile }) {
@@ -89,15 +88,28 @@ function InvestmentCard({ investment, isMobile }) {
               </svg>
               {investment.investedAmount.toLocaleString()} CC
             </div>
+            {/* Only mentioned above 1: the card is now one PROJECT, so a total of
+                900 CC could be one investment or three, and the difference matters
+                to somebody reading their own history. */}
+            {investment.investmentCount > 1 && (
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>
+                across {investment.investmentCount} investments
+              </div>
+            )}
           </div>
 
           <div>
             <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", color: "#999", marginBottom: "4px" }}>
-              INVESTMENT DATE
+              {investment.investmentCount > 1 ? "LATEST INVESTMENT" : "INVESTMENT DATE"}
             </div>
             <div style={{ fontSize: "15px", fontWeight: 700, color: "#111" }}>
               {investment.investmentDate}
             </div>
+            {investment.investmentCount > 1 && (
+              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>
+                first on {investment.firstInvestmentDate}
+              </div>
+            )}
           </div>
 
           <div style={{ flex: isMobile ? "0 0 100%" : "1 1 160px", minWidth: "140px" }}>
@@ -198,7 +210,9 @@ function EmptyLoggedOut({ isMobile }) {
 }
 
 export default function BackerInvestments() {
-  const { isLoggedIn } = useAuth();
+  // canInvest gates the empty state's wording, not the page itself — the route stays
+  // open to everyone, and a pure creator can legitimately land here from a stale link.
+  const { isLoggedIn, canInvest, canCreate } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -211,10 +225,10 @@ export default function BackerInvestments() {
 
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 
-  // There is no GET /investments/my yet, so assemble it by hand: read the ClassCoin
-  // transaction history, keep the INVEST entries, then call GET /projects/:id for each
-  // one to get its title / image / progress.
-  // TODO: ask for a GET /investments/my that joins the project, to drop this N+1.
+  // One request. This used to read the whole ClassCoin transaction history and then call
+  // GET /projects/:id once per row — an N+1 that also produced one card per TRANSACTION,
+  // so backing the same project three times looked like three duplicate cards.
+  // GET /classcoins/investments groups by project and joins it server-side (2026-08-18).
   useEffect(() => {
     if (!isLoggedIn) return;
     let cancelled = false;
@@ -222,18 +236,8 @@ export default function BackerInvestments() {
       setLoading(true);
       setLoadError(null);
       try {
-        const txs = await classCoinApi.getTransactions();
-        const invests = (txs || []).filter(t => t.type === "INVEST" && t.project_id != null);
-
-        const projectIds = [...new Set(invests.map(t => t.project_id))];
-        const projects = await Promise.all(
-          projectIds.map(pid => projectApi.getProjectById(pid).catch(() => null))
-        );
-        const byId = new Map(projectIds.map((pid, i) => [pid, projects[i]]));
-
-        if (!cancelled) {
-          setInvestments(invests.map(t => toInvestment(t, byId.get(t.project_id))));
-        }
+        const rows = await classCoinApi.getMyInvestments();
+        if (!cancelled) setInvestments((rows || []).map(toInvestment));
       } catch (err) {
         if (!cancelled) {
           setLoadError(
@@ -326,13 +330,55 @@ export default function BackerInvestments() {
               )}
             </>
           ) : (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
-              <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
-              <div style={{ fontSize: "14px", fontWeight: 600 }}>You haven't backed any projects yet</div>
-              <div style={{ fontSize: "13px", marginTop: "4px" }}>
-                Invest ClassCoins in a project and it will show up here.
+            /* A pure creator holds no Class Coin balance and cannot invest, so telling
+               them to "invest and it will show up here" points at a door that is locked
+               for them — the Header does not even offer them a balance. Same rule as the
+               nav: canInvest, not isLoggedIn. */
+            canInvest ? (
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>You haven't backed any projects yet</div>
+                <div style={{ fontSize: "13px", marginTop: "4px" }}>
+                  Invest ClassCoins in a project and it will show up here.
+                </div>
               </div>
-            </div>
+            ) : (
+              <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
+                <div style={{ fontSize: "14px", fontWeight: 600 }}>This page is for backers</div>
+                <div style={{ fontSize: "13px", marginTop: "4px", lineHeight: 1.6 }}>
+                  Your account does not hold a Class Coin balance, so it cannot invest in
+                  projects.
+                </div>
+                {/* The CTA is gated on canCreate, not on "not canInvest": an account with
+                    no roles at all reaches this branch too, and sending them to a page
+                    the route guard rejects would just swap one dead end for another. */}
+                {canCreate && (
+                  <Link
+                    to="/creator-my-projects"
+                    style={{
+                      display: "inline-block", marginTop: "18px",
+                      background: "var(--color-brand)", color: "#fff", textDecoration: "none",
+                      borderRadius: "6px", fontSize: "12px", fontWeight: 700,
+                      letterSpacing: "0.06em", padding: "10px 22px",
+                      transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "#aa0000";
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "var(--color-brand)";
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    GO TO MY PROJECTS
+                  </Link>
+                )}
+              </div>
+            )
           )
         ) : (
           <EmptyLoggedOut isMobile={isMobile} />
