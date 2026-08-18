@@ -135,6 +135,38 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
 
 const PROJECTS_PREVIEW_COUNT = 6;
 
+// Sort options for the All Projects grid. "Newest" first because it is the order the
+// API already returns and therefore the one the page had before this control existed —
+// adding a sort should not silently reorder anyone's first visit.
+//
+// Each `compare` sorts a copy of the filtered list; none of them mutate state.
+const SORTS = [
+  {
+    id: "newest",
+    label: "Newest",
+    compare: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  },
+  {
+    id: "funded",
+    label: "Most funded",
+    compare: (a, b) => b.funded - a.funded,
+  },
+  {
+    id: "ending",
+    label: "Ending soon",
+    // daysLeft is null for every project created before 2026-08-06 (no end_date).
+    // Those go to the BACK: an unknown deadline is not the same as an imminent one,
+    // and sorting null as 0 would put the oldest projects at the front of a list
+    // that claims to show what closes first.
+    compare: (a, b) => {
+      if (a.daysLeft == null && b.daysLeft == null) return 0;
+      if (a.daysLeft == null) return 1;
+      if (b.daysLeft == null) return -1;
+      return a.daysLeft - b.daysLeft;
+    },
+  },
+];
+
 // Shared notice block for the loading / error / empty states.
 function StatusBlock({ title, detail, actionLabel, onAction }) {
   return (
@@ -191,6 +223,7 @@ export default function Discover() {
   const [reloadKey, setReloadKey] = useState(0);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
+  const [sortId, setSortId] = useState("newest");
   const [showAll, setShowAll] = useState(false);
   const [search, setSearch] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -234,15 +267,20 @@ export default function Discover() {
 
   // Search and filters run over the whole catalogue, so a query reaches every
   // project (hero + trending + fresh), not just the ones shown in this grid.
-  const filteredProjects = projects.filter(p => {
-    const matchFilter =
-      activeFilter === "ALL" || (FILTER_TAGS[activeFilter] || []).includes(p.tag);
-    const matchSearch =
-      !search ||
-      p.title.toLowerCase().includes(search.toLowerCase()) ||
-      (p.desc && p.desc.toLowerCase().includes(search.toLowerCase()));
-    return matchFilter && matchSearch;
-  });
+  // Sorting is applied last, to a copy — `projects` stays in the API's order, which
+  // is what `hero` above still derives from.
+  const activeSort = SORTS.find(s => s.id === sortId) ?? SORTS[0];
+  const filteredProjects = projects
+    .filter(p => {
+      const matchFilter =
+        activeFilter === "ALL" || (FILTER_TAGS[activeFilter] || []).includes(p.tag);
+      const matchSearch =
+        !search ||
+        p.title.toLowerCase().includes(search.toLowerCase()) ||
+        (p.desc && p.desc.toLowerCase().includes(search.toLowerCase()));
+      return matchFilter && matchSearch;
+    })
+    .sort(activeSort.compare);
 
   // Once expanded, stay expanded across filter/search changes — "show me
   // everything" is the user's standing intent, not a per-tag setting.
@@ -465,6 +503,31 @@ export default function Discover() {
                   ✕ CLEAR
                 </button>
               )}
+
+              {/* Sort sits with the tag chips because it does the same job: it changes
+                  which projects you see first. A native <select> rather than another
+                  row of chips — three more buttons here would crowd the four tags on
+                  mobile, and the current value has to stay readable at a glance. */}
+              <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>
+                  SORT
+                </span>
+                <select
+                  value={sortId}
+                  onChange={e => setSortId(e.target.value)}
+                  style={{
+                    background: "#fff", color: "#444",
+                    border: "1px solid #ddd", borderRadius: "5px",
+                    fontSize: "12px", fontWeight: 600,
+                    padding: "5px 10px", cursor: "pointer",
+                    letterSpacing: "0.04em", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "#ddd"; }}
+                >
+                  {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+              </label>
             </div>
           </div>
 
@@ -475,9 +538,12 @@ export default function Discover() {
               node and sit still while only the new ones animate. Search state is
               in the key so that clearing the box back to empty also remounts:
               otherwise the restored cards would animate alone while the ones
-              already on screen stayed put — the same uneven effect, just moved. */}
+              already on screen stayed put — the same uneven effect, just moved.
+              Sort is in the key for a different reason: changing it mounts and
+              unmounts nothing, so without the remount the cards would silently
+              swap places with no sign the control did anything. */}
           <div
-            key={`${activeFilter}|${isSearching ? "search" : "browse"}`}
+            key={`${activeFilter}|${sortId}|${isSearching ? "search" : "browse"}`}
             className={isSearching ? undefined : "lp-stagger"}
             style={{
               display: "grid",
