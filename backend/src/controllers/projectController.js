@@ -42,8 +42,12 @@ async function getAllApprovedProjects(req, res) {
 // Get Project By ID
 const getProjectById = async (req, res) => {
     try {
+        // req.user comes from authOptional: the real user when a token was sent, and
+        // null for a signed-out visitor. The service uses it to decide whether an
+        // unapproved project is visible.
         const project = await projectService.getProjectById(
-            req.params.id
+            req.params.id,
+            req.user
         );
 
         res.status(200).json(project);
@@ -62,6 +66,23 @@ async function getMyProjects(req, res) {
         const projects = await projectService.getMyProjects(req.user.id);
 
         res.status(200).json(projects);
+
+    } catch (error) {
+
+        res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
+//Get everyone who has backed a project this user owns
+async function getMyBackers(req, res) {
+
+    try {
+
+        const backers = await projectService.getMyBackers(req.user.id);
+
+        res.status(200).json(backers);
 
     } catch (error) {
 
@@ -242,7 +263,7 @@ async function endorseProject(req, res) {
 async function getProjectComments(req, res) {
     try {
 
-        const comments = await projectService.getProjectComments(req.params.id);
+        const comments = await projectService.getProjectComments(req.params.id, req.user);
 
         res.status(200).json(comments);
 
@@ -303,7 +324,7 @@ async function deleteComment(req, res) {
 async function getProjectUpdates(req, res) {
     try {
 
-        const updates = await projectService.getProjectUpdates(req.params.id);
+        const updates = await projectService.getProjectUpdates(req.params.id, req.user);
 
         res.status(200).json(updates);
 
@@ -390,6 +411,7 @@ module.exports = {
     getAllApprovedProjects,
     getProjectById,
     getMyProjects,
+    getMyBackers,
     updateProject,
     archiveProject,
     restoreProject,

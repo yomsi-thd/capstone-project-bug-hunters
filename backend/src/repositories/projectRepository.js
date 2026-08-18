@@ -21,9 +21,10 @@ async function createProject(project) {
             solution,
             funding_usage,
             gallery,
-            solution_bullets
+            solution_bullets,
+            video_url
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         RETURNING *
         `,
         [
@@ -42,7 +43,10 @@ async function createProject(project) {
             project.solution,
             project.funding_usage,
             JSON.stringify(project.gallery ?? []),
-            JSON.stringify(project.solution_bullets ?? [])
+            JSON.stringify(project.solution_bullets ?? []),
+            // A link, not a file. The wizard has always REQUIRED a video and had
+            // nowhere to put it (schema.sql known issue #7) — this is that column.
+            project.video_url
         ]
     );
 
@@ -136,11 +140,58 @@ async function findByCreatorId(userId) {
         SELECT p.*,
                -- My Projects shows archived cards too. When an ADMIN archived it the
                -- creator cannot restore it, so the card names who did and why.
-               a.full_name AS archived_by_name
+               a.full_name AS archived_by_name,
+               -- Same two subqueries findById already runs. They are here so the creator
+               -- dashboard can total backers and comments from THIS one request instead
+               -- of calling GET /projects/:id once per project.
+               (
+                   SELECT COUNT(DISTINCT ct.classcoin_id)::int
+                   FROM classcoin_transactions ct
+                   WHERE ct.project_id = p.id
+                     AND ct.type = 'INVEST'
+               ) AS backers_count,
+               (
+                   SELECT COUNT(*)::int
+                   FROM comments c
+                   WHERE c.project_id = p.id
+               ) AS comments_count
         FROM projects p
         LEFT JOIN users a ON a.id = p.archived_by
         WHERE p.creator_id = $1
         ORDER BY p.created_at DESC
+        `,
+        [userId]
+    );
+
+    return result.rows;
+}
+
+// Everyone who has invested in ANY project owned by this creator, biggest first.
+//
+// Grouped by WALLET OWNER, not by transaction: investing three times into two of the
+// creator's projects is one row totalling all three. That matches backers_count above,
+// which also counts distinct wallets.
+//
+// The JOIN to projects is what scopes this to one creator — a transaction whose project
+// was deleted carries project_id = NULL (ON DELETE SET NULL) and drops out here, which
+// is what we want: it is no longer a backer of anything.
+async function findBackersByCreatorId(userId) {
+
+    const result = await pool.query(
+        `
+        SELECT u.id                                AS user_id,
+               u.full_name,
+               SUM(ct.amount)::int                 AS total_amount,
+               COUNT(DISTINCT ct.project_id)::int  AS project_count,
+               MAX(ct.created_at)                  AS last_invested_at
+        FROM classcoin_transactions ct
+        JOIN classcoins c ON c.id = ct.classcoin_id
+        JOIN users u      ON u.id = c.user_id
+        JOIN projects p   ON p.id = ct.project_id
+        WHERE p.creator_id = $1
+          AND ct.type = 'INVEST'
+        GROUP BY u.id, u.full_name
+        ORDER BY total_amount DESC, last_invested_at DESC
         `,
         [userId]
     );
@@ -165,8 +216,9 @@ async function updateProject(id, project) {
             funding_usage=$9,
             gallery=$10,
             solution_bullets=$11,
+            video_url=$12,
             updated_at=CURRENT_TIMESTAMP
-        WHERE id=$12
+        WHERE id=$13
         RETURNING *
         `,
         [
@@ -185,6 +237,7 @@ async function updateProject(id, project) {
             project.funding_usage,
             JSON.stringify(project.gallery ?? []),
             JSON.stringify(project.solution_bullets ?? []),
+            project.video_url,
             id
         ]
     );
@@ -346,6 +399,7 @@ module.exports = {
     findAllApprovedProjects,
     findById,
     findByCreatorId,
+    findBackersByCreatorId,
     updateProject,
     archiveProject,
     restoreProject,

@@ -51,6 +51,38 @@ function assertNotArchived(project) {
     }
 }
 
+/**
+ * Who may READ a project and everything hanging off it (its comments, its updates).
+ *
+ * Only APPROVED projects are public. A PENDING one has been vetted by nobody and a
+ * REJECTED one was explicitly refused, so neither should be readable by a stranger who
+ * guesses the id — and ids are sequential integers, so guessing is trivial. Serving them
+ * anyway left the approval queue decorative: the moderation gate sat on Discover's
+ * listing rather than on the project itself.
+ *
+ * `viewer` is req.user, which for the public routes comes from authOptional and is NULL
+ * for a signed-out visitor.
+ *
+ * ⚠️ This tests `status` and deliberately NOT `archived_at`. An archived project must
+ * stay readable — a backer who already invested still has a card linking to it, which is
+ * the documented reason these routes never 404 for archived rows.
+ */
+function assertVisibleTo(project, viewer) {
+
+    if (project.status === "APPROVED") {
+        return;
+    }
+
+    const isOwner =
+        viewer && Number(project.creator_id) === Number(viewer.id);
+
+    if (!isOwner && !isAdminRole(viewer?.roles)) {
+        // Deliberately the same message as a missing row. "This exists but is pending
+        // review" already tells a stranger the project exists.
+        throw new Error("Project not found");
+    }
+}
+
 // Create project
 async function createProject(userId, data) {
 
@@ -76,7 +108,10 @@ async function createProject(userId, data) {
         funding_usage: data.funding_usage || null,
         gallery: Array.isArray(data.gallery) ? data.gallery : [],
         // [{ title, desc }] — the highlights listed under "Our Solution".
-        solution_bullets: Array.isArray(data.solution_bullets) ? data.solution_bullets : []
+        solution_bullets: Array.isArray(data.solution_bullets) ? data.solution_bullets : [],
+        // A link to the pitch video. The wizard requires one; before 2026-08-18 there
+        // was no column and it was collected and dropped.
+        video_url: data.video_url || null
     };
 
     const createdProject =
@@ -95,7 +130,9 @@ async function getAllApprovedProjects() {
 }
 
 // Get project by ID
-async function getProjectById(id) {
+// `viewer` is req.user — from authOptional on the public route, and the admin's own
+// req.user on GET /admin/projects/:id. See assertVisibleTo for the rule.
+async function getProjectById(id, viewer = null) {
 
     const project = await projectRepository.findById(id);
 
@@ -103,12 +140,22 @@ async function getProjectById(id) {
         throw new Error("Project not found");
     }
 
+    assertVisibleTo(project, viewer);
+
     return project;
 }
 
 async function getMyProjects(userId) {
 
     return await projectRepository.findByCreatorId(userId);
+}
+
+// Backers of everything this creator owns. The creator id comes from the token, never
+// from the URL, so there is no project to check ownership against — a creator can only
+// ever ask for their own.
+async function getMyBackers(userId) {
+
+    return await projectRepository.findBackersByCreatorId(userId);
 }
 
 // Update project
@@ -139,7 +186,15 @@ async function updateProject(projectId, userId, data) {
         gallery: Array.isArray(data.gallery) ? data.gallery : project.gallery,
         solution_bullets: Array.isArray(data.solution_bullets)
             ? data.solution_bullets
-            : project.solution_bullets
+            : project.solution_bullets,
+        // Three cases, not two: field absent -> leave the column alone; field sent with
+        // text -> store it; field sent empty -> store NULL, not "". createProject already
+        // normalises the same way (`data.video_url || null`), and letting an edit write
+        // "" would leave two different values meaning "no video" in one column.
+        video_url:
+            data.video_url === undefined
+                ? project.video_url
+                : (data.video_url || null)
     };
 
     return await projectRepository.updateProject(projectId, updatedProject);
@@ -315,13 +370,17 @@ async function setProjectEndorsed(id, endorsed) {
 }
 
 // Comments are public to read and open to any signed-in user to write.
-async function getProjectComments(projectId) {
+async function getProjectComments(projectId, viewer = null) {
 
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
         throw new Error("Project not found");
     }
+
+    // Hiding the project but not its discussion would leave the same content readable
+    // one URL over.
+    assertVisibleTo(project, viewer);
 
     return await commentRepository.findByProjectId(projectId);
 }
@@ -386,13 +445,16 @@ async function deleteComment(userId, roles, commentId) {
 }
 
 // Anyone can read a project's updates — they are published on the public project page.
-async function getProjectUpdates(projectId) {
+async function getProjectUpdates(projectId, viewer = null) {
 
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
         throw new Error("Project not found");
     }
+
+    // Same reason as the comments above: the updates are the project's content.
+    assertVisibleTo(project, viewer);
 
     return await projectUpdateRepository.findByProjectId(projectId);
 }
@@ -549,6 +611,7 @@ module.exports = {
     getAllApprovedProjects,
     getProjectById,
     getMyProjects,
+    getMyBackers,
     updateProject,
     archiveProject,
     restoreProject,

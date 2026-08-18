@@ -121,6 +121,12 @@ CREATE TABLE projects (
     funding_usage     TEXT,
     -- Array of image URLs / data URIs uploaded in the create wizard.
     gallery           JSONB         NOT NULL DEFAULT '[]'::jsonb,
+    -- Link to the pitch video (YouTube/Vimeo play inline, anything else renders as a
+    -- link). Added 2026-08-18; the create wizard had required a video since the start
+    -- and there was nowhere to put it. A LINK, never a file — the wizard's video-upload
+    -- branch was removed with this, because a 50MB file base64'd into this row would
+    -- never have been sent anywhere.
+    video_url         TEXT,
     -- "RMIT Endorsed" badge. ADMIN-only (PATCH /projects/:id/endorse).
     endorsed          BOOLEAN       NOT NULL DEFAULT FALSE,
     -- ── Archive (soft delete). A SECOND axis, independent of `status` above.
@@ -257,9 +263,27 @@ CREATE INDEX idx_comments_project
 --    confusing when reading errors.
 --
 -- 6. Reward tiers have no table at all. CreateProject still lets a creator type
---    them and drops them on submit — one of the two remaining places the app
---    loses user input (the other is the video, item 7).
---    Suggested shape:
+--    them and drops them on submit — now the LAST place the app loses user input.
+--
+--    ⚠️ Do not build this from the table alone. A tier is a MINIMUM contribution
+--    (both forms already say so), and to report anything about tiers the system
+--    also has to record which tier a given investment bought. Three pieces:
+--
+--      a) the table below;
+--      b) a tier choice in the invest modal AND a tier_id on the transaction —
+--         `classcoin_transactions` has no tier column and BackerInvestmentModal
+--         has no concept of a tier, so without this the platform can never say
+--         which Class Coins belong to which tier;
+--      c) only then, any "distribution across tiers" view.
+--
+--    Store tier_id at investment time rather than deriving it from the amount:
+--    the creator can edit min_amount later, and derived buckets would silently
+--    rewrite history.
+--
+--    Also unresolved before (a): the two forms disagree on the shape. CreateProject
+--    collects a privileges[] list, EditProject collects one description textarea.
+--    Pick one; the sketch below assumes the textarea.
+--
 --      CREATE TABLE project_tiers (
 --        id          SERIAL PRIMARY KEY,
 --        project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -267,10 +291,9 @@ CREATE INDEX idx_comments_project
 --        min_amount  INTEGER NOT NULL,
 --        description TEXT
 --      );
+--      ALTER TABLE classcoin_transactions
+--        ADD COLUMN tier_id INTEGER REFERENCES project_tiers(id) ON DELETE SET NULL;
 --
--- 7. There is nowhere to store the video the create wizard REQUIRES. It is
---    collected and thrown away:
---      ALTER TABLE projects ADD COLUMN video_url TEXT;
---
---    (The admin's rejection feedback used to be listed here too. `review_note`
---     exists as of 2026-08-11 and is declared in the projects table above.)
+--    (Items 7 and the old review_note note are resolved and no longer listed.
+--     `review_note` landed 2026-08-11 and `video_url` on 2026-08-18; both are
+--     declared in the projects table above.)

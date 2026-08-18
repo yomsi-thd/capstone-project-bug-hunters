@@ -3,6 +3,7 @@ const router = express.Router();
 
 const projectController = require("../controllers/projectController");
 const authenticate = require("../middlewares/authMiddleware");
+const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
 
 // ADMIN is included on purpose: the team treats admin as a superuser, and the nav bar
@@ -17,7 +18,17 @@ router.get("/", projectController.getAllApprovedProjects);
 // The path is "/my" (no :id) — the controller reads the creator from req.user.id.
 router.get("/my", authenticate, projectController.getMyProjects);
 
-router.get("/:id", projectController.getProjectById);
+// Same rule as "/my" above: this has to stay ABOVE "/:id" or Express matches
+// "/:id/..." first. No authorize() — the creator comes from the token, so this can
+// only ever return the caller's own backers.
+router.get("/my/backers", authenticate, projectController.getMyBackers);
+
+// Public, but not blind: authOptional lets a signed-out visitor through with
+// req.user = null while still identifying anyone who did send a token. The service
+// needs that to keep PENDING and REJECTED projects visible to their creator and to
+// admins, and hidden from everyone else. Plain `authenticate` here would lock signed-out
+// visitors out of every project page, which is the opposite of what this route is for.
+router.get("/:id", authenticateOptional, projectController.getProjectById);
 
 router.put("/:id", authenticate, projectController.updateProject);
 
@@ -64,7 +75,10 @@ router.patch(
 
 // Comments: public to read, any signed-in user may post, only the author (or an admin)
 // may delete. Ownership is checked in the service, not by a role guard.
-router.get("/:id/comments", projectController.getProjectComments);
+// Public like the project itself, and optional-auth for the same reason: these are the
+// project's content, so hiding an unapproved project while leaving its discussion
+// readable one URL over would not hide anything.
+router.get("/:id/comments", authenticateOptional, projectController.getProjectComments);
 
 router.post(
     "/:id/comments",
@@ -80,7 +94,7 @@ router.delete(
 
 // Project updates. Reading is public (they show on the project page); posting and
 // deleting are checked against the project's creator inside the service.
-router.get("/:id/updates", projectController.getProjectUpdates);
+router.get("/:id/updates", authenticateOptional, projectController.getProjectUpdates);
 
 router.post(
     "/:id/updates",
