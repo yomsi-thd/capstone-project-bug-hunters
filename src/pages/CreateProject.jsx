@@ -8,9 +8,11 @@ import {
   CREATE_PROJECT_TIERS
 } from "../mock";
 import * as projectApi from "../api/projectApi";
+import { useAuth } from "../context/AuthContext";
+import { draftStorageKey } from "./draftStorageKey";
+import { isLinkable } from "../components/project/videoUrl";
 
 const MAX_GALLERY_IMAGES = 6;
-const DRAFT_STORAGE_KEY = "rmit-launchpad-create-project-draft";
 
 // Class Coins, not AUD. CC is an internal score with no real-world value, so it must
 // never be rendered as a currency — Intl's AUD style produced "$15,000", which read as
@@ -135,12 +137,6 @@ function serializeMedia(media) {
         }
       : null,
     videoUrl: media.videoUrl || "",
-    videoFile: media.videoFile
-      ? {
-          fileName: media.videoFile.file?.name ?? media.videoFile.fileName,
-          fileSize: media.videoFile.file?.size ?? media.videoFile.fileSize,
-        }
-      : null,
     galleryImages: (media.galleryImages || []).map(image => ({
       id: image.id,
       fileName: image.file?.name ?? image.fileName,
@@ -164,14 +160,9 @@ function restoreMedia(mediaDraft) {
         }
       : null,
     videoUrl: mediaDraft?.videoUrl || "",
-    videoFile: mediaDraft?.videoFile
-      ? {
-          file: {
-            name: mediaDraft.videoFile.fileName || "Uploaded video",
-            size: mediaDraft.videoFile.fileSize || 0,
-          },
-        }
-      : null,
+    // A draft saved before 2026-08-18 may still carry a videoFile key. It is ignored
+    // rather than restored: the upload control it came from is gone, and the file
+    // handle behind it did not survive the reload anyway.
     galleryImages: (mediaDraft?.galleryImages || []).map(image => ({
       id: image.id,
       file: {
@@ -184,11 +175,14 @@ function restoreMedia(mediaDraft) {
   };
 }
 
-function getStoredDraft() {
-  if (typeof window === "undefined") return null;
+// `key` comes from draftStorageKey(user.id) and is null when nobody is signed in — in
+// which case there is no drawer to read from, and reading a shared one is what leaked
+// drafts between accounts in the first place.
+function getStoredDraft(key) {
+  if (typeof window === "undefined" || !key) return null;
 
   try {
-    const storedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    const storedDraft = window.localStorage.getItem(key);
     return storedDraft ? JSON.parse(storedDraft) : null;
   } catch {
     return null;
@@ -207,11 +201,11 @@ function draftHasContent(draft) {
   return Boolean(draft.media?.coverImage) || (draft.media?.galleryImages || []).length > 0;
 }
 
-function saveDraftToStorage(draft) {
-  if (typeof window === "undefined") return;
+function saveDraftToStorage(key, draft) {
+  if (typeof window === "undefined" || !key) return;
 
   try {
-    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    window.localStorage.setItem(key, JSON.stringify(draft));
   } catch {
     // Ignore storage errors so the form still works if storage is unavailable.
   }
@@ -222,11 +216,11 @@ function saveDraftToStorage(draft) {
 // "New Project" again presented the project you just submitted, pre-filled and ready to
 // be submitted a second time.
 // Cancelling deliberately does NOT clear it — that is the case the draft exists for.
-function clearDraftFromStorage() {
-  if (typeof window === "undefined") return;
+function clearDraftFromStorage(key) {
+  if (typeof window === "undefined" || !key) return;
 
   try {
-    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    window.localStorage.removeItem(key);
   } catch {
     // Ignore storage errors — same reasoning as saveDraftToStorage.
   }
@@ -362,7 +356,6 @@ const STORY_FIELDS = [
 
 function Step2({ media, setMedia, story, setStory }) {
   const coverInputRef = useRef(null);
-  const videoInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
   const uploadCover = async event => {
@@ -376,12 +369,6 @@ function Step2({ media, setMedia, story, setStory }) {
     event.target.value = "";
   };
 
-  const uploadVideo = event => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setMedia(prev => ({ ...prev, videoFile: { file } }));
-    event.target.value = "";
-  };
 
   const uploadGallery = async event => {
     const files = Array.from(event.target.files || []);
@@ -540,24 +527,17 @@ function Step2({ media, setMedia, story, setStory }) {
           )}
         </div>
         <div>
+          {/* The "OR UPLOAD — MP4, MOV up to 50MB" control that used to sit under this
+              field is gone (2026-08-18). Images are stored base64 inside the project row
+              and a 50MB video would be ~67MB of JSON — far past even the raised 10mb body
+              limit — so a picked file was never sent anywhere. It offered the one route
+              through this required step that guaranteed the video was lost. It comes back
+              when uploads move to a real file store, alongside the images. */}
           <div className="text-[14px] font-bold text-gray-900 mb-1">Project Video</div>
-          <p className="text-[12px] text-gray-400 mb-3">Provide a YouTube/Vimeo URL or upload directly.</p>
-          <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Video URL (Recommended)</label>
+          <p className="text-[12px] text-gray-400 mb-3">Paste a link to your pitch video on YouTube or Vimeo.</p>
+          <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Video URL</label>
           <input value={media.videoUrl} onChange={e => setMedia(prev => ({ ...prev, videoUrl: e.target.value }))} placeholder="https://youtube.com/watch?v=..." className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors mb-2" />
-          {media.videoFile ? (
-            <div className="flex items-center justify-between gap-3 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 mb-2">
-              <div>
-                <div className="text-[13px] font-bold text-gray-900">{media.videoFile.file.name}</div>
-                <div className="text-[11px] text-gray-400">Uploaded video file</div>
-              </div>
-            </div>
-          ) : null}
-          <div className="text-center text-[12px] text-gray-300 my-2">OR UPLOAD</div>
-          <div className="flex items-center gap-3">
-            <input ref={videoInputRef} type="file" accept="video/*" className="hidden" onChange={uploadVideo} />
-            <button type="button" onClick={() => videoInputRef.current?.click()} className="bg-white border border-brand text-brand rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer hover:bg-red-50 transition-colors">↑ SELECT VIDEO FILE</button>
-            <span className="text-[11px] text-gray-300">MP4, MOV UP TO 50MB</span>
-          </div>
+          <p className="text-[11px] text-gray-400">Shown on your project page. Any other link is kept as a plain link.</p>
         </div>
         <div>
           <div className="text-[14px] font-bold text-gray-900 mb-1">Prototype Gallery</div>
@@ -808,7 +788,7 @@ function Step5({ basicData, story, media, team, tiers, onEdit }) {
             </div>
             <div>
               <div className="text-gray-400 text-[11px] font-bold tracking-widest mb-1">Project video</div>
-              <div>{media.videoUrl || fileLabel(media.videoFile) || "Not uploaded"}</div>
+              <div>{media.videoUrl || "Not provided"}</div>
             </div>
           </div>
           <div className="mt-4">
@@ -877,10 +857,16 @@ function Step5({ basicData, story, media, team, tiers, onEdit }) {
 }
 
 export default function CreateProject() {
-  const storedDraft = getStoredDraft();
+  // The draft is scoped to the signed-in account, so one person's half-written project
+  // is never handed to whoever signs in next on the same machine. Plain derived value,
+  // not a ref: user.id cannot change while this page is mounted (the route sits behind
+  // RequireAccess, and signing out unmounts it).
+  const { user } = useAuth();
+  const draftKey = draftStorageKey(user?.id);
+  const storedDraft = getStoredDraft(draftKey);
   const [step, setStep] = useState(storedDraft?.step ?? 1);
   const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", goal: "", proposition: "" });
-  const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", videoFile: null, galleryImages: [] });
+  const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", galleryImages: [] });
   const [story, setStory] = useState(
     storedDraft?.story
       ? { bullets: [], ...storedDraft.story }
@@ -914,7 +900,7 @@ export default function CreateProject() {
     // write the draft back over the one handleSubmit just cleared.
     if (isSubmitted) return;
 
-    saveDraftToStorage({
+    saveDraftToStorage(draftKey, {
       step,
       basicData,
       story,
@@ -922,7 +908,7 @@ export default function CreateProject() {
       team,
       tiers,
     });
-  }, [basicData, story, media, step, team, tiers, isSubmitted]);
+  }, [draftKey, basicData, story, media, step, team, tiers, isSubmitted]);
 
   useEffect(() => {
     if (!hasRestoredDraft) return;
@@ -951,7 +937,13 @@ export default function CreateProject() {
 
     if (targetStep === 2) {
       if (!media.coverImage) return "Upload a cover image before continuing.";
-      if (!hasText(media.videoUrl) && !media.videoFile) return "Add a project video URL or upload a video file before continuing.";
+      if (!hasText(media.videoUrl)) return "Add a link to your project video before continuing.";
+      // The field was required but accepted any text, so "abc" got past this step and was
+      // stored as the project's video — the detail page then had to render it as
+      // "this does not look like a valid video link". isLinkable is the same check that
+      // page uses to decide whether the value is safe to put in an href, so the form and
+      // the page can never disagree about what counts as a link.
+      if (!isLinkable(media.videoUrl)) return "That video link does not look like a web address — it should start with https://";
       if (media.galleryImages.length === 0) return "Upload at least one prototype gallery image before continuing.";
     }
 
@@ -1014,7 +1006,7 @@ export default function CreateProject() {
     // clicking SAVE DRAFT changes none of that effect's dependencies, the effect did not
     // re-run afterwards — so this write was the last one to land and the saved draft came
     // back from a reload with The Challenge / Our Solution / How Your Funding Helps blank.
-    saveDraftToStorage({
+    saveDraftToStorage(draftKey, {
       step,
       basicData,
       story,
@@ -1043,10 +1035,10 @@ export default function CreateProject() {
     setMessage("");
     try {
       // The backend accepts: title, description, category, goal_amount, image_url,
-      // team_members, challenge, solution, funding_usage (and start_date/end_date,
-      // which it defaults for us). There is still NO place for reward tiers, the
-      // video or the gallery.
-      // TODO: tiers are dropped on submit — there is no project_tiers table.
+      // team_members, challenge, solution, funding_usage, gallery, solution_bullets
+      // and video_url (plus start_date/end_date, which it defaults for us).
+      // TODO: tiers are still dropped on submit — there is no project_tiers table,
+      // and the team is deciding what a tier even means before one is built.
       // The column is funding_usage; the form calls the field `funding`.
       await projectApi.createProject({
         title: basicData.title.trim(),
@@ -1063,6 +1055,7 @@ export default function CreateProject() {
         gallery: media.galleryImages
           .map(img => img.dataUrl || img.preview)
           .filter(Boolean),
+        video_url: media.videoUrl.trim(),
         solution_bullets: story.bullets
           .filter(b => b.title.trim() && b.desc.trim())
           .map(b => ({ title: b.title.trim(), desc: b.desc.trim() })),
@@ -1070,7 +1063,7 @@ export default function CreateProject() {
 
       // Clear the saved draft BEFORE flipping isSubmitted, so there is no render in
       // between where the autosave effect could put it back.
-      clearDraftFromStorage();
+      clearDraftFromStorage(draftKey);
 
       setSubmitNote(
         tiers.length > 0
