@@ -7,18 +7,14 @@ import { getNavLinksForUser } from "../../mock/navLinks";
 
 function CCBadge({ ccBalance }) {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", gap: "6px",
-      border: "1px solid #ddd", borderRadius: "6px",
-      padding: "5px 10px", background: "#fff", flexShrink: 0,
-    }}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--color-brand)" }} strokeWidth="2.5">
+    <div className="flex shrink-0 items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2.5 py-[5px]">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="stroke-brand" strokeWidth="2.5">
         <circle cx="12" cy="12" r="10" />
         <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
       </svg>
-      <span style={{ fontSize: "12px", fontWeight: 700, color: "#111", whiteSpace: "nowrap" }}>
+      <span className="text-[12px] font-bold whitespace-nowrap text-neutral-900">
         BALANCE&nbsp;
-        <span style={{ color: "var(--color-brand)" }}>{ccBalance.toLocaleString()} CC</span>
+        <span className="text-brand">{ccBalance.toLocaleString()} CC</span>
       </span>
     </div>
   );
@@ -79,13 +75,10 @@ export default function Header(props = {}) {
       {/* Sticky header stack: the bar + the mobile/tablet search dropdown. The
           search dropdown lives in-flow here so it PUSHES page content down
           instead of covering the results it just filtered. */}
-      <div style={{ position: "sticky", top: 0, zIndex: 100 }}>
-      <nav style={{
-        background: "#fff", borderBottom: "1px solid #ececec",
-        padding: isMobile ? "0 16px" : "0 40px",
-        display: "flex", alignItems: "center", gap: isMobile ? "8px" : "16px",
-        height: "56px",
-      }}>
+      <div className="sticky top-0 z-100">
+      {/* ⚠️ h-14 is 56px and five sidebars offset themselves by exactly that with
+          `top-14`. Change one and the other five gain or lose a gap. */}
+      <nav className={`flex h-14 items-center border-b border-neutral-200 bg-white ${isMobile ? "gap-2 px-4" : "gap-4 px-10"}`}>
         {/* Sidebar toggle, dashboard pages only. Visibility is driven by Tailwind's
             `md:hidden` rather than this header's own isMobile/isDesktop, because it
             has to disappear at exactly the width where the sidebar stops sliding and
@@ -96,58 +89,46 @@ export default function Header(props = {}) {
         {onToggleSidebar && (
           <button
             onClick={onToggleSidebar}
-            className="md:hidden"
+            className="cursor-pointer rounded border-none bg-none p-1 text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 shrink-0 text-[20px] md:hidden"
             aria-label="Toggle sidebar"
-            style={{
-              background: "none", border: "none", cursor: "pointer", padding: "4px",
-              fontSize: "20px", color: "#444", borderRadius: "4px", flexShrink: 0,
-              transition: "background 0.15s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
-            onMouseLeave={e => e.currentTarget.style.background = "none"}
           >
             ☰
           </button>
         )}
 
         {/* Logo */}
-        <Link to="/" style={{ textDecoration: "none", flexShrink: 0, marginRight: "4px" }}>
-          <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", color: "var(--color-brand)", lineHeight: 1.1 }}>
-            RMIT<br /><span style={{ fontWeight: 400, fontSize: isMobile ? "12px" : "14px", color: "#111" }}>Launchpad</span>
+        <Link to="/" className="mr-1 shrink-0 no-underline">
+          <div className={`leading-[1.1] font-extrabold text-brand ${isMobile ? "text-[16px]" : "text-[18px]"}`}>
+            RMIT<br /><span className={`font-normal text-neutral-900 ${isMobile ? "text-[12px]" : "text-[14px]"}`}>Launchpad</span>
           </div>
         </Link>
 
         {/* Desktop nav links (tablet folds these into the hamburger to avoid overflow) */}
         {isDesktop && (
-          <div style={{ display: "flex", gap: "4px", flex: 1 }}>
+          <div className="flex flex-1 gap-1">
             {navLinks.map(({ label, path }) => (
               path.startsWith("#") ? (
                 <a
                   key={label} href={path}
-                  className="lp-navlink"
-                  style={{ fontSize: "14px", fontWeight: 400, padding: "6px 12px" }}
+                  className="lp-navlink px-3 py-1.5 text-[14px] font-normal"
                 >{label}</a>
               ) : (
                 <Link
                   key={label} to={path}
-                  className={isActive(path) ? "lp-navlink is-active" : "lp-navlink"}
-                  style={{
-                    fontSize: "14px", fontWeight: isActive(path) ? 600 : 400,
-                    padding: "6px 12px",
-                  }}
+                  className={`lp-navlink px-3 py-1.5 text-[14px] ${isActive(path) ? "is-active font-semibold" : "font-normal"}`}
                 >{label}</Link>
               )
             ))}
           </div>
         )}
 
-        {!isDesktop && <div style={{ flex: 1 }} />}
+        {!isDesktop && <div className="flex-1" />}
 
         {/* Desktop search */}
         {isDesktop && showSearch && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "6px 12px", width: "200px" }}>
+          <div className="flex items-center gap-2 rounded-md bg-[#f5f5f3] w-50 px-3 py-1.5">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." style={{ border: "none", background: "none", outline: "none", fontSize: "13px", color: "#333", width: "100%" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." className="w-full border-none bg-none text-neutral-800 outline-none text-[13px]" />
           </div>
         )}
 
@@ -155,9 +136,7 @@ export default function Header(props = {}) {
         {(isTablet || isMobile) && showSearch && (
           <button
             onClick={() => setSearchOpen(v => !v)}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: isMobile ? "4px" : "6px", fontSize: "18px", borderRadius: "4px", transition: "background 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
-            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            className={`cursor-pointer rounded border-none bg-none p-1 text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 text-[18px] ${isMobile ? "p-1" : "p-1.5"}`}
             aria-label="Toggle search"
           >🔍</button>
         )}
@@ -166,9 +145,7 @@ export default function Header(props = {}) {
         {isDesktop && !isLoggedIn && (
           <Link
             to="/login"
-            style={{ textDecoration: "none", fontSize: "13px", color: "#444", fontWeight: 500, flexShrink: 0, transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
-            onMouseLeave={e => e.currentTarget.style.color = "#444"}
+            className="shrink-0 text-[13px] font-medium text-neutral-700 no-underline transition-colors duration-150 hover:text-brand"
           >LOGIN</Link>
         )}
 
@@ -179,42 +156,19 @@ export default function Header(props = {}) {
             {canCreate && (
               <Link
                 to="/create-project"
-                style={{
-                  textDecoration: "none", background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
-                  fontSize: "13px", fontWeight: 700, padding: "8px 16px", letterSpacing: "0.03em", flexShrink: 0,
-                  transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = "#aa0000";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = "var(--color-brand)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
+                className="shrink-0 rounded-[5px] bg-brand px-4 py-2 text-[13px] font-bold tracking-[0.03em] text-white no-underline transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_3px_8px_rgba(204,0,0,0.3)]"
               >START A PROJECT</Link>
             )}
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+            <div className="flex shrink-0 items-center gap-1.5">
               <Avatar name={userName} size={30} max={1} fallback="U" />
               <Link
                 to="/account"
-                style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500, transition: "color 0.15s" }}
-                onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
-                onMouseLeave={e => e.currentTarget.style.color = "#333"}
+                className="text-[13px] font-medium text-neutral-800 no-underline transition-colors duration-150 hover:text-brand"
               >Account</Link>
             </div>
             <button
               onClick={onLogout}
-              style={{
-                display: "flex", alignItems: "center", gap: "4px",
-                background: "none", border: "none", cursor: "pointer",
-                fontSize: "13px", color: "#666", fontWeight: 500, padding: 0, flexShrink: 0,
-                transition: "color 0.15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
-              onMouseLeave={e => e.currentTarget.style.color = "#666"}
+              className="flex shrink-0 cursor-pointer items-center gap-1 border-none bg-none p-0 text-[13px] font-medium text-neutral-600 transition-colors duration-150 hover:text-brand"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
               Logout
@@ -226,9 +180,7 @@ export default function Header(props = {}) {
         {isTablet && !isLoggedIn && (
           <Link
             to="/login"
-            style={{ textDecoration: "none", fontSize: "12px", color: "#444", fontWeight: 500, whiteSpace: "nowrap", transition: "color 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
-            onMouseLeave={e => e.currentTarget.style.color = "#444"}
+            className="text-[12px] font-medium whitespace-nowrap text-neutral-700 no-underline transition-colors duration-150 hover:text-brand"
           >LOGIN</Link>
         )}
 
@@ -236,20 +188,14 @@ export default function Header(props = {}) {
         {isTablet && isLoggedIn && (
           <>
             {showBalance && (
-              <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--color-brand)", whiteSpace: "nowrap" }}>
+              <div className="text-[12px] font-bold whitespace-nowrap text-brand">
                 {ccBalance.toLocaleString()} CC
               </div>
             )}
             {canCreate && (
               <Link
                 to="/create-project"
-                style={{
-                  textDecoration: "none", background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
-                  fontSize: "12px", fontWeight: 700, padding: "7px 12px", whiteSpace: "nowrap",
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
+                className="rounded-[5px] bg-brand px-3 py-[7px] text-[12px] font-bold whitespace-nowrap text-white no-underline transition-colors duration-150 hover:bg-brand-dark"
               >START A PROJECT</Link>
             )}
             <Avatar name={userName} size={30} max={1} fallback="U" />
@@ -260,9 +206,7 @@ export default function Header(props = {}) {
         {!isDesktop && (
           <button
             onClick={() => setMenuOpen(v => !v)}
-            style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", fontSize: "22px", color: "#444", borderRadius: "4px", transition: "background 0.15s" }}
-            onMouseEnter={e => e.currentTarget.style.background = "#f3f3f3"}
-            onMouseLeave={e => e.currentTarget.style.background = "none"}
+            className="cursor-pointer rounded border-none bg-none p-1 text-neutral-700 transition-colors duration-150 hover:bg-neutral-100 text-[22px]"
             aria-label="Toggle menu"
           >
             {menuOpen ? "✕" : "☰"}
@@ -273,13 +217,10 @@ export default function Header(props = {}) {
       {/* Search dropdown (mobile/tablet) — in-flow inside the sticky header so it
           pushes content down (never covers results) and rides with the nav. */}
       {(isMobile || isTablet) && showSearch && searchOpen && (
-        <div style={{
-          background: "#fff", borderBottom: "1px solid #ececec", padding: "10px 16px",
-          boxShadow: "0 8px 16px rgba(0,0,0,0.08)",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "#f5f5f3", borderRadius: "6px", padding: "8px 12px" }}>
+        <div className="border-b border-neutral-200 bg-white px-4 py-2.5 shadow-[0_8px_16px_rgba(0,0,0,0.08)]">
+          <div className="flex items-center gap-2 rounded-md bg-[#f5f5f3] px-3 py-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." autoFocus style={{ border: "none", background: "none", outline: "none", fontSize: "14px", color: "#333", width: "100%" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search projects..." autoFocus className="w-full border-none bg-none text-neutral-800 outline-none text-[14px]" />
           </div>
         </div>
       )}
@@ -289,97 +230,52 @@ export default function Header(props = {}) {
           balance/create/login controls already sit on the bar, so those blocks
           below are gated to mobile-only. Fixed overlay under the sticky nav so it
           shows at the current scroll position instead of the top of the page. */}
+      {/* ⚠️ Fixed, and one z BELOW the nav — the bar has to stay on top of its own
+          menu. top-14 and the max-height both track the 56px bar. */}
       {!isDesktop && menuOpen && (
-        <div style={{
-          background: "#fff", borderBottom: "1px solid #ececec", padding: "8px 16px 16px",
-          position: "fixed", top: "56px", left: 0, right: 0, zIndex: 99,
-          maxHeight: "calc(100vh - 56px)", overflowY: "auto",
-          boxShadow: "0 8px 16px rgba(0,0,0,0.08)",
-        }}>
+        <div className="fixed top-14 right-0 left-0 z-99 max-h-[calc(100vh-56px)] overflow-y-auto border-b border-neutral-200 bg-white px-4 pt-2 pb-4 shadow-[0_8px_16px_rgba(0,0,0,0.08)]">
           {navLinks.map(({ label, path }) => (
             path.startsWith("#") ? (
               <a
                 key={label} href={path} onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
-                  fontWeight: 400, color: "#444", borderBottom: "1px solid #f5f5f5",
-                  transition: "background 0.15s, padding-left 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+                className="block border-b border-neutral-100 py-2.5 pl-1 no-underline transition-[background,padding-left] duration-150 hover:bg-neutral-50 hover:pl-2.5 pr-1 text-[15px] font-normal text-neutral-700"
               >{label}</a>
             ) : (
               <Link
                 key={label} to={path} onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "block", textDecoration: "none", padding: "10px 4px", fontSize: "15px",
-                  fontWeight: isActive(path) ? 700 : 400,
-                  color: isActive(path) ? "var(--color-brand)" : "#444",
-                  borderBottom: "1px solid #f5f5f5",
-                  transition: "background 0.15s, padding-left 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+                className={`block border-b border-neutral-100 py-2.5 pl-1 no-underline transition-[background,padding-left] duration-150 hover:bg-neutral-50 hover:pl-2.5 pr-1 text-[15px] ${isActive(path) ? "font-bold text-brand" : "font-normal text-neutral-700"}`}
               >{label}</Link>
             )
           ))}
 
           {isMobile && !isLoggedIn && (
-            <div style={{ marginTop: "12px" }}>
-              <Link
-                to="/login" onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "block", textAlign: "center", textDecoration: "none", background: "var(--color-brand)",
-                  color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
-                  transition: "background 0.15s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
-              >LOGIN</Link>
+            <div className="mt-3">
+              <Link to="/login" onClick={() => setMenuOpen(false)} className="block rounded-[5px] bg-brand p-2.5 text-center text-[13px] font-bold text-white no-underline transition-colors duration-150 hover:bg-brand-dark">LOGIN</Link>
             </div>
           )}
 
           {isLoggedIn && (
-            <div style={{ marginTop: "12px" }}>
+            <div className="mt-3">
               {/* Balance + Start already sit on the tablet bar, so show them in
                   the menu on mobile only; Account + Logout show on both. */}
               {isMobile && showBalance && (
-                <div style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-brand)", padding: "8px 4px", borderBottom: "1px solid #f5f5f5" }}>
+                <div className="border-b border-neutral-100 px-1 py-2 text-[13px] font-bold text-brand">
                   Balance: {ccBalance.toLocaleString()} CC
                 </div>
               )}
               {isMobile && canCreate && (
                 <Link
                   to="/create-project" onClick={() => setMenuOpen(false)}
-                  style={{
-                    display: "block", textAlign: "center", textDecoration: "none", background: "var(--color-brand)",
-                    color: "#fff", borderRadius: "5px", padding: "10px", fontSize: "13px", fontWeight: 700,
-                    margin: "10px 0", transition: "background 0.15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = "#aa0000"}
-                  onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
+                  className="block rounded-[5px] bg-brand p-2.5 text-center text-[13px] font-bold text-white no-underline transition-colors duration-150 hover:bg-brand-dark my-2.5"
                 >START A PROJECT</Link>
               )}
               <Link
                 to="/account" onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "block", textDecoration: "none", padding: "10px 4px",
-                  fontSize: "14px", color: "#333", borderBottom: "1px solid #f5f5f5",
-                  transition: "background 0.15s, padding-left 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+                className="block border-b border-neutral-100 py-2.5 pl-1 no-underline transition-[background,padding-left] duration-150 hover:bg-neutral-50 hover:pl-2.5 pr-1 text-[14px] text-neutral-800"
               >Account</Link>
               <button
                 onClick={() => { setMenuOpen(false); onLogout?.(); }}
-                style={{
-                  display: "block", width: "100%", textAlign: "left", background: "none",
-                  border: "none", padding: "10px 4px", fontSize: "14px", color: "var(--color-brand)",
-                  cursor: "pointer", fontWeight: 600,
-                  transition: "background 0.15s, padding-left 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#fafafa"; e.currentTarget.style.paddingLeft = "10px"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.paddingLeft = "4px"; }}
+                className="block w-full cursor-pointer border-none bg-none py-2.5 pr-1 pl-1 text-left text-[14px] font-semibold text-brand transition-[background,padding-left] duration-150 hover:bg-neutral-50 hover:pl-2.5"
               >Logout</button>
             </div>
           )}
