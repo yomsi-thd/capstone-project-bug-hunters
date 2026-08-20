@@ -1,6 +1,23 @@
 @import "tailwindcss";
-@theme {
+/* `static` là bắt buộc, không phải cho gọn.
+   Mặc định Tailwind 4 chỉ phát ra biến nào có utility tương ứng được DÙNG trong mã nguồn.
+   Nhưng repo này có 124 chỗ viết `var(--color-brand)` thẳng trong inline style, mà trình
+   quét của Tailwind không coi đó là "đã dùng" — cả 124 chỗ đang sống nhờ tác dụng phụ:
+   Khôi tình cờ dùng class `bg-brand`/`text-brand` ở CreatorSidebar và PostUpdateModal.
+   Ngày nào hai file đó bỏ class ấy đi, 124 chỗ kia IM LẶNG mất màu.
+   Kiểm ngày 20/08: bỏ `static` thì --color-brand-dark và --color-surface không hề xuất
+   hiện trong CSS build ra. `static` phát ra mọi biến, bất kể có utility nào dùng hay không. */
+@theme static {
   --color-brand: #cc0000;
+
+  /* 23 chỗ trong src/ gõ #a00 — luôn là brand tối cho trạng thái hover. Đặt tên ở đây để
+     không ai gõ lại hex và trôi dần thành #a10000. */
+  --color-brand-dark: #aa0000;
+
+  /* 11 chỗ gõ #f7f7f5 — nền kem của app. KHÔNG thay bằng neutral-50 (#fafafa) hay
+     gray-50 (#f9fafb): cả hai lạnh hơn thấy rõ trên mảng lớn, mà đây là màu nền nên nó
+     phủ diện tích lớn nhất màn hình. */
+  --color-surface: #f7f7f5;
 }
 :root {
   --text: #6b6375;
@@ -19,7 +36,16 @@
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
+  /* KHÔNG đặt lại font-size ở :root. Tailwind v4 tính mọi khoảng cách và cỡ chữ theo
+     `rem`, nên dòng `font: 18px/145%` từng ở đây phóng toàn bộ thang đo lên 12,5%, và khối
+     media query đi kèm (16px từ 1024px xuống) làm 864 chỗ khoảng cách trên các trang
+     creator/admin NHẢY 12,5% mỗi lần cửa sổ qua đúng mốc đó.
+     Đo trên app đang chạy ngày 20/08, trước khi gỡ: text-sm = 15,75px thay vì 14px,
+     md:p-8 = 36px thay vì 32px, w-48 = 216px thay vì 192px, và top-14 = 63px trong khi
+     header cao đúng 56px — tức là một khe trắng 7px dưới thanh nav ở 5 chỗ.
+     Cả hai dòng đến từ template Vite, không phải từ thiết kế. Gỡ ngày 20/08. */
+  font-family: var(--sans);
+  line-height: 145%;
   letter-spacing: 0.18px;
   /* Light-only on purpose. Every page hardcodes a light background (bg-gray-100,
      #fff cards), so honouring the OS dark theme only flipped the text colours and
@@ -31,10 +57,6 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
 /* The dark-theme override that used to sit here was removed on 2026-08-06.
@@ -106,8 +128,7 @@ p {
   margin: 0;
 }
 
-code,
-.counter {
+code {
   font-family: var(--mono);
   display: inline-flex;
   border-radius: 4px;
@@ -121,77 +142,14 @@ code {
   background: var(--code-bg);
 }
 
-.home-page {
-  width: 100%;
-}
-
-@media (max-width: 1200px) {
-  .home-content {
-    max-width: 100%;
-  }
-
-  .home-hero-grid {
-    grid-template-columns: minmax(0, 1fr) 280px !important;
-  }
-
-  .home-trending-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-
-  .home-fresh-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
-}
-
-@media (max-width: 900px) {
-  .home-navbar {
-    flex-wrap: wrap !important;
-    height: auto !important;
-    padding: 16px 20px !important;
-    gap: 12px !important;
-    align-items: flex-start !important;
-  }
-
-  .home-nav-links {
-    flex: 1 1 100% !important;
-    order: 3;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .home-search {
-    width: 100% !important;
-    order: 4;
-  }
-
-  .home-content {
-    padding: 24px 18px !important;
-  }
-
-  .home-hero-grid {
-    grid-template-columns: 1fr !important;
-    grid-template-rows: auto !important;
-  }
-
-  .home-fresh-header {
-    flex-direction: column;
-    align-items: flex-start !important;
-    gap: 12px;
-  }
-
-  .home-filter-group {
-    flex-wrap: wrap;
-  }
-
-  .home-footer {
-    padding: 32px 20px 24px !important;
-  }
-
-  .home-footer-inner {
-    flex-direction: column;
-    gap: 20px;
-  }
-}
+/* Khối .home-* và .counter bị xoá ngày 20/08 (13 class + .counter).
+   Chúng đến từ Home.jsx (xoá 28/07) và template Vite; không file .jsx nào còn tham chiếu.
+   Kiểm lại bất cứ lúc nào:
+     for c in $(grep -o '^\s*\.[a-z-]*' src/index.css | tr -d ' .' | sort -u); do
+       [ "$(grep -rl "$c" src --include=*.jsx | wc -l)" -eq 0 ] && echo "chet: .$c"
+     done
+   Không phải rác vô hại: chúng dùng !important bên trong media query, nên một class trùng
+   tên đặt sau này sẽ bị đè mà không hiểu vì sao. Các lớp .lp-* thì đang dùng thật — giữ. */
 
 /* ============================================================
    Shared motion system — one animation vocabulary for the app.
@@ -265,38 +223,3 @@ code {
   .lp-navlink { transition: none; }
 }
 
-@media (max-width: 640px) {
-  .home-content {
-    padding: 20px 14px !important;
-  }
-
-  .home-trending-grid,
-  .home-fresh-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  .home-navbar {
-    padding: 14px 14px 16px !important;
-  }
-
-  .home-navbar button {
-    white-space: nowrap;
-  }
-
-  .home-nav-links {
-    gap: 0 !important;
-  }
-
-  .home-search {
-    order: 4;
-  }
-
-  .home-hero-grid > div:first-child {
-    min-height: 300px !important;
-  }
-
-  .home-hero-grid > div:nth-child(2),
-  .home-hero-grid > div:nth-child(3) {
-    height: 180px !important;
-  }
-}
