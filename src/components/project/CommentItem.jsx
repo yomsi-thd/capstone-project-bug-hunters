@@ -1,8 +1,11 @@
 import Avatar from "../ui/Avatar";
 
+// Indigo for BACKER, brand red for CREATOR. Deliberately NOT ui/Badge's tone vocabulary:
+// these two are not "success" or "danger", they are two sides of a relationship, and the
+// indigo exists so the creator's replies stand out in a thread of backers.
 const ROLE_STYLES = {
-  BACKER: { background: "#eef2ff", color: "#4f46e5" },
-  CREATOR: { background: "#fff1f1", color: "var(--color-brand)" },
+  BACKER: "bg-indigo-50 text-indigo-600",
+  CREATOR: "bg-red-50 text-brand",
 };
 
 // The commenter's relationship to THIS project — not their account role.
@@ -16,14 +19,9 @@ const ROLE_STYLES = {
 // their account roles instead "would badge everyone BACKER and make it meaningless."
 function CommentRoleBadge({ role }) {
   if (!role) return null;
-  const style = ROLE_STYLES[role] || { background: "#f3f4f6", color: "#555" };
+  const tone = ROLE_STYLES[role] || "bg-neutral-100 text-neutral-600";
   return (
-    <span style={{
-      ...style,
-      fontSize: "10px", fontWeight: 700,
-      letterSpacing: "0.06em", padding: "2px 7px",
-      borderRadius: "4px", flexShrink: 0,
-    }}>
+    <span className={`shrink-0 rounded px-[7px] py-0.5 text-[10px] font-bold tracking-[0.06em] ${tone}`}>
       {role}
     </span>
   );
@@ -31,19 +29,18 @@ function CommentRoleBadge({ role }) {
 
 export default function CommentItem({ comment, isReply = false }) {
   return (
-    <div style={{
-      display: "flex", gap: "12px",
-      paddingLeft: isReply ? "46px" : "0",
-      marginTop: isReply ? "12px" : "0",
-    }}>
+    // 46px is the avatar (34px) plus the 12px gap, so a reply lines up under the parent's
+    // text rather than under its avatar. CommentList repeats the same offset for the reply
+    // box and the Reply button.
+    <div className={`flex gap-3 ${isReply ? "mt-3 pl-[46px]" : "mt-0 pl-0"}`}>
       <Avatar name={comment.author} size={34} max={1} />
-      <div style={{ flex: 1 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>{comment.author}</span>
+      <div className="flex-1">
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <span className="text-[14px] font-bold text-neutral-900">{comment.author}</span>
           <CommentRoleBadge role={comment.role} />
-          <span style={{ fontSize: "12px", color: "#aaa" }}>• {comment.time}</span>
+          <span className="text-[12px] text-neutral-400">• {comment.time}</span>
         </div>
-        <p style={{ margin: 0, fontSize: "14px", color: "#444", lineHeight: 1.6 }}>
+        <p className="m-0 text-[14px] leading-relaxed text-neutral-700">
           {comment.text}
         </p>
       </div>
