@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
+import { initials } from "../components/ui/initials";
 import CommentList from "../components/project/CommentList";
 import ProjectVideo from "../components/project/ProjectVideo";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
@@ -370,7 +371,7 @@ export default function ProjectDetail() {
                 display: "flex", alignItems: "center", justifyContent: "center",
                 fontSize: "13px", fontWeight: 700, color: "#666", flexShrink: 0,
               }}>
-                {p.creator?.name?.charAt(0) ?? "?"}
+                {initials(p.creator?.name, { max: 1 }) || "?"}
               </div>
               <div>
                 {/* GET /projects/:id joins users for the name and title. Both fallbacks

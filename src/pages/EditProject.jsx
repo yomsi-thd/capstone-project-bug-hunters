@@ -9,6 +9,7 @@ import {
 import * as projectApi from "../api/projectApi";
 import { isLinkable } from "../components/project/videoUrl";
 import SupportLevels from "../components/project/SupportLevels";
+import { initials } from "../components/ui/initials";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
 import { toTier } from "../api/mappers";
 
@@ -123,11 +124,11 @@ function TabTeam({ team, setTeam }) {
       <div className="text-[13px] font-bold text-gray-900">Current Team</div>
       <div className="flex flex-col gap-2">
         {team.map(m => {
-          const initials = m.name.split(" ").map(n => n[0]).slice(0, 2).join("");
+          const initialsText = initials(m.name);
           return (
             <div key={m.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-2 sm:gap-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initials}</div>
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initialsText}</div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[13px] font-semibold text-gray-900">{m.name}</span>

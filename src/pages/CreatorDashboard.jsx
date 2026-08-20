@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
+import { initials } from "../components/ui/initials";
 import * as projectApi from "../api/projectApi";
 import { toNumber, fundedPercent, toBacker } from "../api/mappers";
 
@@ -215,7 +216,7 @@ export default function CreatorDashboard() {
                       className={`flex items-center gap-3 py-2.5 ${i < backers.length - 1 ? "border-b border-gray-100" : ""}`}
                     >
                       <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-500 shrink-0">
-                        {b.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
+                        {initials(b.name)}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 min-w-0">

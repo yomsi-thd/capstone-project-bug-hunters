@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import useBreakpoint, { BREAKPOINTS } from "../../hooks/useBreakpoint";
 import { useAuth } from "../../context/AuthContext";
+import { initials } from "../ui/initials";
 import { getNavLinksForUser } from "../../mock/navLinks";
 
 function CCBadge({ ccBalance }) {
@@ -31,7 +32,7 @@ function Avatar({ userName }) {
       display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: "11px", fontWeight: 700, color: "#555", flexShrink: 0,
     }}>
-      {userName ? userName.charAt(0).toUpperCase() : "U"}
+      {initials(userName, { max: 1 }) || "U"}
     </div>
   );
 }

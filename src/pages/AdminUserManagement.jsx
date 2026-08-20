@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
+import { initials } from "../components/ui/initials";
 import * as adminApi from "../api/adminApi";
 import { toAdminUser } from "../api/mappers";
 import { useAuth } from "../context/AuthContext";
@@ -17,10 +18,6 @@ const ROLE_HINTS = {
   CREATOR: "Starts projects and posts updates on them.",
   BACKER:  "Holds a Class Coin balance and can invest in projects.",
 };
-
-function getInitials(name) {
-  return name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
-}
 
 // users.is_active is a boolean, so these are the only two states that exist. The page
 // used to offer "Pending" and "Suspended" as well — neither the schema nor any endpoint
@@ -102,7 +99,7 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
             </div>
             <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-[13px] font-bold text-gray-600 shrink-0">
-                {getInitials(user.name)}
+                {initials(user.name)}
               </div>
               <div className="min-w-0">
                 <div className="text-[13px] font-bold text-gray-900 truncate">{user.name}</div>
@@ -402,7 +399,7 @@ export default function AdminUserManagement() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-[12px] font-bold text-gray-600 shrink-0">
-                            {getInitials(u.name)}
+                            {initials(u.name)}
                           </div>
                           <div className="min-w-0">
                             <div className="text-[13px] font-bold text-gray-900">{u.name}</div>

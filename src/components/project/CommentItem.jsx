@@ -1,3 +1,5 @@
+import { initials } from "../ui/initials";
+
 const ROLE_STYLES = {
   BACKER: { background: "#eef2ff", color: "#4f46e5" },
   CREATOR: { background: "#fff1f1", color: "var(--color-brand)" },
@@ -26,7 +28,7 @@ function AuthorAvatar({ name }) {
       display: "flex", alignItems: "center", justifyContent: "center",
       fontSize: "12px", fontWeight: 700, color: "#666", flexShrink: 0,
     }}>
-      {name.charAt(0).toUpperCase()}
+      {initials(name, { max: 1 })}
     </div>
   );
 }

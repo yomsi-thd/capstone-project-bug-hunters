@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
+import { initials } from "../components/ui/initials";
 import * as adminApi from "../api/adminApi";
 import * as projectApi from "../api/projectApi";
 import { toApprovalProject, toCreatorRequest, toTier } from "../api/mappers";
@@ -149,10 +150,10 @@ function ProjectReview({ project, onBack, onApprove, onReject }) {
                   // team_members is free-form jsonb — a row may hold a bare string, or an
                   // object with no name at all. Neither must take the screen down.
                   const name = (typeof m === "string" ? m : m?.name) || "Unnamed member";
-                  const initials = name.split(" ").map(n => n[0]).join("").slice(0, 2);
+                  const initialsText = initials(name);
                   return (
                     <div key={m?.id ?? idx} className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initials}</div>
+                      <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-[11px] font-bold shrink-0">{initialsText}</div>
                       <div>
                         <div className="text-[12px] font-semibold text-gray-900">{name}</div>
                         <div className="text-[10px] text-gray-400">
@@ -458,7 +459,7 @@ export default function AdminApprovals() {
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
                           <div className="w-9 h-9 rounded-full bg-brand text-white flex items-center justify-center text-[12px] font-bold shrink-0">
-                            {r.name.charAt(0).toUpperCase()}
+                            {initials(r.name, { max: 1 })}
                           </div>
                           <div>
                             <div className="text-[13px] font-bold text-gray-900 leading-snug">{r.name}</div>
