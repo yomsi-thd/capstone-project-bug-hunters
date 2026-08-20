@@ -14,54 +14,40 @@ import { toCard } from "../api/mappers";
 
 function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner, onEdit }) {
   return (
-    <Link to={`/project/${project.id}`} style={{ textDecoration: "none", color: "inherit", ...style }}>
-      <div
-        style={{ position: "relative", borderRadius: "10px", overflow: "hidden", cursor: "pointer", height: "100%", transition: "transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease" }}
-        onMouseEnter={e => {
-          e.currentTarget.style.filter = "brightness(1.05)";
-          e.currentTarget.style.transform = "translateY(-3px)";
-          e.currentTarget.style.boxShadow = "0 12px 28px rgba(0,0,0,0.18)";
-          const img = e.currentTarget.querySelector("img");
-          if (img) img.style.transform = "scale(1.06)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.filter = "none";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-          const img = e.currentTarget.querySelector("img");
-          if (img) img.style.transform = "scale(1)";
-        }}
-      >
+    // `style` is the grid placement the caller computes, so it stays inline.
+    <Link to={`/project/${project.id}`} className="text-inherit no-underline" style={style}>
+      {/* `group` replaces a pair of handlers that reached into the DOM with
+          querySelector("img") to scale the photo on hover. group-hover states the same
+          thing declaratively, and cannot go looking for an element that is not there. */}
+      <div className="group relative h-full cursor-pointer overflow-hidden rounded-[10px] transition-[transform,box-shadow,filter] duration-250 ease-out hover:-translate-y-[3px] hover:brightness-105 hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
         <img
           src={project.img}
           alt={project.title}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", transition: "transform 0.4s ease" }}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-[400ms] ease-out group-hover:scale-[1.06]"
         />
-        <div style={{
-          position: "absolute", inset: 0,
-          background: showDesc
-            ? "linear-gradient(to top, rgba(0,0,0,0.88) 40%, rgba(0,0,0,0.08) 100%)"
-            : "linear-gradient(to top, rgba(0,0,0,0.72) 50%, rgba(0,0,0,0.1) 100%)",
-        }} />
-        <div style={{
-          position: "absolute",
-          ...(showDesc
-            ? { bottom: "28px", left: "28px", right: "28px" }
-            : { bottom: "14px", left: "14px", right: "14px" }),
-        }}>
+        {/* The big card carries a heavier wash because it also holds body text; the two
+            small ones only need enough to keep a title legible. */}
+        <div
+          className={`absolute inset-0 ${
+            showDesc
+              ? "bg-[linear-gradient(to_top,rgba(0,0,0,0.88)_40%,rgba(0,0,0,0.08)_100%)]"
+              : "bg-[linear-gradient(to_top,rgba(0,0,0,0.72)_50%,rgba(0,0,0,0.1)_100%)]"
+          }`}
+        />
+        <div className={`absolute ${showDesc ? "right-7 bottom-7 left-7" : "right-3.5 bottom-3.5 left-3.5"}`}>
           <Tag label={project.tag} />
-          <h3 style={{
-            margin: showDesc ? "8px 0 6px" : "6px 0 0",
-            fontSize: showDesc ? "26px" : "15px",
-            fontWeight: showDesc ? 800 : 700,
-            color: "#fff",
-            lineHeight: showDesc ? 1.2 : 1.3,
-          }}>
+          <h3
+            className={`text-white ${
+              showDesc
+                ? "mx-0 mt-2 mb-1.5 text-[26px] leading-[1.2] font-extrabold"
+                : "mx-0 mt-1.5 mb-0 text-[15px] leading-[1.3] font-bold"
+            }`}
+          >
             {project.title}
           </h3>
 
           {showDesc && project.desc && (
-            <p style={{ margin: "0 0 16px", fontSize: "13px", color: "rgba(255,255,255,0.8)", lineHeight: 1.6 }}>
+            <p className="mx-0 mt-0 mb-4 text-[13px] leading-relaxed text-white/80">
               {project.desc}
             </p>
           )}
@@ -75,57 +61,28 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner
             <span
               role="button"
               onClick={e => { e.preventDefault(); e.stopPropagation(); onEdit(); }}
-              style={{
-                display: "inline-flex", alignItems: "center", gap: "6px",
-                background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
-                fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
-                padding: "8px 18px", cursor: "pointer",
-                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#aa0000";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "var(--color-brand)";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] bg-brand px-[18px] py-2 text-[11px] font-bold tracking-[0.08em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.35)]"
             >
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
               EDIT THIS PROJECT
             </span>
           ) : showDesc && canInvest ? (
             <span
-              style={{
-                display: "inline-block",
-                background: "var(--color-brand)", color: "#fff", borderRadius: "5px",
-                fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em",
-                padding: "8px 18px", cursor: "pointer",
-                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#aa0000";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "var(--color-brand)";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-[5px] bg-brand px-[18px] py-2 text-[11px] font-bold tracking-[0.08em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.35)]"
             >
               INVEST IN THIS PROJECT
             </span>
           ) : null}
 
           {showFundingBar && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-              <div style={{ flex: 1, height: "3px", background: "rgba(255,255,255,0.3)", borderRadius: "2px" }}>
-                <div style={{ width: `${Math.min(project.funded, 100)}%`, height: "100%", background: "var(--color-brand)", borderRadius: "2px" }} />
+            <div className="mt-1 flex items-center gap-2">
+              <div className="h-[3px] flex-1 rounded-sm bg-white/30">
+                <div
+                  className="h-full rounded-sm bg-brand"
+                  style={{ width: `${Math.min(project.funded, 100)}%` }}
+                />
               </div>
-              <span style={{ fontSize: "11px", color: "#fff", fontWeight: 600 }}>{project.funded}%</span>
+              <span className="text-[11px] font-semibold text-white">{project.funded}%</span>
             </div>
           )}
         </div>
@@ -171,13 +128,13 @@ const SORTS = [
 // Shared notice block for the loading / error / empty states.
 function StatusBlock({ title, detail, actionLabel, onAction }) {
   return (
-    <div style={{
-      background: "#fff", border: "1px solid #eee", borderRadius: "10px",
-      padding: "40px 24px", textAlign: "center", marginBottom: "32px",
-    }}>
-      <h2 style={{ margin: 0, fontSize: "17px", fontWeight: 800, color: "#111" }}>{title}</h2>
+    // ⚠️ Deliberately NOT ui/EmptyState. This is a bordered CARD and it also carries the
+    // loading and error states, not just "there is nothing here" — folding it in would
+    // lose the card and blur three different situations into one look.
+    <div className="mb-8 rounded-[10px] border border-neutral-100 bg-white px-6 py-10 text-center">
+      <h2 className="m-0 text-[17px] font-extrabold text-neutral-900">{title}</h2>
       {detail && (
-        <p style={{ margin: "8px auto 0", fontSize: "13px", color: "#888", maxWidth: "460px", lineHeight: 1.6 }}>
+        <p className="mx-auto mt-2 mb-0 max-w-[460px] text-[13px] leading-relaxed text-neutral-500">
           {detail}
         </p>
       )}
@@ -185,22 +142,7 @@ function StatusBlock({ title, detail, actionLabel, onAction }) {
         <button
           type="button"
           onClick={onAction}
-          style={{
-            marginTop: "18px", background: "var(--color-brand)", color: "#fff",
-            border: "none", borderRadius: "5px", fontSize: "11px", fontWeight: 700,
-            letterSpacing: "0.08em", padding: "10px 22px", cursor: "pointer",
-            transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = "#aa0000";
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.35)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = "var(--color-brand)";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "none";
-          }}
+          className="mt-[18px] cursor-pointer rounded-[5px] border-none bg-brand px-[22px] py-2.5 text-[11px] font-bold tracking-[0.08em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.35)]"
         >
           {actionLabel}
         </button>
@@ -325,7 +267,7 @@ export default function Discover() {
   const GAP = 12;
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+    <div className="min-h-screen bg-surface text-neutral-900">
 
       <Header
         search={search}
@@ -341,7 +283,11 @@ export default function Discover() {
 
       {/* overflowAnchor:none — hiding Hero/Trending on search must not trigger
           the browser's scroll-anchoring, which would fight our scroll-to-top. */}
-      <div style={{ maxWidth: "1100px", margin: "0 auto", padding: pad, overflowAnchor: "none" }}>
+      {/* ⚠️ overflow-anchor:none is load-bearing, not decoration: entering search mode
+          hides the hero and trending blocks, and without it the browser's scroll anchoring
+          fights the manual smooth-scroll-to-top that gives the query its feedback.
+          `pad` is a runtime value from the breakpoint hook. */}
+      <div className="mx-auto max-w-[1100px] [overflow-anchor:none]" style={{ padding: pad }}>
 
         {loading && <StatusBlock title="Loading projects…" />}
 
@@ -366,13 +312,15 @@ export default function Discover() {
         {!isSearching && hero.length > 0 && (
         <>
         {/* ── Hero Grid ── */}
-        <div className="lp-stagger" style={{
-          display: "grid",
-          gridTemplateColumns: isDesktop ? "1fr 320px" : isTablet ? "1fr 1fr" : "1fr",
-          gridTemplateRows: isDesktop ? `${SMALL_H}px ${SMALL_H}px` : "auto",
-          gap: `${GAP}px`,
-          marginBottom: isMobile ? "32px" : "48px",
-        }}>
+        {/* The grid tracks are computed from SMALL_H and GAP, so they stay inline. */}
+        <div
+          className={`lp-stagger grid ${isMobile ? "mb-8" : "mb-12"}`}
+          style={{
+            gridTemplateColumns: isDesktop ? "1fr 320px" : isTablet ? "1fr 1fr" : "1fr",
+            gridTemplateRows: isDesktop ? `${SMALL_H}px ${SMALL_H}px` : "auto",
+            gap: `${GAP}px`,
+          }}
+        >
           <HeroCard
             project={hero[0]}
             showDesc={!isMobile}
@@ -404,26 +352,23 @@ export default function Discover() {
         </div>
 
         {/* ── Trending Projects ── */}
-        <div style={{ marginBottom: isMobile ? "32px" : "48px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "16px" }}>
+        <div className={isMobile ? "mb-8" : "mb-12"}>
+          <div className="mb-4 flex items-end justify-between">
             <div>
-              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>Trending Projects</h2>
-              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>Projects gaining momentum across RMIT.</p>
+              <h2 className={`m-0 font-extrabold text-neutral-900 ${isMobile ? "text-[18px]" : "text-[22px]"}`}>Trending Projects</h2>
+              <p className="mx-0 mt-0.5 mb-0 text-[13px] text-neutral-500">Projects gaining momentum across RMIT.</p>
             </div>
             <a
               href="#all"
-              style={{ fontSize: "12px", color: "var(--color-brand)", fontWeight: 600, letterSpacing: "0.04em", textDecoration: "none", display: "inline-block", transition: "opacity 0.15s, transform 0.15s" }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = "0.7"; e.currentTarget.style.transform = "translateX(3px)"; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateX(0)"; }}
+              className="inline-block text-[12px] font-semibold tracking-[0.04em] text-brand no-underline transition-[opacity,transform] duration-150 hover:translate-x-[3px] hover:opacity-70"
             >
               VIEW ALL →
             </a>
           </div>
-          <div className="lp-stagger" style={{
-            display: "grid",
-            gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
-            gap: "14px",
-          }}>
+          <div
+            className="lp-stagger grid gap-3.5"
+            style={{ gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr" }}
+          >
             {trending.map(p => <ProjectCard key={p.id} project={p} />)}
           </div>
         </div>
@@ -433,50 +378,28 @@ export default function Discover() {
         {/* ── All Projects ── */}
         {/* Hidden while loading / on error / when empty — the StatusBlock above already says so. */}
         {!loading && !loadError && projects.length > 0 && (
-        <div id="all" style={{ marginBottom: isMobile ? "32px" : "48px" }}>
-          <div style={{
-            display: "flex",
-            flexDirection: isMobile ? "column" : "row",
-            justifyContent: "space-between",
-            alignItems: isMobile ? "flex-start" : "center",
-            gap: isMobile ? "12px" : 0,
-            marginBottom: "16px",
-          }}>
+        <div id="all" className={isMobile ? "mb-8" : "mb-12"}>
+          <div className={`mb-4 flex justify-between ${isMobile ? "flex-col items-start gap-3" : "flex-row items-center gap-0"}`}>
             <div>
-              <h2 style={{ margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: 800, color: "#111" }}>
+              <h2 className={`m-0 font-extrabold text-neutral-900 ${isMobile ? "text-[18px]" : "text-[22px]"}`}>
                 {isSearching ? "Search results" : "All Projects"}
               </h2>
-              <p style={{ margin: "2px 0 0", fontSize: "13px", color: "#888" }}>
+              <p className="mx-0 mt-0.5 mb-0 text-[13px] text-neutral-500">
                 {isSearching
                   ? `${filteredProjects.length} ${filteredProjects.length === 1 ? "project" : "projects"} found for “${search}”`
                   : "Browse and search every campaign on RMIT Launchpad."}
               </p>
             </div>
-            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+            <div className="flex flex-wrap gap-1.5">
               {FILTERS.map(f => (
                 <button
                   key={f}
                   onClick={() => setActiveFilter(f)}
-                  style={{
-                    background: activeFilter === f ? "var(--color-brand)" : "#fff",
-                    color: activeFilter === f ? "#fff" : "#444",
-                    border: "1px solid",
-                    borderColor: activeFilter === f ? "var(--color-brand)" : "#ddd",
-                    borderRadius: "5px",
-                    fontSize: "12px", fontWeight: 600,
-                    padding: "5px 14px", cursor: "pointer",
-                    letterSpacing: "0.04em", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.10)";
-                    if (activeFilter !== f) e.currentTarget.style.borderColor = "var(--color-brand)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                    e.currentTarget.style.borderColor = activeFilter === f ? "var(--color-brand)" : "#ddd";
-                  }}
+                  className={`cursor-pointer rounded-[5px] border px-3.5 py-[5px] text-[12px] font-semibold tracking-[0.04em] transition-all duration-150 hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(0,0,0,0.10)] ${
+                    activeFilter === f
+                      ? "border-brand bg-brand text-white"
+                      : "border-neutral-200 bg-white text-neutral-700 hover:border-brand"
+                  }`}
                 >
                   {f}
                 </button>
@@ -484,21 +407,7 @@ export default function Discover() {
               {isSearching && (
                 <button
                   onClick={() => setSearch("")}
-                  style={{
-                    background: "#fff", color: "var(--color-brand)",
-                    border: "1px solid var(--color-brand)", borderRadius: "5px",
-                    fontSize: "12px", fontWeight: 700,
-                    padding: "5px 14px", cursor: "pointer",
-                    letterSpacing: "0.04em", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = "var(--color-brand)";
-                    e.currentTarget.style.color = "#fff";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = "#fff";
-                    e.currentTarget.style.color = "var(--color-brand)";
-                  }}
+                  className="cursor-pointer rounded-[5px] border border-brand bg-white px-3.5 py-[5px] text-[12px] font-bold tracking-[0.04em] text-brand transition-all duration-150 hover:bg-brand hover:text-white"
                 >
                   ✕ CLEAR
                 </button>
@@ -508,21 +417,14 @@ export default function Discover() {
                   which projects you see first. A native <select> rather than another
                   row of chips — three more buttons here would crowd the four tags on
                   mobile, and the current value has to stay readable at a glance. */}
-              <label style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: "#888", letterSpacing: "0.06em" }}>
+              <label className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold tracking-[0.06em] text-neutral-500">
                   SORT
                 </span>
                 <select
                   value={sortId}
                   onChange={e => setSortId(e.target.value)}
-                  style={{
-                    background: "#fff", color: "#444",
-                    border: "1px solid #ddd", borderRadius: "5px",
-                    fontSize: "12px", fontWeight: 600,
-                    padding: "5px 10px", cursor: "pointer",
-                    letterSpacing: "0.04em", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--color-brand)"; }}
+                  className="cursor-pointer rounded-[5px] border border-neutral-200 bg-white px-2.5 py-[5px] text-[12px] font-semibold tracking-[0.04em] text-neutral-700 transition-all duration-150 hover:border-brand"
                   onMouseLeave={e => { e.currentTarget.style.borderColor = "#ddd"; }}
                 >
                   {SORTS.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -544,12 +446,8 @@ export default function Discover() {
               swap places with no sign the control did anything. */}
           <div
             key={`${activeFilter}|${sortId}|${isSearching ? "search" : "browse"}`}
-            className={isSearching ? undefined : "lp-stagger"}
-            style={{
-              display: "grid",
-              gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr",
-              gap: "14px",
-            }}
+            className={`grid gap-3.5 ${isSearching ? "" : "lp-stagger"}`}
+            style={{ gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr" }}
           >
             {visibleProjects.length > 0 ? (
               visibleProjects.map(p => <ProjectCard key={p.id} project={p} />)
@@ -564,28 +462,10 @@ export default function Discover() {
           </div>
 
           {!showAll && filteredProjects.length > PROJECTS_PREVIEW_COUNT && (
-          <div style={{ textAlign: "center", marginTop: "28px" }}>
+          <div className="mt-7 text-center">
             <button
               onClick={() => setShowAll(true)}
-              style={{
-                background: "#fff", border: "1px solid #ccc", borderRadius: "5px",
-                fontSize: "12px", fontWeight: 700, letterSpacing: "0.08em",
-                padding: "12px 36px", cursor: "pointer", color: "#444",
-                width: isMobile ? "100%" : "auto",
-                transition: "background 0.15s, transform 0.15s, box-shadow 0.15s, border-color 0.15s",
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = "#f5f5f5";
-                e.currentTarget.style.borderColor = "var(--color-brand)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 14px rgba(0,0,0,0.10)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = "#fff";
-                e.currentTarget.style.borderColor = "#ccc";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              className={`cursor-pointer rounded-[5px] border border-neutral-300 bg-white px-9 py-3 text-[12px] font-bold tracking-[0.08em] text-neutral-700 transition-[background,transform,box-shadow,border-color] duration-150 hover:-translate-y-0.5 hover:border-brand hover:bg-neutral-100 hover:shadow-[0_6px_14px_rgba(0,0,0,0.10)] ${isMobile ? "w-full" : "w-auto"}`}
             >
               LOAD MORE PROJECTS
             </button>
