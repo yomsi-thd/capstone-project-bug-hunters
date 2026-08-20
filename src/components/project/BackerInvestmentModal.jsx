@@ -7,7 +7,6 @@ const QUICK_AMOUNTS = [25, 50, 100];
 
 export default function BackerInvestmentModal({ project, levels = [], balance, onClose, onConfirm }) {
   const [amount, setAmount] = useState(0);
-  const [inputFocused, setInputFocused] = useState(false);
   // null = "No level - just support", which is a real choice and the default.
   const [selectedTierId, setSelectedTierId] = useState(null);
 
@@ -41,52 +40,40 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
   return (
     <Modal onClose={onClose} maxWidth={550} panelClassName="border-t-[5px] border-brand">
         {/* Header */}
-        <div style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          padding: "24px 30px", borderBottom: "1px solid #eee",
-        }}>
-          <h2 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: "#111" }}>
+        <div className="flex items-center justify-between border-b border-neutral-100 px-[30px] py-6">
+          <h2 className="m-0 text-[22px] font-extrabold text-neutral-900">
             Invest in Innovation
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: "none", border: "none", cursor: "pointer", fontSize: "24px",
-              color: "#888", lineHeight: 1, padding: "4px", borderRadius: "4px",
-              transition: "color 0.15s, background 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.color = "#111"; e.currentTarget.style.background = "#f3f3f3"; }}
-            onMouseLeave={e => { e.currentTarget.style.color = "#888"; e.currentTarget.style.background = "none"; }}
+            className="cursor-pointer rounded border-none bg-none p-1 text-[24px] leading-none text-neutral-500 transition-[color,background] duration-150 hover:bg-neutral-100 hover:text-neutral-900"
             aria-label="Close"
           >
             ✕
           </button>
         </div>
 
-        <div style={{ padding: "30px" }}>
+        <div className="p-[30px]">
           {/* Project info */}
-          <div style={{
-            display: "flex", gap: "15px", alignItems: "center",
-            border: "1px solid #eee", borderRadius: "8px", padding: "15px", marginBottom: "30px",
-          }}>
-            <div style={{ width: "65px", height: "65px", borderRadius: "6px", overflow: "hidden", flexShrink: 0, background: "#111" }}>
-              <img src={project.img} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <div className="mb-[30px] flex items-center gap-[15px] rounded-lg border border-neutral-100 p-[15px]">
+            <div className="h-[65px] w-[65px] shrink-0 overflow-hidden rounded-md bg-neutral-900">
+              <img src={project.img} alt={project.title} className="h-full w-full object-cover" />
             </div>
             <div>
-              <div style={{ fontSize: "17px", fontWeight: 700, color: "#111" }}>{project.title}</div>
-              <div style={{ fontSize: "14px", color: "#888" }}>{project.creator.name}, {project.creator.role.split(",").pop().trim()}</div>
+              <div className="text-[17px] font-bold text-neutral-900">{project.title}</div>
+              <div className="text-[14px] text-neutral-500">{project.creator.name}, {project.creator.role.split(",").pop().trim()}</div>
             </div>
           </div>
 
           {/* Support levels. The whole block is skipped when the project has none, so
               a project without levels keeps exactly the modal it had before. */}
           {levels.length > 0 && (
-            <div style={{ marginBottom: "26px" }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.05em", color: "#888", marginBottom: "10px" }}>
+            <div className="mb-[26px]">
+              <div className="mb-2.5 text-[13px] font-bold tracking-[0.05em] text-neutral-500">
                 SUPPORT LEVEL (OPTIONAL)
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div className="flex flex-col gap-2">
                 {levels.map(level => {
                   const affordable = level.minAmount <= balance;
                   const chosen = selectedTierId === level.id;
@@ -96,26 +83,16 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
                       type="button"
                       onClick={() => affordable && handleSelectTier(level)}
                       disabled={!affordable}
-                      style={{
-                        textAlign: "left", width: "100%",
-                        background: chosen ? "#fff8f8" : "#fff",
-                        border: `1px solid ${chosen ? "var(--color-brand)" : "#e5e5e5"}`,
-                        borderRadius: "8px", padding: "12px 14px",
-                        cursor: affordable ? "pointer" : "not-allowed",
-                        opacity: affordable ? 1 : 0.5,
-                        transition: "border-color 0.15s, background 0.15s",
-                      }}
-                      onMouseEnter={e => { if (affordable && !chosen) e.currentTarget.style.borderColor = "#bbb"; }}
-                      onMouseLeave={e => { if (!chosen) e.currentTarget.style.borderColor = "#e5e5e5"; }}
+                      className={`w-full rounded-lg border px-3.5 py-3 text-left transition-[border-color,background] duration-150 ${chosen ? "border-brand bg-[#fff8f8]" : "border-neutral-200 bg-white hover:border-neutral-300"} ${affordable ? "cursor-pointer opacity-100" : "cursor-not-allowed opacity-50"}`}
                     >
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "10px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>{level.name}</span>
-                        <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-brand)", whiteSpace: "nowrap" }}>
+                      <div className="flex items-baseline justify-between gap-2.5">
+                        <span className="text-[14px] font-bold text-neutral-900">{level.name}</span>
+                        <span className="text-[13px] font-extrabold whitespace-nowrap text-brand">
                           {level.minAmount.toLocaleString()} CC+
                         </span>
                       </div>
                       {level.bullets.length > 0 && (
-                        <div style={{ fontSize: "12px", color: "#777", marginTop: "4px", lineHeight: 1.5 }}>
+                        <div className="mt-1 text-[12px] leading-normal text-neutral-500">
                           {level.bullets[0]}
                           {level.bullets.length > 1 && ` +${level.bullets.length - 1} more`}
                         </div>
@@ -123,7 +100,7 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
                       {/* The reason, not just a greyed-out row - the quick-amount
                           buttons already dim the same way when they exceed the balance. */}
                       {!affordable && (
-                        <div style={{ fontSize: "11px", color: "#b06", marginTop: "4px" }}>
+                        <div className="mt-1 text-[11px] text-[#b06]">
                           Needs more Class Coins than you have.
                         </div>
                       )}
@@ -136,16 +113,7 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
                 <button
                   type="button"
                   onClick={() => handleSelectTier(null)}
-                  style={{
-                    textAlign: "left", width: "100%",
-                    background: selectedTierId === null ? "#fff8f8" : "#fff",
-                    border: `1px solid ${selectedTierId === null ? "var(--color-brand)" : "#e5e5e5"}`,
-                    borderRadius: "8px", padding: "12px 14px", cursor: "pointer",
-                    fontSize: "14px", fontWeight: 700, color: "#111",
-                    transition: "border-color 0.15s, background 0.15s",
-                  }}
-                  onMouseEnter={e => { if (selectedTierId !== null) e.currentTarget.style.borderColor = "#bbb"; }}
-                  onMouseLeave={e => { if (selectedTierId !== null) e.currentTarget.style.borderColor = "#e5e5e5"; }}
+                  className={`w-full rounded-lg border px-3.5 py-3 text-left transition-[border-color,background] duration-150 cursor-pointer text-[14px] font-bold text-neutral-900 ${selectedTierId === null ? "border-brand bg-[#fff8f8]" : "border-neutral-200 bg-white hover:border-neutral-300"}`}
                 >
                   No level - just support
                 </button>
@@ -154,7 +122,7 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
               {/* Without this line the code is "record which level was chosen" and every
                   reader still understands "buy a reward". It is what makes the feature
                   mean what the team decided it means. */}
-              <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#999", lineHeight: 1.6, fontStyle: "italic" }}>
+              <p className="mx-0 mt-2.5 mb-0 text-[12px] leading-relaxed text-neutral-400 italic">
                 Levels tell the creator what backers care about - they are not rewards,
                 and nothing is owed or shipped.
               </p>
@@ -162,81 +130,48 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
           )}
 
           {/* Amount input */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.05em", color: "#888" }}>
+          <div className="mb-2.5 flex items-center justify-between">
+            <span className="text-[13px] font-bold tracking-[0.05em] text-neutral-500">
               INVESTMENT AMOUNT (CC)
             </span>
-            <span style={{ fontSize: "14px", color: "#888" }}>
-              Balance: <strong style={{ color: "var(--color-brand)" }}>{balance.toLocaleString()} CC</strong>
+            <span className="text-[14px] text-neutral-500">
+              Balance: <strong className="text-brand">{balance.toLocaleString()} CC</strong>
             </span>
           </div>
 
-          <div style={{
-            display: "flex", alignItems: "center",
-            border: `1px solid ${inputFocused ? "var(--color-brand)" : "#ddd"}`,
-            boxShadow: inputFocused ? "0 0 0 3px rgba(204,0,0,0.1)" : "none",
-            borderRadius: "6px", padding: "15px 20px", marginBottom: "18px",
-            transition: "border-color 0.15s, box-shadow 0.15s",
-          }}>
-            <span style={{ fontSize: "27px", fontWeight: 800, color: "var(--color-brand)", marginRight: "10px" }}>CC</span>
+          {/* focus-within replaces an `inputFocused` useState plus onFocus and onBlur
+              handlers, whose only job was to move the ring from the input onto its
+              wrapper. CSS can express that directly. */}
+          <div className="mb-[18px] flex items-center rounded-md border border-neutral-200 px-5 py-[15px] transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:shadow-[0_0_0_3px_rgba(204,0,0,0.1)]">
+            <span className="mr-2.5 text-[27px] font-extrabold text-brand">CC</span>
             <input
               value={amount === 0 ? "" : amount}
               onChange={handleInputChange}
-              onFocus={() => setInputFocused(true)}
-              onBlur={() => setInputFocused(false)}
               placeholder="0"
               inputMode="numeric"
-              style={{
-                border: "none", outline: "none", flex: 1, textAlign: "right",
-                fontSize: "27px", fontWeight: 800, color: "#111",
-                background: "transparent",
-              }}
+              className="flex-1 border-none bg-transparent text-right text-[27px] font-extrabold text-neutral-900 outline-none"
             />
           </div>
 
           {belowMinimum && (
-            <div style={{
-              fontSize: "13px", color: "var(--color-brand)", fontWeight: 600,
-              marginTop: "-8px", marginBottom: "18px",
-            }}>
+            <div className="mt-[-8px] mb-[18px] text-[13px] font-semibold text-brand">
               &ldquo;{selectedTier.name}&rdquo; needs at least {selectedTier.minAmount.toLocaleString()} CC.
               Raise the amount, or choose &ldquo;No level - just support&rdquo;.
             </div>
           )}
 
           {/* Quick amount buttons */}
-          <div style={{ display: "flex", gap: "10px", marginBottom: "24px" }}>
+          <div className="mb-6 flex gap-2.5">
             {QUICK_AMOUNTS.map(val => (
               <button
                 key={val}
                 onClick={() => handleQuickAmount(val)}
                 disabled={val > balance}
-                style={{
-                  flex: 1,
-                  background: amount === val ? "var(--color-brand)" : "#fff",
-                  color: amount === val ? "#fff" : "#444",
-                  border: "1px solid",
-                  borderColor: amount === val ? "var(--color-brand)" : "#ddd",
-                  opacity: val > balance ? 0.4 : 1,
-                  borderRadius: "6px",
-                  fontSize: "14px", fontWeight: 700, padding: "14px 8px",
-                  cursor: val > balance ? "not-allowed" : "pointer",
-                  transition: "transform 0.12s, box-shadow 0.12s, background 0.15s, border-color 0.15s, color 0.15s",
-                }}
-                onMouseEnter={e => {
-                  if (val > balance) return;
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.12)";
-                  if (amount !== val) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.background = amount === val ? "var(--color-brand)" : "#fff";
-                  e.currentTarget.style.borderColor = amount === val ? "var(--color-brand)" : "#ddd";
-                }}
-                onMouseDown={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(0) scale(0.97)"; }}
-                onMouseUp={e => { if (val <= balance) e.currentTarget.style.transform = "translateY(-2px) scale(1)"; }}
+                className={`flex-1 cursor-pointer rounded-md border px-2 py-3.5 text-[14px] font-bold transition-[transform,box-shadow,background,border-color,color] duration-150 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 disabled:hover:shadow-none ${
+                  amount === val
+                    ? "border-brand bg-brand text-white"
+                    : "border-neutral-200 bg-white text-neutral-700 hover:border-brand hover:bg-neutral-100"
+                } hover:-translate-y-0.5 hover:shadow-[0_4px_10px_rgba(0,0,0,0.12)] active:translate-y-0 active:scale-[0.97]`}
               >
                 {val} CC
               </button>
@@ -245,72 +180,34 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
 
           <button
             onClick={handleMax}
-            style={{
-              width: "100%", background: amount === balance ? "var(--color-brand)" : "#fff",
-              color: amount === balance ? "#fff" : "#444",
-              border: "1px solid #ddd", borderRadius: "6px",
-              fontSize: "13px", fontWeight: 700, padding: "12px", cursor: "pointer",
-              marginBottom: "24px", transition: "background 0.15s, border-color 0.15s",
-            }}
-            onMouseEnter={e => {
-              if (amount !== balance) { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = amount === balance ? "var(--color-brand)" : "#fff";
-              e.currentTarget.style.borderColor = "#ddd";
-            }}
+            className={`mb-6 w-full cursor-pointer rounded-md border border-neutral-200 p-3 text-[13px] font-bold transition-[background,border-color] duration-150 ${
+              amount === balance
+                ? "bg-brand text-white"
+                : "bg-white text-neutral-700 hover:border-brand hover:bg-neutral-100"
+            }`}
           >
             MAX ({balance.toLocaleString()} CC)
           </button>
 
           {/* Disclaimer */}
-          <div style={{
-            background: "#faf7f2", borderLeft: "3px solid #cc8800",
-            borderRadius: "4px", padding: "16px 18px", marginBottom: "30px",
-            fontSize: "14px", color: "#666", lineHeight: 1.7,
-          }}>
+          <div className="mb-[30px] rounded border-l-[3px] border-l-[#cc8800] bg-[#faf7f2] px-[18px] py-4 text-[14px] leading-[1.7] text-neutral-600">
             By confirming this investment, you agree to the{" "}
-            <span style={{ color: "var(--color-brand)", fontWeight: 600 }}>Terms of Catalyst Funding</span>.
+            <span className="font-semibold text-brand">Terms of Catalyst Funding</span>.
             Class Coins represent academic backing and hold no real-world financial value outside the RMIT ecosystem.
           </div>
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: "12px" }}>
+          <div className="flex gap-3">
             <button
               onClick={onClose}
-              style={{
-                flex: 1, background: "#fff", border: "1px solid #ddd",
-                borderRadius: "6px", fontSize: "15px", fontWeight: 700,
-                color: "#444", padding: "15px", cursor: "pointer",
-                transition: "background 0.15s, border-color 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "#bbb"; }}
-              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#ddd"; }}
+              className="flex-1 cursor-pointer rounded-md border border-neutral-200 bg-white p-[15px] text-[15px] font-bold text-neutral-700 transition-[background,border-color] duration-150 hover:border-neutral-300 hover:bg-neutral-100"
             >
               CANCEL
             </button>
             <button
               onClick={() => isValid && onConfirm(amount, selectedTierId)}
               disabled={!isValid}
-              style={{
-                flex: 1, background: isValid ? "var(--color-brand)" : "#ccc",
-                color: "#fff", border: "none", borderRadius: "6px",
-                fontSize: "15px", fontWeight: 700, padding: "15px",
-                cursor: isValid ? "pointer" : "not-allowed",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-                transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              }}
-              onMouseEnter={e => {
-                if (!isValid) return;
-                e.currentTarget.style.background = "#aa0000";
-                e.currentTarget.style.transform = "translateY(-1px)";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = isValid ? "var(--color-brand)" : "#ccc";
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border-none bg-brand p-[15px] text-[15px] font-bold text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_4px_12px_rgba(204,0,0,0.3)] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:hover:translate-y-0 disabled:hover:bg-neutral-300 disabled:hover:shadow-none"
             >
               CONFIRM INVESTMENT
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5">
