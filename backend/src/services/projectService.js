@@ -123,7 +123,11 @@ function assertTierFields(tier) {
     }
 
     if (!Number.isInteger(tier.min_amount) || tier.min_amount <= 0) {
-        throw new Error("A level needs a minimum above 0 CC.");
+        // Worded identically to tierRules.js on the frontend. The two enforce the same
+        // check (Number.isInteger && > 0), so they must not describe it differently —
+        // a creator who gets past one and is refused by the other should read the same
+        // sentence, not wonder whether they hit a second, stricter rule.
+        throw new Error("A level needs a minimum above 0 CC — a whole number of Class Coins.");
     }
 
     if (tier.bullets.length === 0) {
