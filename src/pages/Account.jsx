@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import RoleBadge from "../components/ui/RoleBadge";
+import EmptyState from "../components/ui/EmptyState";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import AuthInput from "../components/auth/AuthInput";
@@ -14,18 +15,10 @@ import { toProfile } from "../api/mappers";
 
 function Card({ title, subtitle, children }) {
   return (
-    <section
-      style={{
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        borderRadius: "10px",
-        padding: "24px",
-        marginBottom: "20px",
-      }}
-    >
-      <h2 style={{ fontSize: "16px", fontWeight: 700, color: "#111", margin: "0 0 4px" }}>{title}</h2>
+    <section className="mb-5 rounded-[10px] border border-neutral-200 bg-white p-6">
+      <h2 className="mx-0 mt-0 mb-1 text-[16px] font-bold text-neutral-900">{title}</h2>
       {subtitle && (
-        <p style={{ fontSize: "13px", color: "#888", margin: "0 0 20px" }}>{subtitle}</p>
+        <p className="mx-0 mt-0 mb-5 text-[13px] text-neutral-500">{subtitle}</p>
       )}
       {children}
     </section>
@@ -34,35 +27,32 @@ function Card({ title, subtitle, children }) {
 
 function SummaryRow({ label, children }) {
   return (
-    <div style={{ minWidth: "140px" }}>
-      <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", color: "#999", marginBottom: "6px" }}>
+    <div className="min-w-[140px]">
+      <div className="mb-1.5 text-[11px] font-bold tracking-[0.06em] text-neutral-400">
         {label}
       </div>
-      <div style={{ fontSize: "14px", color: "#222", fontWeight: 500 }}>{children}</div>
+      <div className="text-[14px] font-medium text-neutral-800">{children}</div>
     </div>
   );
 }
 
+// A block-level message above a form. Deliberately NOT built on ui/Badge: a badge is an
+// inline label on something else, this is a paragraph the user has to read, and the two
+// only look related because both carry a tone.
+//
+// role is "alert" for errors so a screen reader interrupts, and "status" otherwise so it
+// does not — a saved-successfully message should not cut across what is being read.
+const NOTICE_TONES = {
+  success: "bg-green-50 border-green-200 text-green-800",
+  error: "bg-red-50 border-red-200 text-red-800",
+  warning: "bg-amber-50 border-amber-200 text-amber-800",
+};
+
 function Notice({ tone, children }) {
-  const tones = {
-    success: { bg: "#f0fdf4", border: "#bbf7d0", color: "#166534" },
-    error: { bg: "#fef2f2", border: "#fecaca", color: "#991b1b" },
-    warning: { bg: "#fffbeb", border: "#fde68a", color: "#92400e" },
-  };
-  const t = tones[tone] || tones.warning;
   return (
     <div
       role={tone === "error" ? "alert" : "status"}
-      style={{
-        background: t.bg,
-        border: `1px solid ${t.border}`,
-        color: t.color,
-        borderRadius: "8px",
-        padding: "10px 14px",
-        fontSize: "13px",
-        marginBottom: "16px",
-        lineHeight: 1.5,
-      }}
+      className={`mb-4 rounded-lg border px-3.5 py-2.5 text-[13px] leading-normal ${NOTICE_TONES[tone] ?? NOTICE_TONES.warning}`}
     >
       {children}
     </div>
@@ -74,33 +64,7 @@ function SaveButton({ children, disabled, busy }) {
     <button
       type="submit"
       disabled={disabled}
-      style={{
-        background: disabled ? "#ddd" : "var(--color-brand)",
-        color: "#fff",
-        border: "none",
-        borderRadius: "6px",
-        padding: "11px 22px",
-        fontSize: "13px",
-        fontWeight: 700,
-        letterSpacing: "0.03em",
-        cursor: disabled ? "not-allowed" : "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "8px",
-        transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-      }}
-      onMouseEnter={e => {
-        if (disabled) return;
-        e.currentTarget.style.background = "#aa0000";
-        e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = "0 3px 8px rgba(204,0,0,0.3)";
-      }}
-      onMouseLeave={e => {
-        if (disabled) return;
-        e.currentTarget.style.background = "var(--color-brand)";
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
-      }}
+      className="inline-flex cursor-pointer items-center gap-2 rounded-md border-none bg-brand px-[22px] py-[11px] text-[13px] font-bold tracking-[0.03em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_3px_8px_rgba(204,0,0,0.3)] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:hover:translate-y-0 disabled:hover:bg-neutral-300 disabled:hover:shadow-none"
     >
       {busy && <span className="lp-spin" aria-hidden="true" />}
       {children}
@@ -242,8 +206,7 @@ export default function Account() {
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
+    <div className="min-h-screen bg-surface font-[\'DM_Sans\',\'Helvetica_Neue\',Arial,sans-serif] text-neutral-900">
 
       <Header
         showSearch={false}
@@ -254,24 +217,27 @@ export default function Account() {
         isDesktop={isDesktop}
       />
 
-      <div className="lp-stagger" style={{ maxWidth: "760px", margin: "0 auto", padding: pad }}>
-        <h1 style={{ fontSize: isMobile ? "24px" : "30px", fontWeight: 800, margin: "0 0 6px", color: "#111" }}>
+      {/* `pad` is computed from the breakpoint hook, so it stays inline — a runtime value
+          is one of the three cases where that is still correct. */}
+      <div className="lp-stagger mx-auto max-w-[760px]" style={{ padding: pad }}>
+        <h1 className={`mx-0 mt-0 mb-1.5 font-extrabold text-neutral-900 ${isMobile ? "text-[24px]" : "text-[30px]"}`}>
           My Account
         </h1>
-        <p style={{ fontSize: "14px", color: "#888", margin: "0 0 28px" }}>
+        <p className="mx-0 mt-0 mb-7 text-[14px] text-neutral-500">
           Your details, how you appear on your projects, and your password.
         </p>
 
         {isLoading ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#888", fontSize: "14px" }}>
+          <div className="px-5 py-15 text-center text-[14px] text-neutral-500">
             Loading your account…
           </div>
         ) : loadError ? (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
-            <div style={{ fontSize: "32px", marginBottom: "8px" }}>⚠️</div>
-            <div style={{ fontSize: "14px", fontWeight: 600, color: "#a11" }}>Could not load your account</div>
-            <div style={{ fontSize: "13px", marginTop: "4px" }}>{loadError}</div>
-          </div>
+          <EmptyState
+            className="py-15"
+            icon="⚠️"
+            title={<span className="text-red-700">Could not load your account</span>}
+            detail={loadError}
+          />
         ) : (
           <>
             {readOnly && (
@@ -283,11 +249,11 @@ export default function Account() {
 
             {/* ── Read-only summary ── */}
             <Card title="Account summary">
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "28px" }}>
+              <div className="flex flex-wrap gap-7">
                 <SummaryRow label="NAME">{shown.name || "—"}</SummaryRow>
                 <SummaryRow label="EMAIL">{shown.email || "—"}</SummaryRow>
                 <SummaryRow label="ROLES">
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  <span className="flex flex-wrap gap-1.5">
                     {roles.length ? roles.map(r => <RoleBadge key={r} role={r} />) : "—"}
                   </span>
                 </SummaryRow>
@@ -298,7 +264,7 @@ export default function Account() {
                 )}
                 {shown.joinedOn && <SummaryRow label="MEMBER SINCE">{shown.joinedOn}</SummaryRow>}
               </div>
-              <p style={{ fontSize: "12px", color: "#aaa", margin: "18px 0 0", lineHeight: 1.6 }}>
+              <p className="mx-0 mt-[18px] mb-0 text-[12px] leading-relaxed text-neutral-400">
                 Roles are granted by an administrator — request the Creator role from the sign-up
                 form, or ask an admin to change them.
               </p>
@@ -343,7 +309,7 @@ export default function Account() {
                   error={errors.title}
                   disabled={readOnly}
                 />
-                <p style={{ fontSize: "12px", color: "#aaa", margin: "-8px 0 18px", lineHeight: 1.6 }}>
+                <p className="mx-0 -mt-2 mb-[18px] text-[12px] leading-relaxed text-neutral-400">
                   Your title appears under your name on every project you create.
                 </p>
 
