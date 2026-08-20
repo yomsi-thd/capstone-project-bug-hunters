@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { RoleBadgeList } from "../components/ui/RoleBadge";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import { initials } from "../components/ui/initials";
@@ -30,27 +31,6 @@ function StatusDot({ status }) {
       <span className={`w-1.5 h-1.5 rounded-full inline-block ${dots[status] || "bg-gray-300"}`} />
       {status}
     </span>
-  );
-}
-
-// The roles a user holds, in the table. Admin is the one worth spotting at a glance.
-function RoleBadges({ roles }) {
-  if (!roles.length) {
-    return <span className="text-[11px] text-gray-400 italic">No roles</span>;
-  }
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {roles.map(role => (
-        <span
-          key={role}
-          className={`text-[10px] font-bold px-2.5 py-1 rounded-sm ${
-            role === "ADMIN" ? "bg-brand text-white" : "bg-gray-100 text-gray-600"
-          }`}
-        >
-          {role}
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -412,7 +392,7 @@ export default function AdminUserManagement() {
 
                       {/* Roles */}
                       <td className="px-5 py-3.5">
-                        <RoleBadges roles={u.roles} />
+                        <RoleBadgeList roles={u.roles} />
                       </td>
 
                       {/* Status */}

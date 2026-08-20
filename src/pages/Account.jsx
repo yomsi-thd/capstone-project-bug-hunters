@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import RoleBadge from "../components/ui/RoleBadge";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import AuthInput from "../components/auth/AuthInput";
@@ -28,29 +29,6 @@ function Card({ title, subtitle, children }) {
       )}
       {children}
     </section>
-  );
-}
-
-function RoleBadge({ role }) {
-  // Brand red for admin, neutral for the rest — the same "admin is different"
-  // signal the nav bar gives, without inventing a third colour vocabulary.
-  const isAdmin = role === "admin";
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        fontSize: "11px",
-        fontWeight: 700,
-        letterSpacing: "0.06em",
-        padding: "4px 10px",
-        borderRadius: "999px",
-        background: isAdmin ? "rgba(204,0,0,0.08)" : "#f1f1ef",
-        color: isAdmin ? "var(--color-brand)" : "#555",
-        border: `1px solid ${isAdmin ? "rgba(204,0,0,0.2)" : "#e5e7eb"}`,
-      }}
-    >
-      {role.toUpperCase()}
-    </span>
   );
 }
 
