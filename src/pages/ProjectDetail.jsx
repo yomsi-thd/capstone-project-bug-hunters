@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
+import DeadEndPage from "../components/layout/DeadEndPage";
 import Tag from "../components/project/Tag";
 import Avatar from "../components/ui/Avatar";
 import EmptyState from "../components/ui/EmptyState";
@@ -20,38 +21,38 @@ import { toDetail, toProjectUpdate, toCommentThread, toTier } from "../api/mappe
 // FundingBar in components/project/FundingBar.jsx; kept separate on purpose.
 function ProgressTrack({ percent }) {
   return (
-    <div style={{ height: "6px", background: "#f0f0f0", borderRadius: "3px", overflow: "hidden", margin: "10px 0" }}>
-      <div style={{
-        height: "100%", width: `${Math.min(percent, 100)}%`,
-        background: "var(--color-brand)", borderRadius: "3px", transition: "width 0.4s ease",
-      }} />
+    <div className="my-2.5 h-1.5 overflow-hidden rounded-sm bg-neutral-100">
+      {/* Runtime width — the datum. */}
+      <div
+        className="h-full rounded-sm bg-brand transition-[width] duration-[400ms] ease-out"
+        style={{ width: `${Math.min(percent, 100)}%` }}
+      />
     </div>
   );
 }
 
 function TabNav({ tabs, active, onChange }) {
   return (
-    <div style={{ display: "flex", borderBottom: "2px solid #e5e7eb", marginBottom: "28px", gap: "0" }}>
+    <div className="mb-7 flex gap-0 border-b-2 border-neutral-200">
       {tabs.map(tab => (
         <button
           key={tab.id}
           onClick={() => onChange(tab.id)}
-          className={active === tab.id ? "lp-navlink is-active" : "lp-navlink"}
-          style={{
-            "--nav-base": "#666",
-            background: "none", cursor: "pointer",
-            padding: "10px 20px", fontSize: "14px", fontWeight: active === tab.id ? 700 : 400,
-            marginBottom: "-2px", position: "relative",
-            display: "flex", alignItems: "center", gap: "6px",
-          }}
+          className={`lp-navlink relative -mb-0.5 flex cursor-pointer items-center gap-1.5 bg-none px-5 py-2.5 text-[14px] ${
+            active === tab.id ? "is-active font-bold" : "font-normal"
+          }`}
+          // ⚠️ --nav-base stays inline: .lp-navlink reads it for its resting colour, and it
+          // differs per host (Header passes #444, this passes #666). A context-set custom
+          // property is one of the three cases where inline is still correct.
+          style={{ "--nav-base": "#666" }}
         >
           {tab.label}
           {tab.count != null && (
-            <span style={{
-              background: active === tab.id ? "var(--color-brand)" : "#e5e7eb",
-              color: active === tab.id ? "#fff" : "#666",
-              fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "10px",
-            }}>
+            <span
+              className={`rounded-[10px] px-1.5 py-px text-[10px] font-bold ${
+                active === tab.id ? "bg-brand text-white" : "bg-neutral-200 text-neutral-600"
+              }`}
+            >
               {tab.count}
             </span>
           )}
@@ -63,25 +64,17 @@ function TabNav({ tabs, active, onChange }) {
 
 function EndorsedBadge() {
   return (
-    <div style={{
-      border: "1px solid #e5e7eb", borderRadius: "8px",
-      padding: "14px 16px", marginTop: "14px",
-      display: "flex", gap: "10px", alignItems: "flex-start",
-    }}>
-      <div style={{
-        width: "22px", height: "22px", borderRadius: "50%",
-        background: "var(--color-brand)", display: "flex", alignItems: "center",
-        justifyContent: "center", flexShrink: 0, marginTop: "1px",
-      }}>
+    <div className="mt-3.5 flex items-start gap-2.5 rounded-lg border border-neutral-200 px-4 py-3.5">
+      <div className="mt-px flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-brand">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3">
           <polyline points="20 6 9 17 4 12" />
         </svg>
       </div>
       <div>
-        <div style={{ fontSize: "12px", fontWeight: 700, color: "#111", marginBottom: "3px" }}>
+        <div className="mb-[3px] text-[12px] font-bold text-neutral-900">
           RMIT Endorsed Project
         </div>
-        <div style={{ fontSize: "12px", color: "#888", lineHeight: 1.5 }}>
+        <div className="text-[12px] leading-normal text-neutral-500">
           This project has been reviewed and approved by the School of Engineering ethics and feasibility board.
         </div>
       </div>
@@ -225,9 +218,9 @@ export default function ProjectDetail() {
 
   if (loading) {
     return (
-      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+      <div className="min-h-screen bg-surface text-neutral-900">
         <Header showSearch={false} />
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center", color: "#888" }}>
+        <div className="mx-auto max-w-[1100px] px-6 py-20 text-center text-neutral-500">
           Loading project…
         </div>
         <Footer isMobile={isMobile} />
@@ -237,52 +230,20 @@ export default function ProjectDetail() {
 
   if (loadError) {
     return (
-      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
-        <Header showSearch={false} />
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
-          <h1 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 6px" }}>Could not load this project</h1>
-          <p style={{ fontSize: "14px", color: "#888", margin: "0 0 24px" }}>{loadError}</p>
-          <Link to="/discover" style={{ color: "var(--color-brand)", fontWeight: 700 }}>Back to Discover</Link>
-        </div>
-        <Footer isMobile={isMobile} />
-      </div>
+      <DeadEndPage icon="⚠️" title="Could not load this project" detail={loadError} />
     );
   }
 
   if (!p) {
     return (
-      <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
-        <Header />
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
-          <h1 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 6px" }}>Project not found</h1>
-          <p style={{ fontSize: "14px", color: "#888", margin: "0 0 24px" }}>
-            No project exists with the id “{id}”.
-          </p>
-          <Link
-            to="/discover"
-            style={{
-              display: "inline-block", background: "var(--color-brand)", color: "#fff",
-              textDecoration: "none", borderRadius: "6px",
-              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "12px 28px", transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "#aa0000";
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--color-brand)";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            BACK TO DISCOVER
-          </Link>
-        </div>
-        <Footer isMobile={isMobile} />
-      </div>
+      // A pending or rejected project 404s here for anyone but its creator and the
+      // admins — assertVisibleTo returns "not found" rather than "forbidden", because
+      // "this exists but is under review" already leaks that it exists.
+      <DeadEndPage
+        icon="🔍"
+        title="Project not found"
+        detail={`No project exists with the id “${id}”.`}
+      />
     );
   }
 
@@ -300,7 +261,7 @@ export default function ProjectDetail() {
   ];
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+    <div className="min-h-screen bg-surface text-neutral-900">
 
       <Header
         showSearch={false}
@@ -312,19 +273,19 @@ export default function ProjectDetail() {
       />
 
       {/* Hero image */}
-      <div style={{ width: "100%", height: isMobile ? "220px" : isTablet ? "300px" : "380px", overflow: "hidden", background: "#111" }}>
+      <div className={`w-full overflow-hidden bg-neutral-900 ${isMobile ? "h-[220px]" : isTablet ? "h-[300px]" : "h-[380px]"}`}>
         {/* image_url may be empty — projects created via the API do not require one. */}
         {p.img && (
           <img
             src={p.img}
             alt={p.title}
-            style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.9 }}
+            className="h-full w-full object-cover opacity-90"
           />
         )}
       </div>
 
       {/* Main content */}
-      <div className="lp-reveal" style={{ maxWidth: "1100px", margin: "0 auto", padding: isMobile ? "24px 16px" : "32px 40px" }}>
+      <div className={`lp-reveal mx-auto max-w-[1100px] ${isMobile ? "px-4 py-6" : "px-10 py-8"}`}>
 
         {/* An archived project stays readable rather than 404ing: the link may already
             be shared, and a backer who funded it still reaches this page from My
@@ -332,48 +293,38 @@ export default function ProjectDetail() {
         {p.archived && <ArchivedBanner p={p} isOwner={isOwner} />}
 
         {investError && (
-          <div style={{
-            background: "#fdecec", border: "1px solid #f5c2c2", borderRadius: "8px",
-            padding: "12px 16px", marginBottom: "20px",
-            fontSize: "13px", color: "#a11", display: "flex",
-            justifyContent: "space-between", alignItems: "center", gap: "12px",
-          }}>
+          <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-[#f5c2c2] bg-[#fdecec] px-4 py-3 text-[13px] text-[#a11]">
             <span><strong>Investment failed.</strong> {investError}</span>
             <button
               type="button"
               onClick={() => setInvestError(null)}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "#a11", fontSize: "16px", lineHeight: 1 }}
+              className="cursor-pointer border-none bg-none text-[16px] leading-none text-[#a11]"
             >
               ✕
             </button>
           </div>
         )}
 
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: isDesktop ? "1fr 300px" : "1fr",
-          gap: isDesktop ? "40px" : "28px",
-          alignItems: "start",
-        }}>
+        <div className={`grid items-start ${isDesktop ? "grid-cols-[1fr_300px] gap-10" : "grid-cols-[1fr] gap-7"}`}>
 
           {/* ── LEFT: Main Content ── */}
           <div>
             <Tag label={p.tag} />
-            <h1 style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, margin: "10px 0 14px", lineHeight: 1.2, color: "#111" }}>
+            <h1 className={`mx-0 mt-2.5 mb-3.5 leading-[1.2] font-extrabold text-neutral-900 ${isMobile ? "text-[22px]" : "text-[28px]"}`}>
               {p.title}
             </h1>
 
             {/* Creator */}
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px" }}>
+            <div className="mb-7 flex items-center gap-2.5">
               <Avatar name={p.creator?.name} size={38} max={1} fallback="?" />
               <div>
                 {/* GET /projects/:id joins users for the name and title. Both fallbacks
                     are only reachable when the creator's account was deleted, since
                     projects.creator_id cascades — so in practice, never. */}
-                <div style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>
+                <div className="text-[14px] font-bold text-neutral-900">
                   {p.creator?.name ?? `Creator #${p.ownerId ?? "?"}`}
                 </div>
-                <div style={{ fontSize: "12px", color: "#888" }}>
+                <div className="text-[12px] text-neutral-500">
                   {p.creator?.role ?? "Creator"}
                 </div>
               </div>
@@ -388,7 +339,7 @@ export default function ProjectDetail() {
             {/* About tab content */}
             {activeTab === "about" && (
               <div>
-                <p style={{ fontSize: "15px", color: "#444", lineHeight: 1.8, margin: "0 0 28px" }}>
+                <p className="mx-0 mt-0 mb-7 text-[15px] leading-[1.8] text-neutral-700">
                   {p.about}
                 </p>
 
@@ -403,10 +354,10 @@ export default function ProjectDetail() {
                     have none and show just the blurb above. */}
                 {p.challenge && (
                   <>
-                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
                       The Challenge
                     </h2>
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 28px", whiteSpace: "pre-line" }}>
+                    <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-7">
                       {p.challenge}
                     </p>
                   </>
@@ -416,33 +367,33 @@ export default function ProjectDetail() {
                     jsonb array on the project. The first one sits between The Challenge
                     and Our Solution, exactly as the original design had it. */}
                 {p.gallery[0] && (
-                  <div
-                    style={{ borderRadius: "10px", overflow: "hidden", marginBottom: "28px", background: "#111" }}
-                    onMouseEnter={e => { const img = e.currentTarget.querySelector("img"); if (img) img.style.transform = "scale(1.05)"; }}
-                    onMouseLeave={e => { const img = e.currentTarget.querySelector("img"); if (img) img.style.transform = "scale(1)"; }}
-                  >
-                    <img src={p.gallery[0]} alt="Project gallery" style={{ width: "100%", maxHeight: "320px", objectFit: "cover", display: "block", transition: "transform 0.4s ease" }} />
+                  <div className="group mb-7 overflow-hidden rounded-[10px] bg-neutral-900">
+                    <img
+                      src={p.gallery[0]}
+                      alt="Project gallery"
+                      className="block max-h-[320px] w-full object-cover transition-transform duration-[400ms] ease-out group-hover:scale-105"
+                    />
                   </div>
                 )}
 
                 {p.solution && (
                   <>
-                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
                       Our Solution
                     </h2>
                     {/* Plain prose, not the old mock's { intro, bullets } object — the
                         column is a single TEXT field the creator writes freely.
                         whiteSpace preserves their paragraph breaks. */}
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: p.solutionBullets.length ? "0 0 16px" : "0 0 28px", whiteSpace: "pre-line" }}>
+                    <p className={`mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 ${p.solutionBullets.length ? "mb-4" : "mb-7"}`}>
                       {p.solution}
                     </p>
                     {p.solutionBullets.length > 0 && (
-                      <ul style={{ margin: "0 0 28px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
+                      <ul className="mx-0 mt-0 mb-7 flex list-none flex-col gap-2.5 p-0">
                         {p.solutionBullets.map((b, i) => (
-                          <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
-                            <span style={{ color: "var(--color-brand)", fontWeight: 700, marginTop: "2px", flexShrink: 0 }}>▸</span>
-                            <span style={{ fontSize: "14px", color: "#555", lineHeight: 1.7 }}>
-                              <strong style={{ color: "#111" }}>{b.title}:</strong> {b.desc}
+                          <li key={i} className="flex items-start gap-2.5">
+                            <span className="mt-0.5 shrink-0 font-bold text-brand">▸</span>
+                            <span className="text-[14px] leading-[1.7] text-neutral-600">
+                              <strong className="text-neutral-900">{b.title}:</strong> {b.desc}
                             </span>
                           </li>
                         ))}
@@ -453,10 +404,10 @@ export default function ProjectDetail() {
 
                 {p.funding && (
                   <>
-                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
                       How Your Funding Helps
                     </h2>
-                    <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: "0 0 40px", whiteSpace: "pre-line" }}>
+                    <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-10">
                       {p.funding}
                     </p>
                   </>
@@ -465,13 +416,13 @@ export default function ProjectDetail() {
                 {/* Team members come from projects.team_members (jsonb). */}
                 {p.teamMembers.length > 0 && (
                   <>
-                    <h2 style={{ fontSize: "18px", fontWeight: 800, margin: "0 0 12px", color: "#111" }}>
+                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
                       Team
                     </h2>
-                    <ul style={{ margin: "0 0 40px", padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    <ul className="mx-0 mt-0 mb-10 flex list-none flex-col gap-2 p-0">
                       {p.teamMembers.map((m, i) => (
-                        <li key={i} style={{ fontSize: "14px", color: "#555" }}>
-                          <strong style={{ color: "#111" }}>{m.name ?? m}</strong>
+                        <li key={i} className="text-[14px] text-neutral-600">
+                          <strong className="text-neutral-900">{m.name ?? m}</strong>
                           {m.role ? ` — ${m.role}` : ""}
                         </li>
                       ))}
@@ -479,7 +430,7 @@ export default function ProjectDetail() {
                   </>
                 )}
 
-                <div style={{ borderTop: "1px solid #e5e7eb", paddingTop: "32px" }}>
+                <div className="border-t border-neutral-200 pt-8">
                   <CommentList
                     comments={comments}
                     totalComments={comments.reduce((n, c) => n + 1 + c.replies.length, 0)}
@@ -516,17 +467,17 @@ export default function ProjectDetail() {
                     : "The creator has not posted an update for this project."}
                 />
               ) : (
-                <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "18px" }}>
+                <ul className="m-0 flex list-none flex-col gap-[18px] p-0">
                   {updates.map(u => (
-                    <li key={u.id} style={{ borderLeft: "3px solid var(--color-brand)", paddingLeft: "16px" }}>
-                      <div style={{ fontSize: "11px", color: "#999", marginBottom: "4px" }}>
+                    <li key={u.id} className="border-l-[3px] border-l-brand pl-4">
+                      <div className="mb-1 text-[11px] text-neutral-400">
                         {u.postedOn} · {u.author}
                       </div>
-                      <h2 style={{ fontSize: "16px", fontWeight: 800, margin: "0 0 6px", color: "#111" }}>
+                      <h2 className="mx-0 mt-0 mb-1.5 text-[16px] font-extrabold text-neutral-900">
                         {u.title}
                       </h2>
                       {/* Plain text from the API — keep the author's line breaks. */}
-                      <p style={{ fontSize: "14px", color: "#555", lineHeight: 1.8, margin: 0, whiteSpace: "pre-line" }}>
+                      <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-0">
                         {u.body}
                       </p>
                     </li>
@@ -570,29 +521,25 @@ export default function ProjectDetail() {
 // and where they act depends on who archived it (see CreatorMyProjects).
 function ArchivedBanner({ p, isOwner }) {
   return (
-    <div style={{
-      background: "#fff8e6", border: "1px solid #f0d9a0", borderRadius: "8px",
-      padding: "14px 16px", marginBottom: "20px",
-      display: "flex", gap: "12px", alignItems: "flex-start",
-    }}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a06a00" strokeWidth="2" style={{ flexShrink: 0, marginTop: "1px" }}>
+    <div className="mb-5 flex items-start gap-3 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a06a00" strokeWidth="2" className="mt-px shrink-0">
         <rect x="2" y="4" width="20" height="5" rx="1" /><path d="M4 9v10a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9" /><line x1="10" y1="14" x2="14" y2="14" />
       </svg>
-      <div style={{ fontSize: "13px", color: "#7a5200", lineHeight: 1.5 }}>
+      <div className="text-[13px] leading-normal text-[#7a5200]">
         <strong>This project has been archived.</strong>{" "}
         It is no longer listed on Discover and is not accepting investments or comments.
         {p.archiveReason && (
-          <div style={{ marginTop: "4px" }}>
+          <div className="mt-1">
             Reason: {p.archiveReason}
           </div>
         )}
         {p.archivedByName && (
-          <div style={{ marginTop: "4px", color: "#96702a" }}>
+          <div className="mt-1 text-[#96702a]">
             Archived by {p.archivedByName}{p.archivedAt && ` on ${p.archivedAt}`}.
           </div>
         )}
         {isOwner && (
-          <div style={{ marginTop: "6px" }}>
+          <div className="mt-1.5">
             You can restore it from <strong>My Projects</strong> if you archived it yourself.
           </div>
         )}
@@ -603,41 +550,42 @@ function ArchivedBanner({ p, isOwner }) {
 
 function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
   return (
-    <div style={{
-      border: "1px solid #e5e7eb", borderRadius: "10px",
-      background: "#fff", padding: "22px",
-      position: sticky ? "sticky" : "static",
-      top: sticky ? "72px" : undefined,
-      marginBottom: sticky ? "0" : "28px",
-    }}>
+    // ⚠️ `sticky` is a PROP, not a breakpoint utility. On mobile and tablet this card is
+    // injected into the flow above the tabs, and a sticky card there would follow the
+    // reader down the page and cover the content it is meant to sit beside.
+    <div
+      className={`rounded-[10px] border border-neutral-200 bg-white p-[22px] ${
+        sticky ? "sticky top-[72px] mb-0" : "static mb-7"
+      }`}
+    >
       <ProgressTrack percent={p.stats.funded} />
 
-      <div style={{ fontSize: "28px", fontWeight: 800, color: "var(--color-brand)", marginBottom: "2px" }}>
+      <div className="mb-0.5 text-[28px] font-extrabold text-brand">
         {p.stats.funded}%
       </div>
-      <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", color: "#888", marginBottom: "14px" }}>
+      <div className="mb-3.5 text-[11px] font-bold tracking-[0.06em] text-neutral-500">
         FUNDED
       </div>
 
-      <div style={{ fontSize: "22px", fontWeight: 800, color: "#111" }}>
+      <div className="text-[22px] font-extrabold text-neutral-900">
         {p.stats.raised.toLocaleString()} CC
       </div>
-      <div style={{ fontSize: "13px", color: "#888", marginBottom: "18px" }}>
+      <div className="mb-[18px] text-[13px] text-neutral-500">
         pledged of {p.stats.goal.toLocaleString()} CC goal
       </div>
 
-      <div style={{ display: "flex", gap: "24px", marginBottom: "22px" }}>
+      <div className="mb-[22px] flex gap-6">
         <div>
           {/* end_date exists in the DB but createProject never writes it -> usually null. */}
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.daysLeft ?? "—"}</div>
-          <div style={{ fontSize: "12px", color: "#888" }}>days to go</div>
+          <div className="text-[20px] font-extrabold text-neutral-900">{p.stats.daysLeft ?? "—"}</div>
+          <div className="text-[12px] text-neutral-500">days to go</div>
         </div>
         <div>
           {/* backers_count on GET /projects/:id — DISTINCT wallets, not transactions.
               "—" is for a row that predates the column, not for a real zero: the
               mapper's check is `== null`, so nobody-yet renders as 0. */}
-          <div style={{ fontSize: "20px", fontWeight: 800, color: "#111" }}>{p.stats.backers ?? "—"}</div>
-          <div style={{ fontSize: "12px", color: "#888" }}>backers</div>
+          <div className="text-[20px] font-extrabold text-neutral-900">{p.stats.backers ?? "—"}</div>
+          <div className="text-[12px] text-neutral-500">backers</div>
         </div>
       </div>
 
@@ -646,14 +594,11 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
           "restore needs no re-approval" honest), so offering the button would only
           produce an error after the fact. Restoring happens in My Projects. */}
       {p.archived ? (
-        <div style={{
-          background: "#f6f6f4", border: "1px dashed #d4d4d0", borderRadius: "6px",
-          padding: "14px", textAlign: "center",
-        }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em", color: "#8a8a85", marginBottom: "4px" }}>
+        <div className="rounded-md border border-dashed border-[#d4d4d0] bg-[#f6f6f4] p-3.5 text-center">
+          <div className="mb-1 text-[12px] font-bold tracking-[0.06em] text-[#8a8a85]">
             ARCHIVED
           </div>
-          <div style={{ fontSize: "12px", color: "#999", lineHeight: 1.5 }}>
+          <div className="text-[12px] leading-normal text-neutral-400">
             This project is not accepting investments.
           </div>
         </div>
@@ -661,30 +606,13 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
         <>
           <button
             onClick={onEdit}
-            style={{
-              width: "100%", background: "var(--color-brand)",
-              color: "#fff", border: "none", borderRadius: "6px",
-              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "14px", cursor: "pointer",
-              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "#aa0000";
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--color-brand)";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-none bg-brand p-3.5 text-[13px] font-bold tracking-[0.06em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_8px_20px_rgba(204,0,0,0.35)]"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
             EDIT THIS PROJECT
           </button>
 
-          <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+          <p className="mx-0 mt-2 mb-0 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
             You are the creator of this project.
           </p>
@@ -694,30 +622,12 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
           <button
             disabled={!canInvest}
             onClick={() => canInvest && onInvest()}
-            style={{
-              width: "100%", background: canInvest ? "var(--color-brand)" : "#ccc",
-              color: "#fff", border: "none", borderRadius: "6px",
-              fontSize: "13px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "14px", cursor: canInvest ? "pointer" : "not-allowed",
-              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            }}
-            onMouseEnter={e => {
-              if (!canInvest) return;
-              e.currentTarget.style.background = "#aa0000";
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
-            }}
-            onMouseLeave={e => {
-              if (!canInvest) return;
-              e.currentTarget.style.background = "var(--color-brand)";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-md border-none bg-brand p-3.5 text-[13px] font-bold tracking-[0.06em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_8px_20px_rgba(204,0,0,0.35)] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:hover:translate-y-0 disabled:hover:bg-neutral-300 disabled:hover:shadow-none"
           >
             INVEST IN THIS PROJECT
           </button>
 
-          <p style={{ fontSize: "11px", color: "#aaa", textAlign: "center", margin: "8px 0 0", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+          <p className="mx-0 mt-2 mb-0 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
             All or nothing funding model.
           </p>
