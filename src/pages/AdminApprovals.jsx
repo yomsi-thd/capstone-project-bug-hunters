@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
 import * as projectApi from "../api/projectApi";
-import { toApprovalProject, toCreatorRequest } from "../api/mappers";
+import { toApprovalProject, toCreatorRequest, toTier } from "../api/mappers";
+import SupportLevels from "../components/project/SupportLevels";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
@@ -12,6 +13,26 @@ import {
 // ── Project Review Page ──
 function ProjectReview({ project, onBack, onApprove, onReject }) {
   const [feedback, setFeedback] = useState("");
+
+  // Loaded here rather than carried on the queue row: GET /admin/projects does not join
+  // the levels (they are per-project detail, not queue data), and an admin deciding
+  // whether to approve a project should be able to see what its backers will be offered.
+  // A failure must not take the review screen down with it - the verdict buttons work
+  // without this panel.
+  const [levels, setLevels] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getProjectTiers(project.id);
+        if (!cancelled) setLevels((rows || []).map(toTier));
+      } catch {
+        if (!cancelled) setLevels([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [project.id]);
 
   return (
     <div className="flex-1 flex flex-col bg-gray-50 overflow-y-auto">
@@ -144,27 +165,15 @@ function ProjectReview({ project, onBack, onApprove, onReject }) {
               </div>
             </div>
 
-            {/* Reward Tiers */}
+            {/* Support Levels. The same component the project page renders, so what the
+                admin approves is exactly what a backer will see. */}
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <h3 className="text-[13px] font-bold text-gray-900 mb-3">Reward Tiers</h3>
-              <div className="flex flex-col gap-3">
-                {/* Always empty for now — there is no project_tiers table, and
-                    CreateProject drops whatever the creator typed. */}
-                {(project.tiers || []).length === 0 && (
-                  <div className="text-[11px] text-gray-400">
-                    No reward tiers — the API has no tiers table yet.
-                  </div>
-                )}
-                {(project.tiers || []).map((t, i) => (
-                  <div key={i} className="border border-gray-100 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[14px] font-extrabold text-gray-900">{t.amount}</span>
-                      <span className="bg-brand text-white text-[9px] font-bold px-2 py-0.5 rounded-sm">{t.label}</span>
-                    </div>
-                    <p className="text-[11px] text-gray-400 leading-relaxed">{t.desc}</p>
-                  </div>
-                ))}
-              </div>
+              <h3 className="text-[13px] font-bold text-gray-900 mb-3">Support Levels</h3>
+              <SupportLevels
+                levels={levels}
+                compact
+                emptyMessage="This creator has not set any levels. Backers can still invest any amount."
+              />
             </div>
           </div>
         </div>

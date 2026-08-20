@@ -1,14 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   EDIT_PROJECT_TABS as TABS,
   SCHOOLS,
-  MOCK_TIERS,
   ROLE_BADGE,
   EDIT_PROJECT_INITIAL_DATA,
   EDIT_PROJECT_INITIAL_TEAM,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
 import { isLinkable } from "../components/project/videoUrl";
+import SupportLevels from "../components/project/SupportLevels";
+import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
+import { toTier } from "../api/mappers";
 
 // The three optional story sections ProjectDetail renders under the blurb. Kept in the
 // Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
@@ -158,75 +160,261 @@ function TabTeam({ team, setTeam }) {
   );
 }
 
-function TabTiers({ tiers, setTiers }) {
-  const [showNew, setShowNew] = useState(false);
-  const [newTier, setNewTier] = useState({ name: "", amount: "", desc: "" });
+// An empty level form. Bullet lines start with one blank row so the field is visibly
+// there; blanks are filtered out before anything is sent.
+const EMPTY_TIER = { name: "", amount: "", bullets: [""] };
 
-  const saveTier = () => {
-    if (newTier.name && newTier.amount) {
-      setTiers([...tiers, { ...newTier, id: Date.now() }]);
-      setNewTier({ name: "", amount: "", desc: "" });
-      setShowNew(false);
+// Support Levels - `project_tiers` in the database, and NOT rewards. A level is a
+// minimum contribution plus the lines saying what choosing it signals; the creator owes
+// nothing, so there is no quantity, delivery date or fulfilment state to edit here.
+//
+// ⚠️ This tab has NO shared Save button - the modal's SAVE CHANGES only writes the
+// Basic Info fields. So every action here calls the API on its own and then refetches.
+// The alternative (collect edits, save with the rest) would silently drop them, which is
+// exactly the class of bug this whole feature was built to end.
+function TabTiers({ projectId }) {
+  const [levels, setLevels] = useState([]);
+  // Seeded from projectId rather than always true: with no project there is nothing to
+  // fetch, and flipping it off from inside the effect would be a setState in an effect
+  // body for no reason.
+  const [loading, setLoading] = useState(Boolean(projectId));
+  const [loadError, setLoadError] = useState(null);
+
+  const [draft, setDraft] = useState(EMPTY_TIER);
+  const [editingId, setEditingId] = useState(null);
+  const [showNew, setShowNew] = useState(false);
+  const [formError, setFormError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  // Bumped after every add / edit / remove to refetch. Same pattern as ProjectDetail's
+  // commentsVersion, and for the same reason: backersCount on each level is computed in
+  // SQL, so the list has to come back from the server rather than be patched locally.
+  const [version, setVersion] = useState(0);
+  const reload = () => setVersion(v => v + 1);
+
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const rows = await projectApi.getProjectTiers(projectId);
+        if (!cancelled) setLevels((rows || []).map(toTier));
+      } catch (err) {
+        if (!cancelled) setLoadError(err.response?.data?.message || err.message || "Could not load the support levels");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [projectId, version]);
+
+  const closeForm = () => { setShowNew(false); setEditingId(null); setDraft(EMPTY_TIER); setFormError(""); };
+
+  const startEdit = (level) => {
+    setEditingId(level.id);
+    setShowNew(true);
+    setFormError("");
+    setDraft({
+      name: level.name,
+      amount: String(level.minAmount),
+      bullets: level.bullets.length > 0 ? [...level.bullets] : [""],
+    });
+  };
+
+  const updateBullet = (i, val) => {
+    const next = [...draft.bullets];
+    next[i] = val;
+    setDraft({ ...draft, bullets: next });
+  };
+
+  const save = async () => {
+    // Validate the list AS IT WOULD BE, not the one level: the duplicate-minimum and
+    // the 5-level rules only exist across levels. Same function the wizard and the
+    // backend use, so the three cannot drift.
+    const candidate = { ...draft, id: editingId ?? "new" };
+    const nextList = editingId
+      ? levels.map(l => (l.id === editingId ? candidate : { ...l, amount: String(l.minAmount) }))
+      : [...levels.map(l => ({ ...l, amount: String(l.minAmount) })), candidate];
+
+    const problem = validateTiers(nextList);
+    if (problem) { setFormError(problem); return; }
+
+    const payload = {
+      name: draft.name.trim(),
+      min_amount: Number(String(draft.amount).replace(/[^0-9]/g, "")) || 0,
+      bullets: draft.bullets.map(b => b.trim()).filter(Boolean),
+    };
+
+    setBusy(true);
+    setFormError("");
+    try {
+      if (editingId) {
+        // Raising the minimum deliberately does not touch history - an investment
+        // already carries its tier_id, so nobody's past choice is rewritten.
+        await projectApi.updateTier(projectId, editingId, payload);
+        setNotice("Level updated.");
+      } else {
+        await projectApi.createTier(projectId, payload);
+        setNotice("Level added.");
+      }
+      closeForm();
+      reload();
+    } catch (err) {
+      setFormError(err.response?.data?.message || err.message || "Could not save the level");
+    } finally {
+      setBusy(false);
     }
   };
 
+  const remove = async (level) => {
+    setBusy(true);
+    setNotice("");
+    try {
+      // The backend decides between deleting and hiding: a level somebody already chose
+      // has to survive, because their investment points at it. Say which happened -
+      // "it vanished from the list but is still in someone's history" is confusing
+      // silence otherwise.
+      const result = await projectApi.deleteTier(projectId, level.id);
+      setNotice(result.hidden
+        ? "Hidden. Backers who chose it keep their history."
+        : "Level deleted.");
+      if (editingId === level.id) closeForm();
+      reload();
+    } catch (err) {
+      setNotice(err.response?.data?.message || err.message || "Could not remove the level");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!projectId) {
+    return (
+      <div className="text-[13px] text-gray-400">
+        This modal was opened without a project, so there are no support levels to edit.
+      </div>
+    );
+  }
+
+  const atLimit = levels.length >= MAX_TIERS && editingId === null;
+
   return (
     <div>
-      <h3 className="text-lg font-extrabold text-gray-900 mb-1">Edit Reward Tiers</h3>
-      <p className="text-[13px] text-gray-400 mb-4">Configure the tiers and incentives for university-backed research crowdfunding.</p>
+      <h3 className="text-lg font-extrabold text-gray-900 mb-1">Support Levels</h3>
+      <p className="text-[13px] text-gray-400 mb-1">
+        Each level is a minimum number of Class Coins plus the lines describing what choosing it says.
+      </p>
+      <p className="text-[13px] text-gray-400 mb-4 italic">
+        Not rewards - you are not promising to deliver anything. Changes here save immediately.
+      </p>
+
+      {loadError && (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-brand">{loadError}</div>
+      )}
+      {notice && (
+        <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-600">{notice}</div>
+      )}
+
       <div className="flex justify-between items-center mb-3">
-        <span className="text-[13px] font-bold text-gray-900">Existing Tiers</span>
-        <span className="text-[11px] text-gray-400 font-semibold">{tiers.length} ACTIVE TIERS</span>
+        <span className="text-[13px] font-bold text-gray-900">Existing Levels</span>
+        <span className="text-[11px] text-gray-400 font-semibold">{levels.length} OF {MAX_TIERS}</span>
       </div>
-      <div className="flex flex-col gap-2.5 mb-4">
-        {tiers.map(t => (
-          <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-3.5 flex gap-3.5">
-            <div className="w-10 h-10 border border-gray-200 rounded-md flex items-center justify-center text-lg shrink-0">🏷</div>
-            <div className="flex-1">
-              <div className="flex justify-between">
-                <div>
-                  <div className="text-[14px] font-bold text-gray-900">{t.name}</div>
-                  <div className="text-[11px] font-bold text-brand tracking-wide mb-1">MINIMUM CONTRIBUTION: {t.amount} CC</div>
-                  <div className="text-[12px] text-gray-500 leading-relaxed">{t.desc}</div>
-                </div>
-                <div className="flex gap-2 ml-3 shrink-0">
-                  <button className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-gray-600 text-sm">✎</button>
-                  <button onClick={() => setTiers(tiers.filter(t2 => t2.id !== t.id))} className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-brand text-sm">🗑</button>
+
+      {loading ? (
+        <div className="text-[12px] text-gray-400 mb-4">Loading levels…</div>
+      ) : (
+        <div className="flex flex-col gap-2.5 mb-4">
+          {levels.length === 0 && (
+            <div className="text-[12px] text-gray-400 border border-dashed border-gray-200 rounded-lg px-4 py-5 text-center">
+              No levels yet. Backers can still invest any amount without one.
+            </div>
+          )}
+          {levels.map(t => (
+            <div key={t.id} className="bg-white border border-gray-200 rounded-lg p-3.5 flex gap-3.5">
+              <div className="w-10 h-10 border border-gray-200 rounded-md flex items-center justify-center text-lg shrink-0">◎</div>
+              <div className="flex-1 min-w-0">
+                <div className="flex justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-[14px] font-bold text-gray-900">{t.name}</div>
+                    <div className="text-[11px] font-bold text-brand tracking-wide mb-1">MINIMUM: {t.minAmount.toLocaleString()} CC</div>
+                    {t.bullets.map((b, i) => (
+                      <div key={i} className="text-[12px] text-gray-500 leading-relaxed">› {b}</div>
+                    ))}
+                    {/* The number that makes levels worth recording, and also the
+                        warning that removing this one will hide rather than delete it. */}
+                    <div className="text-[11px] text-gray-400 mt-1">
+                      {t.backersCount === 0
+                        ? "No backers at this level yet"
+                        : `${t.backersCount} ${t.backersCount === 1 ? "backer" : "backers"} at this level`}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-3 shrink-0 self-start">
+                    <button onClick={() => startEdit(t)} disabled={busy} className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-gray-600 text-sm disabled:cursor-not-allowed">✎</button>
+                    <button onClick={() => remove(t)} disabled={busy} className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-brand text-sm disabled:cursor-not-allowed">🗑</button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-      <div onClick={() => !showNew && setShowNew(true)} className={`border-2 border-dashed border-gray-200 rounded-lg ${showNew ? "p-4" : "p-3.5 cursor-pointer hover:border-brand transition-colors"}`}>
+          ))}
+        </div>
+      )}
+
+      <div onClick={() => !showNew && !atLimit && setShowNew(true)} className={`border-2 border-dashed border-gray-200 rounded-lg ${showNew ? "p-4" : atLimit ? "p-3.5" : "p-3.5 cursor-pointer hover:border-brand transition-colors"}`}>
         {!showNew ? (
           <div className="flex items-center gap-2 text-gray-400 text-[13px] font-semibold">
-            <span className="text-lg">⊕</span> Create New Tier
+            <span className="text-lg">⊕</span>
+            {atLimit ? `All ${MAX_TIERS} levels used — edit or remove one to add another` : "Create New Level"}
           </div>
         ) : (
           <div>
-            <div className="text-[13px] font-bold text-gray-900 mb-3">New Tier</div>
+            <div className="text-[13px] font-bold text-gray-900 mb-3">{editingId ? "Edit Level" : "New Level"}</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-2.5">
               <div>
-                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">TIER NAME</label>
-                <input value={newTier.name} onChange={e => setNewTier({ ...newTier, name: e.target.value })} placeholder="e.g., Gold Supporter" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+                <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">LEVEL NAME</label>
+                <input value={draft.name} onChange={e => setDraft({ ...draft, name: e.target.value })} placeholder="e.g., Pilot partner" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
               </div>
               <div>
                 <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">MINIMUM (CC)</label>
-                <input value={newTier.amount} onChange={e => setNewTier({ ...newTier, amount: e.target.value })} placeholder="e.g., 250" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+                <input value={draft.amount} onChange={e => setDraft({ ...draft, amount: e.target.value })} placeholder="e.g., 250" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
               </div>
             </div>
+            {/* A LIST, not the single textarea this tab used to have. The wizard already
+                collected a list, so the two forms disagreed about the shape of the same
+                thing - one of them had to be losing structure, and it was this one. */}
             <div className="mb-2.5">
-              <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">DESCRIPTION</label>
-              <textarea value={newTier.desc} onChange={e => setNewTier({ ...newTier, desc: e.target.value })} placeholder="Describe the rewards..." className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none min-h-[56px] resize-y focus:border-brand transition-colors" />
+              <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">WHAT THIS LEVEL SIGNALS</label>
+              {draft.bullets.map((b, i) => (
+                <div key={i} className="flex gap-2 mb-1.5 items-center">
+                  <span className="text-brand text-sm">›</span>
+                  <input value={b} onChange={e => updateBullet(i, e.target.value)} placeholder={i === 0 ? "I want to trial this on my own campus" : "I am happy to be interviewed for 30 minutes"} className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-[13px] outline-none focus:border-brand transition-colors" />
+                  {i > 0 && <button onClick={() => setDraft({ ...draft, bullets: draft.bullets.filter((_, idx) => idx !== i) })} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-base">×</button>}
+                </div>
+              ))}
+              <button onClick={() => setDraft({ ...draft, bullets: [...draft.bullets, ""] })} className="bg-transparent border-none text-[12px] text-brand font-bold cursor-pointer hover:underline">+ ADD ANOTHER LINE</button>
             </div>
+            {formError && (
+              <div className="mb-2.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-brand">{formError}</div>
+            )}
             <div className="flex justify-end gap-2">
-              <button onClick={() => setShowNew(false)} className="bg-white border border-gray-200 rounded-md px-4 py-1.5 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50">Cancel</button>
-              <button onClick={saveTier} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-1.5 text-[12px] font-bold cursor-pointer transition-colors">Save Tier</button>
+              <button onClick={closeForm} disabled={busy} className="bg-white border border-gray-200 rounded-md px-4 py-1.5 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50 disabled:cursor-not-allowed">Cancel</button>
+              <button onClick={save} disabled={busy} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-1.5 text-[12px] font-bold cursor-pointer transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed">
+                {busy ? "Saving…" : editingId ? "Save Level" : "Add Level"}
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* The same component the project page and the admin review screen render, so
+          this preview cannot drift from what a backer actually sees. */}
+      {levels.length > 0 && (
+        <div className="mt-5">
+          <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-2">PROJECT PAGE PREVIEW</div>
+          <SupportLevels levels={levels} compact />
+        </div>
+      )}
     </div>
   );
 }
@@ -258,13 +446,13 @@ export default function EditProject({ project, onClose }) {
       : { ...EDIT_PROJECT_INITIAL_DATA, challenge: "", solution: "", funding: "", videoUrl: "" }
   );
   const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
-  const [tiers, setTiers] = useState(project?.tiers || MOCK_TIERS);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
   // PUT /api/projects/:id — the backend accepts title, description, category,
-  // goal_amount, image_url, team_members and the three story columns. The Media and
-  // Tiers tabs still have nowhere to save.
+  // goal_amount, image_url, team_members and the three story columns. Support Levels
+  // save themselves through their own endpoints (see TabTiers); the Media tab is still
+  // the one with nowhere to save.
   const handleSave = async () => {
     if (!project?.id) {
       setSaveError("This modal was opened without a project, so there is nothing to save.");
@@ -314,7 +502,9 @@ export default function EditProject({ project, onClose }) {
       case "basic": return <TabBasicInfo data={basicData} setData={setBasicData} />;
       case "media": return <TabMedia />;
       case "team":  return <TabTeam team={team} setTeam={setTeam} />;
-      case "tiers": return <TabTiers tiers={tiers} setTiers={setTiers} />;
+      // Self-contained: it loads and saves the project's real levels itself, because
+      // SAVE CHANGES below only writes Basic Info.
+      case "tiers": return <TabTiers projectId={project?.id} />;
       default: return null;
     }
   };

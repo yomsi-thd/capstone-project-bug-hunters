@@ -5,12 +5,12 @@ import {
   SCHOOLS,
   MOCK_TEAM,
   ROLE_BADGE,
-  CREATE_PROJECT_TIERS
 } from "../mock";
 import * as projectApi from "../api/projectApi";
 import { useAuth } from "../context/AuthContext";
 import { draftStorageKey } from "./draftStorageKey";
 import { isLinkable } from "../components/project/videoUrl";
+import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
 
 const MAX_GALLERY_IMAGES = 6;
 
@@ -235,7 +235,11 @@ function clearDraftFromStorage(key) {
  * Navigating on an explicit click rather than automatically, matching
  * RegisterSuccessModal — the page should not vanish out from under someone mid-read.
  */
-function SubmitSuccessModal({ title, note, onGoToProjects }) {
+// No `note` prop any more. Its only ever caller passed the apology "Your reward tiers
+// were not saved" - the last thing in the app that admitted to discarding user input.
+// Support levels are saved with the project now, so there is nothing left to apologise
+// for; the slot is gone rather than left empty for the next half-finished feature.
+function SubmitSuccessModal({ title, onGoToProjects }) {
   return (
     <div className="lp-overlay fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
       <div className="lp-modal bg-white rounded-xl shadow-2xl w-full max-w-[460px] p-7 text-center">
@@ -251,12 +255,6 @@ function SubmitSuccessModal({ title, note, onGoToProjects }) {
           board for review. It stays in <span className="font-semibold text-gray-700">Pending Review</span> until
           an admin approves it, and appears on Discover once they do.
         </p>
-
-        {note && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 text-[12px] text-amber-800 leading-relaxed mt-4 text-left">
-            {note}
-          </div>
-        )}
 
         <button
           onClick={onGoToProjects}
@@ -625,31 +623,50 @@ function Step3({ team, setTeam }) {
   );
 }
 
+// Support Levels - "project_tiers" in the database, and NOT rewards.
+//
+// A level is a minimum contribution plus the lines that say what choosing it SIGNALS.
+// The backer is the one making a statement ("I want to trial this"), the creator owes
+// nothing: Class Coins have no real-world value and creators never receive them, so
+// the platform must not imply anything is being bought. Every label and placeholder
+// below is written to push the creator into that voice, because no validation can read
+// intent and Kickstarter habits pull hard the other way.
 function Step4({ tiers, setTiers }) {
-  const [newTier, setNewTier] = useState({ name: "", amount: "", privileges: [""] });
+  const [newTier, setNewTier] = useState({ name: "", amount: "", bullets: [""] });
   const [editingTierId, setEditingTierId] = useState(null);
+  const [tierError, setTierError] = useState("");
 
-  const updatePrivilege = (i, val) => { const u = [...newTier.privileges]; u[i] = val; setNewTier({ ...newTier, privileges: u }); };
-  const resetTierForm = () => { setEditingTierId(null); setNewTier({ name: "", amount: "", privileges: [""] }); };
+  const atLimit = tiers.length >= MAX_TIERS && editingTierId === null;
+
+  const updateBullet = (i, val) => { const u = [...newTier.bullets]; u[i] = val; setNewTier({ ...newTier, bullets: u }); };
+  const resetTierForm = () => { setEditingTierId(null); setNewTier({ name: "", amount: "", bullets: [""] }); setTierError(""); };
+
   const saveTier = () => {
-    if (!newTier.name || !newTier.amount) return;
-
     const nextTier = { ...newTier, id: editingTierId ?? Date.now() };
-    setTiers(prev => (
-      editingTierId
-        ? prev.map(tier => (tier.id === editingTierId ? nextTier : tier))
-        : [...prev, nextTier]
-    ));
+    const nextList = editingTierId
+      ? tiers.map(tier => (tier.id === editingTierId ? nextTier : tier))
+      : [...tiers, nextTier];
+
+    // The SAME function the backend and EditProject use, so a level cannot pass here
+    // and be refused there. Validating the whole list rather than the one level is what
+    // catches the duplicate-minimum and the 5-level cases.
+    const problem = validateTiers(nextList);
+    if (problem) { setTierError(problem); return; }
+
+    setTiers(nextList);
     resetTierForm();
   };
+
   const editTier = tier => {
     setEditingTierId(tier.id);
+    setTierError("");
     setNewTier({
       name: tier.name,
       amount: tier.amount,
-      privileges: tier.privileges.length > 0 ? [...tier.privileges] : [""]
+      bullets: tier.bullets.length > 0 ? [...tier.bullets] : [""]
     });
   };
+
   const deleteTier = tierId => {
     setTiers(prev => prev.filter(tier => tier.id !== tierId));
     if (editingTierId === tierId) resetTierForm();
@@ -657,50 +674,67 @@ function Step4({ tiers, setTiers }) {
 
   return (
     <div>
-      <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Reward Tiers <span className="font-normal text-gray-400">(Optional)</span></h2>
-      <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Define structured backing tiers using Class Coins (CC).</p>
+      <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Support Levels <span className="font-normal text-gray-400">(Optional)</span></h2>
+      <p className="text-[13px] text-gray-400 mb-1 leading-relaxed">
+        Levels let backers tell you how far they want to get involved. Each one is a minimum
+        number of Class Coins plus the lines describing what choosing it says.
+      </p>
+      <p className="text-[13px] text-gray-400 mb-6 leading-relaxed italic">
+        These are not rewards - you are not promising to deliver anything. Write what the
+        backer is signalling, not what they receive. Up to {MAX_TIERS} levels.
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-center justify-between gap-3 mb-4">
-            <div className="text-[14px] font-bold text-gray-900">{editingTierId ? "Edit Tier" : "Create New Tier"}</div>
-            {editingTierId && <div className="text-[11px] font-bold text-brand uppercase tracking-widest">Editing saved tier</div>}
+            <div className="text-[14px] font-bold text-gray-900">{editingTierId ? "Edit Level" : "Create New Level"}</div>
+            {editingTierId && <div className="text-[11px] font-bold text-brand uppercase tracking-widest">Editing saved level</div>}
           </div>
           <div className="mb-3.5">
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">TIER NAME</label>
-            <input value={newTier.name} onChange={e => setNewTier({ ...newTier, name: e.target.value })} placeholder="e.g., VIP Lab Access" className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
+            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">LEVEL NAME</label>
+            <input value={newTier.name} onChange={e => setNewTier({ ...newTier, name: e.target.value })} placeholder="e.g., Pilot partner" className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
           </div>
           <div className="mb-3.5">
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">MINIMUM CONTRIBUTION (CC)</label>
+            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">MINIMUM (CC)</label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-gray-400">CC</span>
-              <input value={newTier.amount} onChange={e => setNewTier({ ...newTier, amount: e.target.value })} placeholder="100" className="w-full border border-gray-200 rounded-md pl-10 pr-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
+              <input value={newTier.amount} onChange={e => setNewTier({ ...newTier, amount: e.target.value })} placeholder="250" className="w-full border border-gray-200 rounded-md pl-10 pr-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
             </div>
           </div>
           <div className="mb-4">
-            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">PRIVILEGES / REWARDS INCLUDED</label>
-            {newTier.privileges.map((p, i) => (
+            <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">WHAT THIS LEVEL SIGNALS</label>
+            {newTier.bullets.map((b, i) => (
               <div key={i} className="flex gap-2 mb-2 items-center">
-                <span className="text-brand text-sm">✓</span>
-                <input value={p} onChange={e => updatePrivilege(i, e.target.value)} placeholder={i === 0 ? "Early access to alpha testing" : "Add a privilege..."} className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-[13px] outline-none focus:border-brand transition-colors" />
-                {i > 0 && <button onClick={() => setNewTier({ ...newTier, privileges: newTier.privileges.filter((_, idx) => idx !== i) })} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-base">×</button>}
+                <span className="text-brand text-sm">›</span>
+                {/* Placeholders in the backer's voice on purpose: they are the only
+                    thing steering a creator away from typing "free t-shirt". */}
+                <input value={b} onChange={e => updateBullet(i, e.target.value)} placeholder={i === 0 ? "I want to trial this on my own campus" : "I am happy to be interviewed for 30 minutes"} className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-[13px] outline-none focus:border-brand transition-colors" />
+                {i > 0 && <button onClick={() => setNewTier({ ...newTier, bullets: newTier.bullets.filter((_, idx) => idx !== i) })} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-base">×</button>}
               </div>
             ))}
-            <button onClick={() => setNewTier({ ...newTier, privileges: [...newTier.privileges, ""] })} className="bg-transparent border-none text-[12px] text-brand font-bold cursor-pointer hover:underline">+ ADD ANOTHER PRIVILEGE</button>
+            <button onClick={() => setNewTier({ ...newTier, bullets: [...newTier.bullets, ""] })} className="bg-transparent border-none text-[12px] text-brand font-bold cursor-pointer hover:underline">+ ADD ANOTHER LINE</button>
           </div>
+          {tierError && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-brand">{tierError}</div>
+          )}
+          {atLimit && !tierError && (
+            <div className="mb-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-[12px] text-gray-500">
+              You have all {MAX_TIERS} levels. Edit or remove one to add another.
+            </div>
+          )}
           <div className="flex justify-end gap-2.5">
             <button onClick={resetTierForm} className="bg-white border border-gray-200 rounded-md px-5 py-2 text-[12px] text-gray-600 cursor-pointer hover:bg-gray-50">CLEAR</button>
-            <button onClick={saveTier} className="bg-[#1a1a5c] hover:bg-blue-900 text-white border-none rounded-md px-5 py-2 text-[12px] font-bold cursor-pointer transition-colors">{editingTierId ? "UPDATE TIER" : "SAVE TIER"}</button>
+            <button onClick={saveTier} disabled={atLimit} className={`border-none rounded-md px-5 py-2 text-[12px] font-bold text-white transition-colors ${atLimit ? "bg-gray-300 cursor-not-allowed" : "bg-[#1a1a5c] hover:bg-blue-900 cursor-pointer"}`}>{editingTierId ? "UPDATE LEVEL" : "SAVE LEVEL"}</button>
           </div>
         </div>
         <div>
           <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-3">PROJECT PAGE PREVIEW</div>
           {tiers.length > 0 ? tiers.map((t, i) => (
             <div key={t.id} className="bg-white border border-gray-200 rounded-xl p-4 mb-2.5">
-              <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-1">TIER {i + 1}</div>
+              <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-1">LEVEL {i + 1}</div>
               <div className="text-lg font-extrabold text-gray-900 mb-1">{t.name}</div>
               <div className="text-[22px] font-extrabold text-gray-900 mb-2.5">{t.amount} CC <span className="text-[13px] font-normal text-gray-400">or more</span></div>
-              {t.privileges.filter(Boolean).map((p, pi) => (
-                <div key={pi} className="flex gap-2 text-[12px] text-gray-600 mb-1"><span className="text-brand">✓</span>{p}</div>
+              {t.bullets.filter(Boolean).map((b, bi) => (
+                <div key={bi} className="flex gap-2 text-[12px] text-gray-600 mb-1"><span className="text-brand">›</span>{b}</div>
               ))}
               <div className="mt-3 flex items-center justify-end gap-2">
                 <button
@@ -721,7 +755,7 @@ function Step4({ tiers, setTiers }) {
             </div>
           )) : (
             <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-7 text-center">
-              <div className="text-[12px] text-gray-300">NEW TIER PREVIEW WILL APPEAR HERE</div>
+              <div className="text-[12px] text-gray-300">NEW LEVEL PREVIEW WILL APPEAR HERE</div>
             </div>
           )}
         </div>
@@ -828,8 +862,8 @@ function Step5({ basicData, story, media, team, tiers, onEdit }) {
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">FUNDING TIERS</div>
-              <div className="text-lg font-extrabold text-gray-900">{tiers.length > 0 ? `${tiers.length} tier${tiers.length > 1 ? "s" : ""}` : "No tiers added"}</div>
+              <div className="text-[11px] font-bold text-gray-400 tracking-widest mb-1">SUPPORT LEVELS</div>
+              <div className="text-lg font-extrabold text-gray-900">{tiers.length > 0 ? `${tiers.length} level${tiers.length > 1 ? "s" : ""}` : "No levels added"}</div>
             </div>
             <button type="button" onClick={() => onEdit(4)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
           </div>
@@ -838,17 +872,17 @@ function Step5({ basicData, story, media, team, tiers, onEdit }) {
               {tiers.map(tier => (
                 <div key={tier.id} className="rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <div className="text-[13px] font-bold text-gray-900">{tier.name}</div>
-                  <div className="text-[12px] text-gray-500 mb-2">{tier.amount} CC minimum contribution</div>
+                  <div className="text-[12px] text-gray-500 mb-2">{tier.amount} CC minimum</div>
                   <div className="flex flex-wrap gap-2">
-                    {tier.privileges.filter(Boolean).map(privilege => (
-                      <span key={privilege} className="rounded-full bg-white border border-gray-200 px-2.5 py-1 text-[12px] text-gray-600">{privilege}</span>
+                    {tier.bullets.filter(Boolean).map(line => (
+                      <span key={line} className="rounded-full bg-white border border-gray-200 px-2.5 py-1 text-[12px] text-gray-600">{line}</span>
                     ))}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-[13px] text-gray-400">You can submit without reward tiers, but you should add them before publishing.</div>
+            <div className="text-[13px] text-gray-400">You can submit without support levels and add them later from Edit Project.</div>
           )}
         </section>
       </div>
@@ -873,7 +907,18 @@ export default function CreateProject() {
       : { challenge: "", solution: "", funding: "", bullets: [] }
   );
   const [team, setTeam] = useState(storedDraft?.team ?? MOCK_TEAM);
-  const [tiers, setTiers] = useState(storedDraft?.tiers ?? CREATE_PROJECT_TIERS);
+  // Empty, not a seeded example. This used to default to CREATE_PROJECT_TIERS, so every
+  // new project started with a level the creator never wrote - invisible while tiers
+  // were dropped on submit, and written straight to the database the moment they were
+  // not. A draft saved before 2026-08-20 holds `privileges`; read both names, write one,
+  // so restoring an old draft does not render a level with no bullets.
+  const [tiers, setTiers] = useState(() =>
+    (storedDraft?.tiers ?? []).map(tier => ({
+      ...tier,
+      bullets: tier.bullets ?? tier.privileges ?? [],
+      privileges: undefined,
+    }))
+  );
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   // In flight. Drives the button label and disabled state.
@@ -885,8 +930,6 @@ export default function CreateProject() {
   // still created two identical projects on a double click. A ref changes synchronously,
   // so the second call sees the lock immediately.
   const submitLockRef = useRef(false);
-  // Anything worth saying in the success modal — currently only the reward-tiers warning.
-  const [submitNote, setSubmitNote] = useState("");
   // "Draft restored" only when there is actually something to restore. The autosave
   // effect writes on mount, so merely opening this page and leaving stores an EMPTY
   // draft — and the old `Boolean(storedDraft)` then announced a restored draft over a
@@ -952,7 +995,10 @@ export default function CreateProject() {
     }
 
     if (targetStep === 4) {
-      if (tiers.some(tier => !hasText(tier.name) || !hasText(tier.amount))) return "Complete or remove any partially filled reward tiers before continuing.";
+      // Same function as the level form itself and as the backend, so a project cannot
+      // pass this step and then be refused by the API.
+      const tierProblem = validateTiers(tiers);
+      if (tierProblem) return tierProblem;
     }
 
     return "";
@@ -1037,8 +1083,6 @@ export default function CreateProject() {
       // The backend accepts: title, description, category, goal_amount, image_url,
       // team_members, challenge, solution, funding_usage, gallery, solution_bullets
       // and video_url (plus start_date/end_date, which it defaults for us).
-      // TODO: tiers are still dropped on submit — there is no project_tiers table,
-      // and the team is deciding what a tier even means before one is built.
       // The column is funding_usage; the form calls the field `funding`.
       await projectApi.createProject({
         title: basicData.title.trim(),
@@ -1059,17 +1103,22 @@ export default function CreateProject() {
         solution_bullets: story.bullets
           .filter(b => b.title.trim() && b.desc.trim())
           .map(b => ({ title: b.title.trim(), desc: b.desc.trim() })),
+        // Support levels, saved for real since 2026-08-20 - this was the last place in
+        // the app that collected input and threw it away. The service inserts the
+        // project and its levels in ONE transaction, so a level that fails validation
+        // rolls the whole project back rather than leaving the creator believing they
+        // saved levels that do not exist.
+        tiers: tiers.map(tier => ({
+          name: tier.name.trim(),
+          min_amount: Number(String(tier.amount).replace(/[^0-9]/g, "")) || 0,
+          bullets: tier.bullets.map(b => b.trim()).filter(Boolean),
+        })),
       });
 
       // Clear the saved draft BEFORE flipping isSubmitted, so there is no render in
       // between where the autosave effect could put it back.
       clearDraftFromStorage(draftKey);
 
-      setSubmitNote(
-        tiers.length > 0
-          ? "Your reward tiers were not saved — the API has no tiers table yet. Everything else was submitted."
-          : ""
-      );
       setMessage("");
       setIsSubmitted(true);
     } catch (err) {
@@ -1157,7 +1206,6 @@ export default function CreateProject() {
       {isSubmitted && (
         <SubmitSuccessModal
           title={basicData.title.trim()}
-          note={submitNote}
           onGoToProjects={() => navigate("/creator-my-projects")}
         />
       )}

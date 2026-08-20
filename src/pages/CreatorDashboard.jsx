@@ -192,12 +192,14 @@ export default function CreatorDashboard() {
 
             {/* Backers.
                 This panel used to be "Backer Tiers — distribution of funds across
-                defined reward levels", which needs three things that do not exist: a
+                defined reward levels", which needed three things that did not exist: a
                 project_tiers table, a tier choice in the invest modal, and a tier_id on
-                the transaction. Without the middle one no amount of tier data would say
-                which Class Coins belong to which tier. The half that IS real — who put
-                money in — is what the panel shows now, and it absorbed the separate
-                "RECENT BACKERS" block that sat underneath saying the same thing. */}
+                the transaction. All three landed on 2026-08-20, so the chip below is
+                real — but the panel stays "who put money in" rather than becoming a
+                distribution chart: "which level attracts people" is already answered on
+                the project page, per level, without another screen.
+                It also absorbed the separate "RECENT BACKERS" block that sat underneath
+                saying the same thing. */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Your Backers</h3>
               <p className="text-[12px] text-gray-400 mb-4">Everyone who has invested in your projects, most first.</p>
@@ -216,7 +218,19 @@ export default function CreatorDashboard() {
                         {b.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase()}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-semibold text-gray-800 truncate">{b.name}</div>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[13px] font-semibold text-gray-800 truncate">{b.name}</span>
+                          {/* The highest support level this person ever chose across ALL
+                              your projects — the row is grouped per person, not per
+                              project. The "N projects" line right below keeps that from
+                              being read as "their level on one project". Absent for
+                              anyone who invested before 2026-08-20 or chose no level. */}
+                          {b.topTier && (
+                            <span className="shrink-0 rounded-sm border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-brand">
+                              {b.topTier.name.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-[11px] text-gray-400">{b.projectsLabel} · {b.lastInvested}</div>
                       </div>
                       <div className="text-[13px] font-bold text-brand shrink-0">{b.amount}</div>

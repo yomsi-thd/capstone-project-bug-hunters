@@ -2,13 +2,14 @@ export const EDIT_PROJECT_TABS = [
   { id: "basic", label: "Basic Info",   icon: "ℹ" },
   { id: "media", label: "Media",        icon: "🖼" },
   { id: "team",  label: "Team",         icon: "👥" },
-  { id: "tiers", label: "Reward Tiers", icon: "🎁" },
+  { id: "tiers", label: "Support Levels", icon: "◎" },
 ];
 
-export const MOCK_TIERS = [
-  { id: 1, name: "Digital Supporter",  amount: "25",  desc: "Digital certificate of appreciation, name in project credits, and monthly newsletter access." },
-  { id: 2, name: "Lab Access Partner", amount: "500", desc: "Exclusive physical lab tour, meeting with the research lead, and physical plaque installation." },
-];
+// MOCK_TIERS was deleted on 2026-08-20. The tab initialised its list from it, so a
+// creator opening Support Levels was editing two invented rows belonging to no project.
+// It also wrote them in the reward voice ("physical plaque installation"), which the
+// feature explicitly is not. The tab now loads the project's real levels from
+// GET /projects/:id/tiers.
 
 export const EDIT_PROJECT_INITIAL_DATA = {
   title: "Autonomous Urban Transit",
