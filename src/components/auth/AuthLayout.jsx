@@ -12,7 +12,6 @@ export default function AuthLayout({ children, isMobile }) {
       fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif",
       padding: isMobile ? "24px 16px" : "40px",
     }}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       {/* Background image + overlay */}
       <div style={{

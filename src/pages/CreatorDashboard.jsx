@@ -75,7 +75,6 @@ export default function CreatorDashboard() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       {/* The shared Header spans the full width, exactly as on the public pages.
           The sidebar and the content sit in a row underneath it. */}

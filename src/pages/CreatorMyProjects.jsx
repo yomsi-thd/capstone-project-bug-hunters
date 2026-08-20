@@ -605,7 +605,6 @@ export default function CreatorMyProjects() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 font-sans relative overflow-x-hidden">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
       <Header showSearch={false} onToggleSidebar={() => setSidebarOpen(true)} />
 

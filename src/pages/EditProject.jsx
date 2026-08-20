@@ -525,7 +525,6 @@ export default function EditProject({ project, onClose }) {
     //  Reading the form again, it is not one: it is the only dialog here with unsaved work
     //  in it, so it is the only one that should be hard to dismiss by accident.)
     <Modal onClose={onClose} closable={false} maxWidth={660} panelScroll={false} panelClassName="flex max-h-[90vh] flex-col overflow-hidden font-sans">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">

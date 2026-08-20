@@ -18,6 +18,10 @@
      gray-50 (#f9fafb): cả hai lạnh hơn thấy rõ trên mảng lớn, mà đây là màu nền nên nó
      phủ diện tích lớn nhất màn hình. */
   --color-surface: #f7f7f5;
+
+  /* Makes Tailwind's own `font-sans` resolve to the app typeface, so a component reaching
+     for it lands on DM Sans instead of the framework default. */
+  --font-sans: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
 }
 :root {
   --text: #6b6375;
@@ -32,7 +36,10 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  /* DM Sans is the app's typeface. It used to be applied by eleven separate inline
+     fontFamily declarations that each overrode this variable; now it IS this variable,
+     so the override is gone and there is one place to change it. */
+  --sans: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
@@ -66,16 +73,8 @@
    to fall back to — if the team ever wants one it has to be built deliberately,
    page backgrounds included. */
 
-body {
-  margin: 0;
-}
-
 * {
   box-sizing: border-box;
-}
-
-img {
-  max-width: 100%;
 }
 
 #root {
@@ -98,6 +97,38 @@ img {
    machine set to dark mode — near-white on a light background, i.e. invisible.
    Inline styles were unaffected, which is why only the Tailwind-styled pages broke. */
 @layer base {
+  /* ⚠️ EVERY bare-element rule below MUST stay inside @layer base.
+     Tailwind 4 emits its utilities in @layer utilities, and UNLAYERED CSS BEATS ANY
+     LAYERED RULE regardless of specificity. While `p { margin: 0 }` sat outside a layer it
+     silently killed the margin on every <p> carrying a Tailwind margin class — 41 of them
+     across the app, most in pages written months ago. Nobody noticed because the pages
+     that predate this used inline styles, and inline beats everything.
+     Same trap for `img { max-width: 100% }` against max-w-*, and for `code`.
+     Moved in on 20/08, found while converting Account: mb-7 on a <p> measured 0px. */
+
+  body {
+    margin: 0;
+  }
+
+  img {
+    max-width: 100%;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  code {
+    font-family: var(--mono);
+    display: inline-flex;
+    border-radius: 4px;
+    color: var(--text-h);
+    font-size: 15px;
+    line-height: 135%;
+    padding: 4px 8px;
+    background: var(--code-bg);
+  }
+
   h1,
   h2 {
     font-family: var(--heading);
@@ -124,24 +155,6 @@ img {
     }
   }
 }
-p {
-  margin: 0;
-}
-
-code {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
-
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
-
 /* Khối .home-* và .counter bị xoá ngày 20/08 (13 class + .counter).
    Chúng đến từ Home.jsx (xoá 28/07) và template Vite; không file .jsx nào còn tham chiếu.
    Kiểm lại bất cứ lúc nào:

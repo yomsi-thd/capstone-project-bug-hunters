@@ -1152,7 +1152,6 @@ export default function CreateProject() {
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
       <header className="bg-white border-b border-gray-200 h-13 flex items-center justify-between px-4 md:px-10">
         <div className="text-[15px] font-extrabold text-brand tracking-widest py-3">RMIT LAUNCHPAD</div>
         <button onClick={() => navigate(-1)} className="bg-transparent border-none text-[13px] text-gray-400 cursor-pointer hover:text-gray-600">× CANCEL</button>
