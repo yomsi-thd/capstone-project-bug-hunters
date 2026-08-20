@@ -1,13 +1,17 @@
 export default function FundingBar({ percent }) {
   const clamped = Math.min(percent, 100);
   return (
-    <div style={{ marginTop: "auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-        <span style={{ fontSize: "13px", fontWeight: 700, color: "var(--color-brand)" }}>{percent}%</span>
-        <span style={{ fontSize: "11px", color: "#888" }}>Funded</span>
+    // mt-auto pushes the bar to the bottom of a card whose text is shorter than its
+    // neighbours, so a row of cards lines its bars up.
+    <div className="mt-auto">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[13px] font-bold text-brand">{percent}%</span>
+        <span className="text-[11px] text-neutral-500">Funded</span>
       </div>
-      <div style={{ height: "3px", background: "#e5e5e5", borderRadius: "2px", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${clamped}%`, background: "var(--color-brand)", borderRadius: "2px" }} />
+      <div className="h-[3px] overflow-hidden rounded-sm bg-neutral-200">
+        {/* The width is the datum this component exists to show, so it stays inline — a
+            runtime value is one of the three cases where that is still correct. */}
+        <div className="h-full rounded-sm bg-brand" style={{ width: `${clamped}%` }} />
       </div>
     </div>
   );

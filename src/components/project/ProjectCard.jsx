@@ -4,24 +4,20 @@ import FundingBar from "./FundingBar";
 
 export default function ProjectCard({ project }) {
   return (
-    <Link
-      to={`/project/${project.id}`}
-      style={{ textDecoration: "none", color: "inherit" }}
-    >
-      <div
-        className="lp-card"
-        style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "8px", overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", height: "100%" }}
-      >
-        <div style={{ height: "160px", overflow: "hidden", position: "relative" }}>
-          <img src={project.img} alt={project.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-          <div style={{ position: "absolute", top: "10px", left: "10px" }}>
+    <Link to={`/project/${project.id}`} className="text-inherit no-underline">
+      {/* .lp-card carries the hover lift — it is part of the shared motion vocabulary, so
+          it is NOT rewritten as a hover: utility here. */}
+      <div className="lp-card flex h-full cursor-pointer flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="relative h-40 overflow-hidden">
+          <img src={project.img} alt={project.title} className="h-full w-full object-cover" />
+          <div className="absolute top-2.5 left-2.5">
             <Tag label={project.tag} />
           </div>
         </div>
-        <div style={{ padding: "14px 16px 16px", display: "flex", flexDirection: "column", flex: 1, gap: "6px" }}>
-          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 700, color: "#111", lineHeight: 1.35 }}>{project.title}</h3>
+        <div className="flex flex-1 flex-col gap-1.5 px-4 pt-3.5 pb-4">
+          <h3 className="m-0 text-[14px] leading-[1.35] font-bold text-neutral-900">{project.title}</h3>
           {project.desc && (
-            <p style={{ margin: 0, fontSize: "12px", color: "#666", lineHeight: 1.5 }}>{project.desc}</p>
+            <p className="m-0 text-[12px] leading-normal text-neutral-600">{project.desc}</p>
           )}
           <FundingBar percent={project.funded} />
         </div>
