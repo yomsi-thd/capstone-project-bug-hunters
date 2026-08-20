@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
-import { initials } from "../components/ui/initials";
+import Avatar from "../components/ui/Avatar";
 import * as projectApi from "../api/projectApi";
 import { toNumber, fundedPercent, toBacker } from "../api/mappers";
 
@@ -215,9 +215,7 @@ export default function CreatorDashboard() {
                       key={b.id}
                       className={`flex items-center gap-3 py-2.5 ${i < backers.length - 1 ? "border-b border-gray-100" : ""}`}
                     >
-                      <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[11px] font-bold text-gray-500 shrink-0">
-                        {initials(b.name)}
-                      </div>
+                      <Avatar name={b.name} size={32} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-[13px] font-semibold text-gray-800 truncate">{b.name}</span>

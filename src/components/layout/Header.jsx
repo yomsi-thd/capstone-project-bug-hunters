@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import useBreakpoint, { BREAKPOINTS } from "../../hooks/useBreakpoint";
 import { useAuth } from "../../context/AuthContext";
-import { initials } from "../ui/initials";
+import Avatar from "../ui/Avatar";
 import { getNavLinksForUser } from "../../mock/navLinks";
 
 function CCBadge({ ccBalance }) {
@@ -20,19 +20,6 @@ function CCBadge({ ccBalance }) {
         BALANCE&nbsp;
         <span style={{ color: "var(--color-brand)" }}>{ccBalance.toLocaleString()} CC</span>
       </span>
-    </div>
-  );
-}
-
-function Avatar({ userName }) {
-  return (
-    <div style={{
-      width: "30px", height: "30px", borderRadius: "50%",
-      background: "#e8e8e8", border: "1px solid #ddd",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: "11px", fontWeight: 700, color: "#555", flexShrink: 0,
-    }}>
-      {initials(userName, { max: 1 }) || "U"}
     </div>
   );
 }
@@ -210,7 +197,7 @@ export default function Header(props = {}) {
               >START A PROJECT</Link>
             )}
             <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-              <Avatar userName={userName} />
+              <Avatar name={userName} size={30} max={1} fallback="U" />
               <Link
                 to="/account"
                 style={{ textDecoration: "none", fontSize: "13px", color: "#333", fontWeight: 500, transition: "color 0.15s" }}
@@ -265,7 +252,7 @@ export default function Header(props = {}) {
                 onMouseLeave={e => e.currentTarget.style.background = "var(--color-brand)"}
               >START A PROJECT</Link>
             )}
-            <Avatar userName={userName} />
+            <Avatar name={userName} size={30} max={1} fallback="U" />
           </>
         )}
 

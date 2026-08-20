@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { RoleBadgeList } from "../components/ui/RoleBadge";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
-import { initials } from "../components/ui/initials";
+import Avatar from "../components/ui/Avatar";
 import * as adminApi from "../api/adminApi";
 import { toAdminUser } from "../api/mappers";
 import { useAuth } from "../context/AuthContext";
@@ -78,9 +78,7 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
               <span className="text-[11px] font-bold text-gray-500 tracking-widest">USER IDENTITY</span>
             </div>
             <div className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-              <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-[13px] font-bold text-gray-600 shrink-0">
-                {initials(user.name)}
-              </div>
+              <Avatar name={user.name} size={40} fontSize={13} />
               <div className="min-w-0">
                 <div className="text-[13px] font-bold text-gray-900 truncate">{user.name}</div>
                 <div className="text-[12px] text-gray-500 truncate">{user.email}</div>
@@ -378,9 +376,7 @@ export default function AdminUserManagement() {
                       {/* Identity */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-[12px] font-bold text-gray-600 shrink-0">
-                            {initials(u.name)}
-                          </div>
+                          <Avatar name={u.name} size={36} fontSize={12} />
                           <div className="min-w-0">
                             <div className="text-[13px] font-bold text-gray-900">{u.name}</div>
                             {/* The email, not an invented "ID: #12" — it is also the

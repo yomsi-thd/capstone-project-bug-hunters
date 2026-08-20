@@ -3,8 +3,8 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
+import Avatar from "../components/ui/Avatar";
 import EmptyState from "../components/ui/EmptyState";
-import { initials } from "../components/ui/initials";
 import CommentList from "../components/project/CommentList";
 import ProjectVideo from "../components/project/ProjectVideo";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
@@ -366,14 +366,7 @@ export default function ProjectDetail() {
 
             {/* Creator */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "28px" }}>
-              <div style={{
-                width: "38px", height: "38px", borderRadius: "50%",
-                background: "#e8e8e8", border: "1px solid #ddd",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "13px", fontWeight: 700, color: "#666", flexShrink: 0,
-              }}>
-                {initials(p.creator?.name, { max: 1 }) || "?"}
-              </div>
+              <Avatar name={p.creator?.name} size={38} max={1} fallback="?" />
               <div>
                 {/* GET /projects/:id joins users for the name and title. Both fallbacks
                     are only reachable when the creator's account was deleted, since
