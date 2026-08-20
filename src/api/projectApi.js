@@ -144,9 +144,42 @@ export const deleteProjectUpdate = async (id, updateId) => {
   return response.data;
 };
 
-export const investProject = async (id, amount) => {
+// Support levels. Reading is public and follows the project's own visibility rule;
+// adding, editing and removing are restricted to the project's creator (or an admin)
+// by the backend. `project_tiers` in the database, "Support Levels" on screen.
+export const getProjectTiers = async (id) => {
+  const response = await api.get(`/projects/${id}/tiers`);
+
+  return response.data;
+};
+
+// `tier` is { name, min_amount, bullets } — the same shape for both of these.
+export const createTier = async (id, tier) => {
+  const response = await api.post(`/projects/${id}/tiers`, tier);
+
+  return response.data;
+};
+
+export const updateTier = async (id, tierId, tier) => {
+  const response = await api.put(`/projects/${id}/tiers/${tierId}`, tier);
+
+  return response.data;
+};
+
+// Resolves to { hidden } — true when somebody had already chosen the level, so it was
+// hidden instead of deleted and their investment history still points at a live row.
+export const deleteTier = async (id, tierId) => {
+  const response = await api.delete(`/projects/${id}/tiers/${tierId}`);
+
+  return response.data;
+};
+
+// `tierId` is the support level the backer picked. Optional: the modal's
+// "No level — just support" sends null, and the backend treats that as valid.
+export const investProject = async (id, amount, tierId = null) => {
   const response = await api.post(`/projects/${id}/invest`, {
     amount,
+    tierId,
   });
 
   return response.data;

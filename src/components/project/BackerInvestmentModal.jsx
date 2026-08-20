@@ -1,10 +1,16 @@
 import { useState } from "react";
+import { meetsMinimum } from "./tierRules";
 
 const QUICK_AMOUNTS = [25, 50, 100];
 
-export default function BackerInvestmentModal({ project, balance, onClose, onConfirm }) {
+export default function BackerInvestmentModal({ project, levels = [], balance, onClose, onConfirm }) {
   const [amount, setAmount] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
+  // null = "No level - just support", which is a real choice and the default.
+  const [selectedTierId, setSelectedTierId] = useState(null);
+
+  const selectedTier = levels.find(l => l.id === selectedTierId) || null;
+  const belowMinimum = selectedTier != null && !meetsMinimum(amount, selectedTier);
 
   const handleQuickAmount = (val) => setAmount(val);
   const handleMax = () => setAmount(balance);
@@ -15,7 +21,20 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
     setAmount(val);
   };
 
-  const isValid = amount > 0 && amount <= balance;
+  // Picking a level fills the minimum in for you. Typing MORE afterwards is fine;
+  // typing less disables CONFIRM and says why, but deliberately does NOT clear the
+  // selection - silently undoing somebody's choice is the surest way to leave them
+  // with no idea what just happened.
+  const handleSelectTier = (tier) => {
+    if (tier === null) {
+      setSelectedTierId(null);
+      return;
+    }
+    setSelectedTierId(tier.id);
+    if (amount < tier.minAmount) setAmount(Math.min(tier.minAmount, balance));
+  };
+
+  const isValid = amount > 0 && amount <= balance && !belowMinimum;
 
   return (
     <div
@@ -74,6 +93,89 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
             </div>
           </div>
 
+          {/* Support levels. The whole block is skipped when the project has none, so
+              a project without levels keeps exactly the modal it had before. */}
+          {levels.length > 0 && (
+            <div style={{ marginBottom: "26px" }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.05em", color: "#888", marginBottom: "10px" }}>
+                SUPPORT LEVEL (OPTIONAL)
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {levels.map(level => {
+                  const affordable = level.minAmount <= balance;
+                  const chosen = selectedTierId === level.id;
+                  return (
+                    <button
+                      key={level.id}
+                      type="button"
+                      onClick={() => affordable && handleSelectTier(level)}
+                      disabled={!affordable}
+                      style={{
+                        textAlign: "left", width: "100%",
+                        background: chosen ? "#fff8f8" : "#fff",
+                        border: `1px solid ${chosen ? "var(--color-brand)" : "#e5e5e5"}`,
+                        borderRadius: "8px", padding: "12px 14px",
+                        cursor: affordable ? "pointer" : "not-allowed",
+                        opacity: affordable ? 1 : 0.5,
+                        transition: "border-color 0.15s, background 0.15s",
+                      }}
+                      onMouseEnter={e => { if (affordable && !chosen) e.currentTarget.style.borderColor = "#bbb"; }}
+                      onMouseLeave={e => { if (!chosen) e.currentTarget.style.borderColor = "#e5e5e5"; }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "10px" }}>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: "#111" }}>{level.name}</span>
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: "var(--color-brand)", whiteSpace: "nowrap" }}>
+                          {level.minAmount.toLocaleString()} CC+
+                        </span>
+                      </div>
+                      {level.bullets.length > 0 && (
+                        <div style={{ fontSize: "12px", color: "#777", marginTop: "4px", lineHeight: 1.5 }}>
+                          {level.bullets[0]}
+                          {level.bullets.length > 1 && ` +${level.bullets.length - 1} more`}
+                        </div>
+                      )}
+                      {/* The reason, not just a greyed-out row - the quick-amount
+                          buttons already dim the same way when they exceed the balance. */}
+                      {!affordable && (
+                        <div style={{ fontSize: "11px", color: "#b06", marginTop: "4px" }}>
+                          Needs more Class Coins than you have.
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {/* A first-class choice, not a fallback: investing without declaring a
+                    level is perfectly normal and must not look like a mistake. */}
+                <button
+                  type="button"
+                  onClick={() => handleSelectTier(null)}
+                  style={{
+                    textAlign: "left", width: "100%",
+                    background: selectedTierId === null ? "#fff8f8" : "#fff",
+                    border: `1px solid ${selectedTierId === null ? "var(--color-brand)" : "#e5e5e5"}`,
+                    borderRadius: "8px", padding: "12px 14px", cursor: "pointer",
+                    fontSize: "14px", fontWeight: 700, color: "#111",
+                    transition: "border-color 0.15s, background 0.15s",
+                  }}
+                  onMouseEnter={e => { if (selectedTierId !== null) e.currentTarget.style.borderColor = "#bbb"; }}
+                  onMouseLeave={e => { if (selectedTierId !== null) e.currentTarget.style.borderColor = "#e5e5e5"; }}
+                >
+                  No level - just support
+                </button>
+              </div>
+
+              {/* Without this line the code is "record which level was chosen" and every
+                  reader still understands "buy a reward". It is what makes the feature
+                  mean what the team decided it means. */}
+              <p style={{ margin: "10px 0 0", fontSize: "12px", color: "#999", lineHeight: 1.6, fontStyle: "italic" }}>
+                Levels tell the creator what backers care about - they are not rewards,
+                and nothing is owed or shipped.
+              </p>
+            </div>
+          )}
+
           {/* Amount input */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
             <span style={{ fontSize: "13px", fontWeight: 700, letterSpacing: "0.05em", color: "#888" }}>
@@ -106,6 +208,16 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
               }}
             />
           </div>
+
+          {belowMinimum && (
+            <div style={{
+              fontSize: "13px", color: "var(--color-brand)", fontWeight: 600,
+              marginTop: "-8px", marginBottom: "18px",
+            }}>
+              &ldquo;{selectedTier.name}&rdquo; needs at least {selectedTier.minAmount.toLocaleString()} CC.
+              Raise the amount, or choose &ldquo;No level - just support&rdquo;.
+            </div>
+          )}
 
           {/* Quick amount buttons */}
           <div style={{ display: "flex", gap: "10px", marginBottom: "24px" }}>
@@ -193,7 +305,7 @@ export default function BackerInvestmentModal({ project, balance, onClose, onCon
               CANCEL
             </button>
             <button
-              onClick={() => isValid && onConfirm(amount)}
+              onClick={() => isValid && onConfirm(amount, selectedTierId)}
               disabled={!isValid}
               style={{
                 flex: 1, background: isValid ? "var(--color-brand)" : "#ccc",

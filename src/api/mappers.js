@@ -262,9 +262,53 @@ export function toApprovalProject(row) {
     // "Cannot read properties of undefined (reading '0')" and — with no error boundary
     // above it — blanked the whole app. Always hand back arrays.
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    // No project_tiers table yet, so this is always empty; the screen renders an
-    // empty state rather than crashing.
+    // Kept as a safety net even though support levels now have their own endpoint.
+    // GET /admin/projects does not join them (they are per-project detail, not queue
+    // data), so this stays empty and the review screen loads them itself with
+    // getProjectTiers. Removing the field would make a page in Khôi's area depend on
+    // two changes landing together.
     tiers: [],
+  };
+}
+
+/**
+ * project_tiers row -> a support level as the UI reads it.
+ *
+ * "Support Level" on screen, `tier` in the code and the column names. A level is a
+ * MINIMUM contribution plus the lines saying what choosing it signals — the creator
+ * owes nothing, so there is no quantity, delivery date or fulfilment state here.
+ */
+export function toTier(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    name: row.name,
+    // min_amount is INTEGER and backers_count comes from COUNT(), but node-postgres has
+    // handed this codebase numeric columns as strings before (goal_amount, current_amount)
+    // and the bugs were silent — arithmetic that "worked" and produced wrong percentages.
+    // Coercing costs nothing and removes the whole class.
+    minAmount: toNumber(row.min_amount),
+    bullets: Array.isArray(row.bullets) ? row.bullets : [],
+    // How many DISTINCT people chose this level. This is the number that makes support
+    // levels worth having: it says which level attracts people.
+    backersCount: toNumber(row.backers_count),
+    // A hidden level (somebody chose it, then the creator removed it) never reaches the
+    // public list, but the flag rides along for the creator's own screens.
+    isActive: row.is_active !== false,
+  };
+}
+
+/**
+ * The one support level to show on a row that covers SEVERAL investments: the highest
+ * the person ever chose. Null when they never chose one, which is the common case —
+ * every transaction made before 2026-08-20 and every "just support" investment.
+ */
+function toTopTier(row) {
+  if (!row.top_tier_name) return null;
+
+  return {
+    name: row.top_tier_name,
+    minAmount: toNumber(row.top_tier_min),
   };
 }
 
@@ -356,6 +400,11 @@ export function toBacker(row) {
     projects,
     projectsLabel: `${projects} ${projects === 1 ? "project" : "projects"}`,
     lastInvested: formatDate(row.last_invested_at),
+    // The highest support level this person ever chose across the creator's projects.
+    // The row is grouped per PERSON over every project they backed, so the chip means
+    // "their strongest signal to you", not "their level on one project" — the
+    // "N projects" line next to it keeps that from being misread.
+    topTier: toTopTier(row),
   };
 }
 
@@ -478,5 +527,9 @@ export function toInvestment(row) {
     // The backer keeps the card either way — archiving a project must not erase
     // somebody's spend history — so it is badged rather than dropped.
     archived: row.archived_at != null,
+    // The highest support level chosen for this project. Null for anything backed
+    // before support levels existed and for every "just support" investment, which is
+    // most of them — the card simply shows no chip.
+    topTier: toTopTier(row),
   };
 }

@@ -14,6 +14,7 @@ import {
   toInvestment,
   toProjectUpdate,
   toCommentThread,
+  toTier,
 } from "./mappers";
 
 // A project row as Postgres actually returns it through node-postgres: note that
@@ -386,6 +387,19 @@ describe("toBacker", () => {
     expect(toBacker(backerRow({ project_count: 1 })).projectsLabel).toBe("1 project");
     expect(toBacker(backerRow({ project_count: 2 })).projectsLabel).toBe("2 projects");
   });
+
+  it("has no support level when the person never chose one", () => {
+    // The common case by far: every investment made before 2026-08-20, plus every
+    // "No level — just support" choice. The LEFT JOIN leaves both columns NULL.
+    expect(toBacker(backerRow({ top_tier_name: null, top_tier_min: null })).topTier).toBeNull();
+    // Absent entirely, e.g. an older cached response.
+    expect(toBacker(backerRow()).topTier).toBeNull();
+  });
+
+  it("carries the highest level the person chose", () => {
+    const b = toBacker(backerRow({ top_tier_name: "Pilot partner", top_tier_min: 250 }));
+    expect(b.topTier).toEqual({ name: "Pilot partner", minAmount: 250 });
+  });
 });
 
 describe("toAdminProject", () => {
@@ -573,6 +587,85 @@ describe("toInvestment", () => {
 // The archive columns, added 2026-08-11 when delete was replaced by a two-step bin.
 // The point of these is that archiving is a SECOND axis: it must never disturb the
 // moderation status, because restore relies on that status surviving untouched.
+describe("toInvestment support level", () => {
+  const row = (overrides = {}) => ({
+    project_id: 4,
+    title: "Autonomous Swarm Drones",
+    description: "Coordinated drones for disaster mapping.",
+    category: "ENGINEERING",
+    image_url: null,
+    current_amount: "500.00",
+    goal_amount: "15000.00",
+    status: "APPROVED",
+    archived_at: null,
+    invested_amount: 500,
+    investment_count: 1,
+    first_invested_at: "2026-08-05T02:46:36.210Z",
+    last_invested_at: "2026-08-05T02:46:36.210Z",
+    ...overrides,
+  });
+
+  it("is null when no level was chosen", () => {
+    expect(toInvestment(row()).topTier).toBeNull();
+    expect(toInvestment(row({ top_tier_name: null, top_tier_min: null })).topTier).toBeNull();
+  });
+
+  it("carries the highest level chosen for the project", () => {
+    expect(toInvestment(row({ top_tier_name: "Advocate", top_tier_min: 50 })).topTier)
+      .toEqual({ name: "Advocate", minAmount: 50 });
+  });
+
+  it("coerces the minimum, since node-postgres has handed this codebase strings before", () => {
+    expect(toInvestment(row({ top_tier_name: "Advocate", top_tier_min: "50" })).topTier.minAmount).toBe(50);
+  });
+});
+
+describe("toTier", () => {
+  const tierRow = (overrides = {}) => ({
+    id: 3,
+    project_id: 4,
+    name: "Pilot partner",
+    min_amount: 250,
+    bullets: ["I want the team to install a trial unit in my area."],
+    is_active: true,
+    backers_count: 12,
+    created_at: "2026-08-20T02:00:00.000Z",
+    ...overrides,
+  });
+
+  it("maps a level onto the shape the UI reads", () => {
+    const t = toTier(tierRow());
+    expect(t.id).toBe(3);
+    expect(t.name).toBe("Pilot partner");
+    expect(t.minAmount).toBe(250);
+    expect(t.bullets).toEqual(["I want the team to install a trial unit in my area."]);
+    expect(t.backersCount).toBe(12);
+    expect(t.isActive).toBe(true);
+  });
+
+  it("coerces min_amount and backers_count to numbers", () => {
+    // COUNT() and INTEGER columns have both arrived as strings from node-postgres in
+    // this codebase, and the resulting bugs were silent.
+    const t = toTier(tierRow({ min_amount: "250", backers_count: "12" }));
+    expect(t.minAmount).toBe(250);
+    expect(t.backersCount).toBe(12);
+  });
+
+  it("reports 0 backers rather than NaN when nobody has chosen it", () => {
+    expect(toTier(tierRow({ backers_count: 0 })).backersCount).toBe(0);
+    expect(toTier(tierRow({ backers_count: null })).backersCount).toBe(0);
+  });
+
+  it("always hands back an array of bullets", () => {
+    expect(toTier(tierRow({ bullets: null })).bullets).toEqual([]);
+    expect(toTier(tierRow({ bullets: undefined })).bullets).toEqual([]);
+  });
+
+  it("treats a hidden level as inactive", () => {
+    expect(toTier(tierRow({ is_active: false })).isActive).toBe(false);
+  });
+});
+
 describe("archive fields", () => {
   it("reports a live project as not archived, with no stray metadata", () => {
     for (const mapped of [toDetail(projectRow()), toCreatorProject(projectRow()), toAdminProject(projectRow())]) {

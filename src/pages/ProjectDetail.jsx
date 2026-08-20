@@ -7,10 +7,11 @@ import CommentList from "../components/project/CommentList";
 import ProjectVideo from "../components/project/ProjectVideo";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
 import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
+import SupportLevels from "../components/project/SupportLevels";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
-import { toDetail, toProjectUpdate, toCommentThread } from "../api/mappers";
+import { toDetail, toProjectUpdate, toCommentThread, toTier } from "../api/mappers";
 
 // Plain progress track for the detail-page sidebar (no % label — the sidebar
 // renders its own big % + "FUNDED" below). Distinct from the labelled card
@@ -176,16 +177,39 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const handleConfirmInvestment = async (amount) => {
+  // Support levels, on their own endpoint for the same reason the updates are: a
+  // failure here must not blank a page that reads perfectly well without them.
+  // `tiersVersion` is bumped after a successful investment — backersCount on each level
+  // only exists server-side, so the count is refetched rather than guessed at locally.
+  const [tiers, setTiers] = useState([]);
+  const [tiersVersion, setTiersVersion] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await projectApi.getProjectTiers(id);
+        if (!cancelled) setTiers((rows || []).map(toTier));
+      } catch {
+        if (!cancelled) setTiers([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id, tiersVersion]);
+
+  // `tierId` is the support level the backer picked, or null for "just support".
+  const handleConfirmInvestment = async (amount, tierId = null) => {
     setInvestError(null);
     try {
-      await projectApi.investProject(id, amount);
+      await projectApi.investProject(id, amount, tierId);
       setInvestedAmount(amount);
       setInvestStep("success");
       // Both the Header balance and the funding progress change after investing.
       refreshBalance();
       const row = await projectApi.getProjectById(id);
       setP(toDetail(row));
+      // And so does the "N backers at this level" count, which is computed in SQL.
+      setTiersVersion(v => v + 1);
     } catch (err) {
       setInvestStep(null);
       setInvestError(err.response?.data?.message || err.message || "Investment failed");
@@ -269,7 +293,7 @@ export default function ProjectDetail() {
 
   const tabs = [
     { id: "about", label: "About" },
-    { id: "rewards", label: "Rewards" },
+    { id: "levels", label: "Support Levels", count: tiers.length },
     { id: "updates", label: "Updates", count: updates.length },
   ];
 
@@ -477,11 +501,15 @@ export default function ProjectDetail() {
               </div>
             )}
 
-            {activeTab === "rewards" && (
-              <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>🎁</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>No rewards available yet</div>
-              </div>
+            {activeTab === "levels" && (
+              <SupportLevels
+                levels={tiers}
+                emptyMessage={
+                  isOwner
+                    ? "Add them from My Projects → Edit Project → Support Levels."
+                    : "This project has not set any support levels."
+                }
+              />
             )}
 
             {activeTab === "updates" && (
@@ -526,6 +554,7 @@ export default function ProjectDetail() {
       {investStep === "invest" && (
         <BackerInvestmentModal
           project={p}
+          levels={tiers}
           balance={balance}
           onClose={closeModals}
           onConfirm={handleConfirmInvestment}

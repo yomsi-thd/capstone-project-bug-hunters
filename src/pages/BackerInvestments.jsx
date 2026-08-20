@@ -63,6 +63,20 @@ function InvestmentCard({ investment, isMobile }) {
                 ARCHIVED
               </span>
             )}
+            {/* The support level this backer chose. Null for anything backed before
+                2026-08-20 and for every "just support" investment, so most cards show
+                nothing here. When the card covers several investments it is the HIGHEST
+                level they picked — "across N investments" below already says the card is
+                a total, so the two do not contradict each other. */}
+            {investment.topTier && (
+              <span style={{
+                fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
+                color: "#7a1020", background: "#fff2f4", border: "1px solid #f3ccd4",
+                borderRadius: "4px", padding: "3px 7px", whiteSpace: "nowrap",
+              }}>
+                {investment.topTier.name.toUpperCase()}
+              </span>
+            )}
             <Tag label={investment.tag} />
           </div>
         </div>
