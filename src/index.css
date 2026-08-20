@@ -199,6 +199,20 @@
 .lp-stagger > *:nth-child(8) { animation-delay: 0.39s; }
 .lp-stagger > *:nth-child(n+9) { animation-delay: 0.44s; }
 
+/* The two drifting blobs behind the sign-in card. Moved out of a <style> tag inside
+   AuthLayout on 20/08 — keyframes belong to the one motion vocabulary, not to a component
+   that re-injects them into the document every time it mounts. */
+@keyframes lp-float-a {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(-20px, 20px); }
+}
+@keyframes lp-float-b {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(20px, -15px); }
+}
+.lp-float-a { animation: lp-float-a 8s ease-in-out infinite; }
+.lp-float-b { animation: lp-float-b 10s ease-in-out infinite; }
+
 /* Modal backdrop + card. */
 .lp-overlay { animation: lp-fade-in 0.2s ease-out; }
 .lp-modal   { animation: lp-pop-in 0.32s cubic-bezier(0.16, 1, 0.3, 1); }
@@ -230,6 +244,8 @@
   .lp-reveal,
   .lp-stagger > *,
   .lp-overlay,
+  .lp-float-a,
+  .lp-float-b,
   .lp-modal { animation: none !important; }
   .lp-card { transition: none; }
   .lp-card:hover { transform: none; }

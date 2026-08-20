@@ -9,45 +9,33 @@ export default function AuthInput({
   const inputType = isPassword ? (showPassword ? "text" : "password") : type;
 
   return (
-    <div style={{ marginBottom: "18px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-        <label style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", color: "#888" }}>
+    <div className="mb-[18px]">
+      <div className="mb-1.5 flex items-center justify-between">
+        <label className="text-[11px] font-bold tracking-[0.06em] text-neutral-500">
           {label}
         </label>
         {rightSlot}
       </div>
 
-      <div style={{ position: "relative" }}>
+      <div className="relative">
+        {/* The focus ring used to be a `.auth-input:focus` rule with !important on both
+            declarations, injected from AuthLayout — !important was the only way to beat the
+            inline border-color that used to sit on this input. With the border in a class,
+            focus: wins on its own and the hack is gone. */}
         <input
-          className="auth-input"
           type={inputType}
           value={value}
           onChange={onChange}
           placeholder={placeholder}
           disabled={disabled}
-          style={{
-            width: "100%", boxSizing: "border-box",
-            border: `1px solid ${error ? "var(--color-brand)" : "#ddd"}`,
-            borderRadius: "7px", padding: isPassword ? "12px 42px 12px 14px" : "12px 14px",
-            fontSize: "14px", color: disabled ? "#999" : "#222", outline: "none",
-            transition: "border-color 0.15s, box-shadow 0.15s",
-            background: disabled ? "#f1f1ef" : "#fafafa",
-            cursor: disabled ? "not-allowed" : "text",
-          }}
+          className={`w-full rounded-[7px] border bg-neutral-50 py-3 text-[14px] text-neutral-800 outline-none transition-[border-color,box-shadow] duration-150 focus:border-brand focus:shadow-[0_0_0_3px_rgba(204,0,0,0.1)] disabled:cursor-not-allowed disabled:bg-[#f1f1ef] disabled:text-neutral-400 ${error ? "border-brand" : "border-neutral-200"} ${isPassword ? "pr-[42px] pl-3.5" : "px-3.5"}`}
         />
         {isPassword && (
           <button
             type="button"
             onClick={() => setShowPassword(v => !v)}
             tabIndex={-1}
-            style={{
-              position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
-              background: "none", border: "none", cursor: "pointer", padding: "4px",
-              color: "#999", display: "flex", alignItems: "center",
-              transition: "color 0.15s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.color = "#666"}
-            onMouseLeave={e => e.currentTarget.style.color = "#999"}
+            className="absolute top-1/2 right-2.5 flex -translate-y-1/2 cursor-pointer items-center border-none bg-none p-1 text-neutral-400 transition-colors duration-150 hover:text-neutral-600"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? (
@@ -60,7 +48,7 @@ export default function AuthInput({
       </div>
 
       {error && (
-        <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "5px" }}>{error}</div>
+        <div className="mt-[5px] text-[12px] text-brand">{error}</div>
       )}
     </div>
   );
