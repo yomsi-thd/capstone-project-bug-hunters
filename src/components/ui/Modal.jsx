@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 // The shared dialog frame.
 //
 // Before 20/08 ten modals across nine files built their own overlay, and they had drifted
@@ -41,6 +43,26 @@ export default function Modal({
   panelClassName = "",
   children,
 }) {
+  // Escape closes the dialog. Added 20/08 — this ADDS behaviour rather than moving style,
+  // which is why it landed in its own commit.
+  //
+  // ⚠️ The listener goes on `document`, not on the panel. The panel takes no focus, so a
+  // handler bound to it would silently do nothing until the user had already clicked
+  // inside — which is the one case where they do not need a shortcut.
+  //
+  // It honours `closable`, so the three dialogs that must not be dismissed by accident
+  // are not suddenly dismissable by keyboard instead.
+  useEffect(() => {
+    if (!closable) return;
+
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [closable, onClose]);
+
   return (
     <div
       className="lp-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
