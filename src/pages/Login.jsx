@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import AuthLayout from "../components/auth/AuthLayout";
 import AuthInput from "../components/auth/AuthInput";
+import SsoButton from "../components/auth/SsoButton";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 
@@ -129,17 +130,7 @@ export default function Login() {
       </div>
 
       {/* SSO button */}
-      <button
-        type="button"
-        onClick={() => {/* TODO: integrate RMIT SSO */}}
-        /* The hover shadow is navy, not brand red, and that is deliberate: this is RMIT
-           SSO rather than the app own primary action, and a red glow under a navy button
-           would read as the same button painted twice. */
-        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-[#1a1a3d] p-[13px] text-[13px] font-bold tracking-[0.03em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-[#0d0d28] hover:shadow-[0_6px_16px_rgba(26,26,61,0.35)]"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
-        SIGN IN WITH RMIT SSO
-      </button>
+      <SsoButton label="SIGN IN WITH RMIT SSO" />
 
       {/* Register link */}
       <p className="mt-6 mb-0 text-center text-[13px] text-neutral-500">
