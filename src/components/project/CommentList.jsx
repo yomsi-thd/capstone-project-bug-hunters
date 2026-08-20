@@ -56,16 +56,13 @@ export default function CommentList({
 
   return (
     <div>
-      <h2 style={{ fontSize: "20px", fontWeight: 800, margin: "0 0 20px", color: "#111" }}>
+      <h2 className="mx-0 mt-0 mb-5 text-[20px] font-extrabold text-neutral-900">
         Feedback &amp; Discussion
       </h2>
 
       {/* Leave a comment */}
-      <div style={{
-        border: "1px solid #e5e7eb", borderRadius: "8px",
-        padding: "16px", marginBottom: "28px", background: "#fff",
-      }}>
-        <p style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em", color: "#888", margin: "0 0 8px" }}>
+      <div className="mb-7 rounded-lg border border-neutral-200 bg-white p-4">
+        <p className="mx-0 mt-0 mb-2 text-[11px] font-bold tracking-[0.06em] text-neutral-500">
           LEAVE A COMMENT
         </p>
         <textarea
@@ -73,58 +70,35 @@ export default function CommentList({
           onChange={e => setText(e.target.value)}
           placeholder="Ask a question or share your thoughts with the team..."
           disabled={!canPost}
-          style={{
-            width: "100%", minHeight: "80px", border: "none",
-            outline: "none", resize: "vertical", fontSize: "14px",
-            color: "#333", lineHeight: 1.6, fontFamily: "inherit",
-            background: "transparent", boxSizing: "border-box",
-            opacity: canPost ? 1 : 0.5,
-          }}
+          className={`min-h-20 w-full resize-y border-none bg-transparent font-[inherit] text-[14px] leading-relaxed text-neutral-800 outline-none ${canPost ? "opacity-100" : "opacity-50"}`}
         />
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
+        <div className="mt-2 flex justify-end">
           <button
             onClick={handlePost}
             disabled={!canPost || !text.trim() || posting}
-            style={{
-              background: canPost && text.trim() ? "var(--color-brand)" : "#ccc",
-              color: "#fff", border: "none", borderRadius: "5px",
-              fontSize: "12px", fontWeight: 700, letterSpacing: "0.06em",
-              padding: "8px 20px", cursor: canPost && text.trim() ? "pointer" : "not-allowed",
-              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            }}
-            onMouseEnter={e => {
-              if (!canPost || !text.trim()) return;
-              e.currentTarget.style.background = "#aa0000";
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = canPost && text.trim() ? "var(--color-brand)" : "#ccc";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            className="cursor-pointer rounded-[5px] border-none bg-brand px-5 py-2 text-[12px] font-bold tracking-[0.06em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_4px_12px_rgba(204,0,0,0.3)] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:hover:translate-y-0 disabled:hover:bg-neutral-300 disabled:hover:shadow-none"
           >
             {posting ? "POSTING…" : "POST COMMENT"}
           </button>
         </div>
         {error && (
-          <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "8px" }}>{error}</div>
+          <div className="mt-2 text-[12px] text-brand">{error}</div>
         )}
         {/* `locked` is checked first: a signed-in reader on a closed thread must not be
             told to sign in. */}
         {locked ? (
-          <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px" }}>
+          <div className="mt-2 text-[12px] text-neutral-400">
             {lockedMessage}
           </div>
         ) : !isLoggedIn && (
-          <div style={{ fontSize: "12px", color: "#aaa", marginTop: "8px" }}>
+          <div className="mt-2 text-[12px] text-neutral-400">
             Sign in to join the discussion.
           </div>
         )}
       </div>
 
       {/* Comment list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+      <div className="flex flex-col gap-5">
         {visibleComments.map(comment => (
           <div key={comment.id}>
             <CommentItem comment={comment} />
@@ -136,55 +110,35 @@ export default function CommentList({
                 own, matching what CommentItem can render. */}
             {canPost && (
               replyTo === comment.id ? (
-                <div style={{ paddingLeft: "46px", marginTop: "12px" }}>
+                <div className="mt-3 pl-[46px]">
                   <textarea
                     value={replyText}
                     onChange={e => setReplyText(e.target.value)}
                     placeholder={`Reply to ${comment.author}…`}
                     autoFocus
-                    style={{
-                      width: "100%", minHeight: "62px", border: "1px solid #e5e7eb",
-                      borderRadius: "6px", padding: "10px", outline: "none", resize: "vertical",
-                      fontSize: "13px", color: "#333", lineHeight: 1.6, fontFamily: "inherit",
-                      boxSizing: "border-box",
-                    }}
+                    className="min-h-[62px] w-full resize-y rounded-md border border-neutral-200 p-2.5 font-[inherit] text-[13px] leading-relaxed text-neutral-800 outline-none"
                   />
-                  <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "6px" }}>
+                  <div className="mt-1.5 flex justify-end gap-2">
                     <button
                       onClick={() => { setReplyTo(null); setReplyText(""); }}
-                      style={{
-                        background: "none", border: "1px solid #ddd", borderRadius: "5px",
-                        fontSize: "11px", fontWeight: 600, color: "#666",
-                        padding: "6px 14px", cursor: "pointer",
-                      }}
+                      className="cursor-pointer rounded-[5px] border border-neutral-200 bg-none px-3.5 py-1.5 text-[11px] font-semibold text-neutral-600"
                     >
                       CANCEL
                     </button>
                     <button
                       onClick={() => handleReply(comment.id)}
                       disabled={!replyText.trim() || posting}
-                      style={{
-                        background: replyText.trim() && !posting ? "var(--color-brand)" : "#ccc",
-                        color: "#fff", border: "none", borderRadius: "5px",
-                        fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em",
-                        padding: "6px 16px",
-                        cursor: replyText.trim() && !posting ? "pointer" : "not-allowed",
-                      }}
+                      className="cursor-pointer rounded-[5px] border-none bg-brand px-4 py-1.5 text-[11px] font-bold tracking-[0.06em] text-white disabled:cursor-not-allowed disabled:bg-neutral-300"
                     >
                       {posting ? "POSTING…" : "REPLY"}
                     </button>
                   </div>
                 </div>
               ) : (
-                <div style={{ paddingLeft: "46px", marginTop: "10px" }}>
+                <div className="mt-2.5 pl-[46px]">
                   <button
                     onClick={() => { setReplyTo(comment.id); setReplyText(""); }}
-                    style={{
-                      background: "none", border: "none", padding: 0, cursor: "pointer",
-                      fontSize: "12px", fontWeight: 600, color: "#888", transition: "color 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = "var(--color-brand)"}
-                    onMouseLeave={e => e.currentTarget.style.color = "#888"}
+                    className="cursor-pointer border-none bg-none p-0 text-[12px] font-semibold text-neutral-500 transition-colors duration-150 hover:text-brand"
                   >
                     ↩ Reply
                   </button>
@@ -192,12 +146,12 @@ export default function CommentList({
               )
             )}
 
-            <div style={{ borderBottom: "1px solid #f0f0f0", marginTop: "20px" }} />
+            <div className="mt-5 border-b border-neutral-100" />
           </div>
         ))}
 
         {comments.length === 0 && (
-          <div style={{ fontSize: "13px", color: "#aaa", padding: "8px 0" }}>
+          <div className="py-2 text-[13px] text-neutral-400">
             No comments yet — be the first to ask the team something.
           </div>
         )}
@@ -205,16 +159,10 @@ export default function CommentList({
 
       {/* View all */}
       {!expanded && comments.length > PREVIEW_COUNT && (
-        <div style={{ textAlign: "center", marginTop: "24px" }}>
+        <div className="mt-6 text-center">
           <button
             onClick={() => setExpanded(true)}
-            style={{
-              background: "none", border: "1px solid #ddd", borderRadius: "5px",
-              fontSize: "13px", fontWeight: 600, color: "#555",
-              padding: "10px 24px", cursor: "pointer", transition: "all 0.15s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = "var(--color-brand)"}
-            onMouseLeave={e => e.currentTarget.style.borderColor = "#ddd"}
+            className="cursor-pointer rounded-[5px] border border-neutral-200 bg-none px-6 py-2.5 text-[13px] font-semibold text-neutral-600 transition-all duration-150 hover:border-brand"
           >
             VIEW ALL {totalComments} COMMENTS
           </button>
