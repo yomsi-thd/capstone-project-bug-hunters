@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import Badge from "../components/ui/Badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import EditProject from "./EditProject";
@@ -26,25 +27,31 @@ const DEPT_STYLE = {
 // Pending Review and a rejected project matched none of them, so it sat in the list as a
 // blank card indistinguishable from a loading one — which is why it looked like rejected
 // projects had silently disappeared. They never left; they just stopped saying anything.
+// `tone` here is the Badge vocabulary, so the colours live in one place. The LABEL still
+// belongs to this file: toCreatorProject renames APPROVED to "Active" for the funding
+// framing, but a creator looking at this card needs the board's verdict, so the badge says
+// APPROVED while the "ACTIVE FUNDING" stat keeps the other wording.
 const STATUS_BADGE = {
-  Active: { label: "APPROVED", className: "text-green-700 bg-green-50 border-green-200" },
-  "Pending Review": { label: "PENDING REVIEW", className: "text-amber-700 bg-amber-50 border-amber-200" },
-  Rejected: { label: "REJECTED", className: "text-red-700 bg-red-50 border-red-200" },
-  Draft: { label: "DRAFT", className: "text-gray-500 bg-gray-50 border-gray-200" },
+  Active: { label: "APPROVED", tone: "success" },
+  "Pending Review": { label: "PENDING REVIEW", tone: "warning" },
+  Rejected: { label: "REJECTED", tone: "danger" },
+  Draft: { label: "DRAFT", tone: "neutral" },
 };
 
+// ⚠️ Kept separate from AdminUserManagement's StatusDot even though both say "status".
+// That one is a USER's status; this is a PROJECT's. Same shape, different fact.
 function StatusBadge({ status }) {
   // An unmapped status still gets a badge rather than silently rendering nothing —
   // that silence is the bug this exists to fix.
   const badge = STATUS_BADGE[status] || {
     label: String(status || "UNKNOWN").toUpperCase(),
-    className: "text-gray-500 bg-gray-50 border-gray-200",
+    tone: "neutral",
   };
 
   return (
-    <span className={`text-[10px] font-bold border rounded-sm px-2 py-1 shrink-0 whitespace-nowrap ${badge.className}`}>
+    <Badge tone={badge.tone} size="sm" className="shrink-0">
       {badge.label}
-    </span>
+    </Badge>
   );
 }
 
