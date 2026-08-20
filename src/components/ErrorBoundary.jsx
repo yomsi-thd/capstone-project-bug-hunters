@@ -2,6 +2,18 @@ import { Component } from "react";
 import { useLocation } from "react-router-dom";
 
 /**
+ * ⚠️ THIS FILE KEEPS ITS INLINE STYLES ON PURPOSE — do not convert it to Tailwind.
+ *
+ * The rest of the app moved to Tailwind on 2026-08-20. This is the ONE exception left,
+ * and it is a decision rather than an oversight: if the measuring command in
+ * CODE-GUIDE §7.2 prints this file, that is the right answer.
+ *
+ * This is the screen that appears when everything else has already failed. Inline styles
+ * are the last link in the chain of things it refuses to depend on: they render correctly
+ * EVEN IF THE STYLESHEET NEVER LOADED. A Tailwind class is a promise that a separate file
+ * arrived and parsed; on the one screen whose whole job is to work when promises are
+ * broken, that is the wrong trade. Consistency is worth less here than certainty.
+ *
  * The fallback is deliberately SELF-CONTAINED: no Header, no Footer, no useAuth, no
  * router Link.
  *
