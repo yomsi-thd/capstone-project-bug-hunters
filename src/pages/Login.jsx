@@ -64,7 +64,7 @@ export default function Login() {
 
   return (
     <AuthLayout isMobile={isMobile}>
-      <h1 style={{ fontSize: "18px", fontWeight: 700, color: "#333", textAlign: "center", margin: "0 0 28px" }}>
+      <h1 className="mx-0 mt-0 mb-7 text-center text-[18px] font-bold text-neutral-800">
         Sign in to your account
       </h1>
 
@@ -87,21 +87,19 @@ export default function Login() {
           rightSlot={
             <Link
               to="#"
-              style={{ fontSize: "12px", color: "var(--color-brand)", fontWeight: 600, textDecoration: "none", transition: "opacity 0.15s" }}
-              onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-              onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+              className="text-[12px] font-semibold text-brand no-underline transition-opacity hover:opacity-70"
             >
               Forgot Password?
             </Link>
           }
         />
 
-        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "#555", marginBottom: "22px", cursor: "pointer" }}>
+        <label className="mb-[22px] flex cursor-pointer items-center gap-2 text-[13px] text-neutral-600">
           <input
             type="checkbox"
             checked={rememberMe}
             onChange={e => setRememberMe(e.target.checked)}
-            style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer" }}
+            className="h-[15px] w-[15px] cursor-pointer accent-brand"
           />
           Remember me
         </label>
@@ -109,32 +107,14 @@ export default function Login() {
         <button
           type="submit"
           disabled={isSubmitting}
-          style={{
-            width: "100%", background: isSubmitting ? "#e88a8a" : "var(--color-brand)",
-            color: "#fff", border: "none", borderRadius: "8px",
-            fontSize: "14px", fontWeight: 700, letterSpacing: "0.04em",
-            padding: "14px", cursor: isSubmitting ? "default" : "pointer",
-            transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          }}
-          onMouseEnter={e => {
-            if (isSubmitting) return;
-            e.currentTarget.style.background = "#aa0000";
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "var(--color-brand)";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "none";
-          }}
+          /* The lift-and-shadow hover is Tailwind now rather than two mouse handlers.
+             disabled: carries the submitting state, so "do not lift while submitting" is
+             stated once instead of being re-tested inside the hover handler. */
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-brand p-3.5 text-[14px] font-bold tracking-[0.04em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.3)] disabled:cursor-default disabled:bg-[#e88a8a] disabled:hover:translate-y-0 disabled:hover:bg-[#e88a8a] disabled:hover:shadow-none"
         >
           {isSubmitting ? (
             <>
-              <span className="lp-spin" style={{
-                width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)",
-                borderTopColor: "#fff", borderRadius: "50%", display: "inline-block",
-              }} />
+              <span className="lp-spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white" />
               SIGNING IN...
             </>
           ) : "LOGIN"}
@@ -142,46 +122,31 @@ export default function Login() {
       </form>
 
       {/* Divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "26px 0" }}>
-        <div style={{ flex: 1, height: "1px", background: "#eee" }} />
-        <span style={{ fontSize: "11px", color: "#aaa", fontWeight: 600 }}>OR</span>
-        <div style={{ flex: 1, height: "1px", background: "#eee" }} />
+      <div className="my-[26px] flex items-center gap-3">
+        <div className="h-px flex-1 bg-neutral-100" />
+        <span className="text-[11px] font-semibold text-neutral-400">OR</span>
+        <div className="h-px flex-1 bg-neutral-100" />
       </div>
 
       {/* SSO button */}
       <button
         type="button"
         onClick={() => {/* TODO: integrate RMIT SSO */}}
-        style={{
-          width: "100%", background: "#1a1a3d", color: "#fff", border: "none",
-          borderRadius: "8px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.03em",
-          padding: "13px", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = "#0d0d28";
-          e.currentTarget.style.transform = "translateY(-1px)";
-          e.currentTarget.style.boxShadow = "0 6px 16px rgba(26,26,61,0.35)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = "#1a1a3d";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
+        /* The hover shadow is navy, not brand red, and that is deliberate: this is RMIT
+           SSO rather than the app own primary action, and a red glow under a navy button
+           would read as the same button painted twice. */
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-[#1a1a3d] p-[13px] text-[13px] font-bold tracking-[0.03em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-[#0d0d28] hover:shadow-[0_6px_16px_rgba(26,26,61,0.35)]"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         SIGN IN WITH RMIT SSO
       </button>
 
       {/* Register link */}
-      <p style={{ textAlign: "center", fontSize: "13px", color: "#777", marginTop: "24px", marginBottom: 0 }}>
+      <p className="mt-6 mb-0 text-center text-[13px] text-neutral-500">
         Don't have an account?{" "}
         <Link
           to="/register"
-          style={{ color: "var(--color-brand)", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-          onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+          className="font-bold text-brand no-underline transition-opacity hover:opacity-70"
         >
           Register
         </Link>
