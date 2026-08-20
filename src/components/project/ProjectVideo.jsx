@@ -9,21 +9,21 @@ export default function ProjectVideo({ url }) {
   const embed = toEmbedUrl(url);
 
   return (
-    <div style={{ marginBottom: "32px" }}>
-      <h2 style={{ fontSize: "18px", fontWeight: 800, color: "#111", margin: "0 0 12px" }}>
+    <div className="mb-8">
+      <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
         Project Video
       </h2>
 
       {embed ? (
         // 16:9 through padding rather than `aspect-ratio`, so it behaves identically in
         // whatever browser the demo runs in.
-        <div style={{ position: "relative", width: "100%", paddingTop: "56.25%", borderRadius: "10px", overflow: "hidden", background: "#000" }}>
+        <div className="relative w-full overflow-hidden rounded-[10px] bg-black pt-[56.25%]">
           <iframe
             src={embed}
             title="Project video"
             allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
-            style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+            className="absolute inset-0 h-full w-full border-none"
           />
         </div>
       ) : isLinkable(url) ? (
@@ -31,14 +31,14 @@ export default function ProjectVideo({ url }) {
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{ fontSize: "14px", color: "var(--color-brand)", fontWeight: 600, wordBreak: "break-all" }}
+          className="text-[14px] font-semibold break-all text-brand"
         >
           {url} ↗
         </a>
       ) : (
         // Not a usable link. Shown as text rather than hidden, so the creator can see
         // what they saved and go fix it.
-        <div style={{ fontSize: "13px", color: "#888", wordBreak: "break-all" }}>
+        <div className="text-[13px] break-all text-neutral-500">
           {url} — this does not look like a valid video link.
         </div>
       )}
