@@ -11,56 +11,28 @@ import { toInvestment } from "../api/mappers";
 
 function InvestmentCard({ investment, isMobile }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: isMobile ? "column" : "row",
-        border: "1px solid #e5e7eb",
-        borderRadius: "10px",
-        overflow: "hidden",
-        background: "#fff",
-        marginBottom: "20px",
-        transition: "transform 0.2s ease, box-shadow 0.2s ease",
-      }}
-      onMouseEnter={e => {
-        e.currentTarget.style.transform = "translateY(-3px)";
-        e.currentTarget.style.boxShadow = "0 10px 24px rgba(0,0,0,0.08)";
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
+    <div className={`mb-5 flex overflow-hidden rounded-[10px] border border-neutral-200 bg-white transition-[transform,box-shadow] duration-200 ease-out hover:-translate-y-[3px] hover:shadow-[0_10px_24px_rgba(0,0,0,0.08)] ${isMobile ? "flex-col" : "flex-row"}`}>
       {/* Image */}
-      <div style={{
-        width: isMobile ? "100%" : "220px",
-        height: isMobile ? "160px" : "auto",
-        flexShrink: 0,
-        background: "#111",
-      }}>
+      <div className={`shrink-0 bg-neutral-900 ${isMobile ? "h-40 w-full" : "h-auto w-[220px]"}`}>
         <img
           src={investment.img}
           alt={investment.title}
-          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+          className="block h-full w-full object-cover"
         />
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, padding: isMobile ? "16px" : "20px 24px", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "6px" }}>
-          <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: "#111" }}>
+      <div className={`flex flex-1 flex-col ${isMobile ? "p-4" : "px-6 py-5"}`}>
+        <div className="mb-1.5 flex items-start justify-between gap-3">
+          <h3 className="m-0 text-[18px] font-extrabold text-neutral-900">
             {investment.title}
           </h3>
-          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
+          <div className="flex shrink-0 items-center gap-1.5">
             {/* The project was archived after this investment. The card stays — nobody's
                 spend history disappears because a creator or admin tidied up — but it is
                 marked so the funding bar below is not read as a live campaign. */}
             {investment.archived && (
-              <span style={{
-                fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
-                color: "#7a5200", background: "#fff8e6", border: "1px solid #f0d9a0",
-                borderRadius: "4px", padding: "3px 7px", whiteSpace: "nowrap",
-              }}>
+              <span className="rounded border border-[#f0d9a0] bg-[#fff8e6] px-[7px] py-[3px] text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-[#7a5200]">
                 ARCHIVED
               </span>
             )}
@@ -70,11 +42,7 @@ function InvestmentCard({ investment, isMobile }) {
                 level they picked — "across N investments" below already says the card is
                 a total, so the two do not contradict each other. */}
             {investment.topTier && (
-              <span style={{
-                fontSize: "10px", fontWeight: 700, letterSpacing: "0.06em",
-                color: "#7a1020", background: "#fff2f4", border: "1px solid #f3ccd4",
-                borderRadius: "4px", padding: "3px 7px", whiteSpace: "nowrap",
-              }}>
+              <span className="rounded border border-[#f3ccd4] bg-[#fff2f4] px-[7px] py-[3px] text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-[#7a1020]">
                 {investment.topTier.name.toUpperCase()}
               </span>
             )}
@@ -82,22 +50,17 @@ function InvestmentCard({ investment, isMobile }) {
           </div>
         </div>
 
-        <p style={{ margin: "0 0 16px", fontSize: "13px", color: "#777", lineHeight: 1.6 }}>
+        <p className="mx-0 mt-0 mb-4 text-[13px] leading-relaxed text-neutral-500">
           {investment.desc}
         </p>
 
-        <div style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: isMobile ? "16px" : "32px",
-          marginBottom: "16px",
-        }}>
+        <div className={`mb-4 flex flex-wrap ${isMobile ? "gap-4" : "gap-8"}`}>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", color: "#999", marginBottom: "4px" }}>
+            <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
               INVESTED AMOUNT
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "15px", fontWeight: 700, color: "#111" }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={{ stroke: "var(--color-brand)" }} strokeWidth="2.5">
+            <div className="flex items-center gap-[5px] text-[15px] font-bold text-neutral-900">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className="stroke-brand" strokeWidth="2.5">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 6v12M9 9h4.5a1.5 1.5 0 0 1 0 3H9m0 0h4.5a1.5 1.5 0 0 1 0 3H9" />
               </svg>
@@ -107,73 +70,47 @@ function InvestmentCard({ investment, isMobile }) {
                 900 CC could be one investment or three, and the difference matters
                 to somebody reading their own history. */}
             {investment.investmentCount > 1 && (
-              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>
+              <div className="mt-[3px] text-[11px] text-neutral-500">
                 across {investment.investmentCount} investments
               </div>
             )}
           </div>
 
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", color: "#999", marginBottom: "4px" }}>
+            <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
               {investment.investmentCount > 1 ? "LATEST INVESTMENT" : "INVESTMENT DATE"}
             </div>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: "#111" }}>
+            <div className="text-[15px] font-bold text-neutral-900">
               {investment.investmentDate}
             </div>
             {investment.investmentCount > 1 && (
-              <div style={{ fontSize: "11px", color: "#888", marginTop: "3px" }}>
+              <div className="mt-[3px] text-[11px] text-neutral-500">
                 first on {investment.firstInvestmentDate}
               </div>
             )}
           </div>
 
-          <div style={{ flex: isMobile ? "0 0 100%" : "1 1 160px", minWidth: "140px" }}>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.05em", color: "#999", marginBottom: "4px" }}>
+          <div className={`min-w-[140px] ${isMobile ? "flex-[0_0_100%]" : "flex-[1_1_160px]"}`}>
+            <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
               FUNDING PROGRESS ({investment.fundingProgress}%)
             </div>
-            <div style={{ height: "6px", background: "#f0f0f0", borderRadius: "3px", overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                width: `${Math.min(investment.fundingProgress, 100)}%`,
-                background: "var(--color-brand)",
-                borderRadius: "3px",
-              }} />
+            <div className="h-1.5 overflow-hidden rounded-sm bg-neutral-100">
+              {/* Runtime width — the datum. */}
+              <div
+                className="h-full rounded-sm bg-brand"
+                style={{ width: `${Math.min(investment.fundingProgress, 100)}%` }}
+              />
             </div>
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: "10px", marginTop: "auto" }}>
-          <button
-            style={{
-              background: "#fff", border: "1px solid #ddd", borderRadius: "5px",
-              fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em",
-              padding: "9px 18px", cursor: "pointer", color: "#444",
-              transition: "background 0.15s, border-color 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#f5f5f5"; e.currentTarget.style.borderColor = "var(--color-brand)"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#ddd"; }}
-          >
+        <div className="mt-auto flex gap-2.5">
+          <button className="cursor-pointer rounded-[5px] border border-neutral-200 bg-white px-[18px] py-[9px] text-[12px] font-bold tracking-[0.04em] text-neutral-700 transition-[background,border-color] duration-150 hover:border-brand hover:bg-neutral-100">
             VIEW UPDATES
           </button>
           <Link
             to={`/project/${investment.projectId}`}
-            style={{
-              textDecoration: "none", background: "var(--color-brand)", color: "#fff",
-              border: "none", borderRadius: "5px",
-              fontSize: "12px", fontWeight: 700, letterSpacing: "0.04em",
-              padding: "9px 18px", cursor: "pointer", display: "inline-block",
-              transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.background = "#aa0000";
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 4px 12px rgba(204,0,0,0.3)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.background = "var(--color-brand)";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            className="rounded-[5px] border-none bg-brand px-[18px] py-[9px] text-[12px] font-bold tracking-[0.04em] text-white no-underline cursor-pointer inline-block transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_4px_12px_rgba(204,0,0,0.3)]"
           >
             PROJECT PAGE
           </Link>
@@ -185,38 +122,17 @@ function InvestmentCard({ investment, isMobile }) {
 
 function EmptyLoggedOut({ isMobile }) {
   return (
-    <div style={{
-      textAlign: "center",
-      padding: isMobile ? "60px 20px" : "80px 20px",
-      border: "1px dashed #ddd",
-      borderRadius: "10px",
-      background: "#fff",
-    }}>
-      <div style={{ fontSize: "36px", marginBottom: "12px" }}>🔒</div>
-      <h3 style={{ fontSize: "18px", fontWeight: 800, color: "#111", margin: "0 0 8px" }}>
+    <div className={`rounded-[10px] border border-dashed border-neutral-200 bg-white px-5 text-center ${isMobile ? "py-15" : "py-20"}`}>
+      <div className="mb-3 text-[36px]">🔒</div>
+      <h3 className="mx-0 mt-0 mb-2 text-[18px] font-extrabold text-neutral-900">
         Login to view your investments
       </h3>
-      <p style={{ fontSize: "14px", color: "#888", margin: "0 0 24px", maxWidth: "360px", marginLeft: "auto", marginRight: "auto" }}>
+      <p className="mx-auto mt-0 mb-6 max-w-[360px] text-[14px] text-neutral-500">
         Sign in to track the RMIT innovations you've backed and follow their funding progress.
       </p>
       <Link
         to="/login"
-        style={{
-          textDecoration: "none", background: "var(--color-brand)", color: "#fff",
-          borderRadius: "6px", fontSize: "13px", fontWeight: 700,
-          letterSpacing: "0.04em", padding: "12px 28px", display: "inline-block",
-          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = "#aa0000";
-          e.currentTarget.style.transform = "translateY(-1px)";
-          e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = "var(--color-brand)";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
+        className="inline-block rounded-md bg-brand px-7 py-3 text-[13px] font-bold tracking-[0.04em] text-white no-underline transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.3)]"
       >
         LOGIN
       </Link>
@@ -276,7 +192,7 @@ export default function BackerInvestments() {
     : investments;
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Helvetica Neue', Arial, sans-serif", background: "#f7f7f5", minHeight: "100vh", color: "#111" }}>
+    <div className="min-h-screen bg-surface text-neutral-900">
 
       <Header
         showSearch={false}
@@ -287,17 +203,18 @@ export default function BackerInvestments() {
         isDesktop={isDesktop}
       />
 
-      <div className="lp-stagger" style={{ maxWidth: "1100px", margin: "0 auto", padding: pad }}>
-        <h1 style={{ fontSize: isMobile ? "24px" : "30px", fontWeight: 800, margin: "0 0 6px", color: "#111" }}>
+      {/* `pad` is derived from the breakpoint hook, so it stays inline. */}
+      <div className="lp-stagger mx-auto max-w-[1100px]" style={{ padding: pad }}>
+        <h1 className={`mx-0 mt-0 mb-1.5 font-extrabold text-neutral-900 ${isMobile ? "text-[24px]" : "text-[30px]"}`}>
           My Investments
         </h1>
-        <p style={{ fontSize: "14px", color: "#888", margin: "0 0 28px" }}>
+        <p className="mx-0 mt-0 mb-7 text-[14px] text-neutral-500">
           Track the progress of RMIT innovations you have supported.
         </p>
 
         {isLoggedIn ? (
           loading ? (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "#888", fontSize: "14px" }}>
+            <div className="px-5 py-15 text-center text-[14px] text-neutral-500">
               Loading your investments…
             </div>
           ) : loadError ? (
@@ -310,24 +227,19 @@ export default function BackerInvestments() {
           ) : investments.length > 0 ? (
             <>
               {/* Local filter — sits right above the list it filters. */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: "8px",
-                background: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px",
-                padding: "10px 14px", marginBottom: "24px",
-                maxWidth: isMobile ? "100%" : "380px",
-              }}>
+              <div className={`mb-6 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 ${isMobile ? "max-w-full" : "max-w-[380px]"}`}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                 <input
                   value={query}
                   onChange={e => setQuery(e.target.value)}
                   placeholder="Search my investments..."
-                  style={{ border: "none", background: "none", outline: "none", fontSize: "14px", color: "#333", width: "100%" }}
+                  className="w-full border-none bg-none text-[14px] text-neutral-800 outline-none"
                 />
                 {query && (
                   <button
                     onClick={() => setQuery("")}
                     aria-label="Clear search"
-                    style={{ background: "none", border: "none", cursor: "pointer", color: "#999", fontSize: "14px", lineHeight: 1, padding: 0 }}
+                    className="cursor-pointer border-none bg-none p-0 text-[14px] leading-none text-neutral-400"
                   >✕</button>
                 )}
               </div>
@@ -370,23 +282,7 @@ export default function BackerInvestments() {
                 {canCreate && (
                   <Link
                     to="/creator-my-projects"
-                    style={{
-                      display: "inline-block", marginTop: "18px",
-                      background: "var(--color-brand)", color: "#fff", textDecoration: "none",
-                      borderRadius: "6px", fontSize: "12px", fontWeight: 700,
-                      letterSpacing: "0.06em", padding: "10px 22px",
-                      transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "#aa0000";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = "0 8px 20px rgba(204,0,0,0.35)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "var(--color-brand)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
+                    className="inline-block rounded-md bg-brand px-[22px] py-2.5 text-[12px] font-bold tracking-[0.06em] text-white no-underline transition-[background,transform,box-shadow] duration-150 hover:-translate-y-0.5 hover:bg-brand-dark hover:shadow-[0_8px_20px_rgba(204,0,0,0.35)]"
                   >
                     GO TO MY PROJECTS
                   </Link>
