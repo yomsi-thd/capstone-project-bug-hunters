@@ -162,6 +162,30 @@ function money(value) {
   return `${toNumber(value).toLocaleString("en-US")} CC`;
 }
 
+/**
+ * A formatted amount string -> a number. The inverse of money().
+ *
+ * It lives next to money() on purpose: the two have to agree, and in one file they
+ * cannot drift. Before 20/08 this rule was hand-copied in SEVEN places in two variants.
+ *
+ * ⚠️ Strip with /[^0-9.]/g, NOT /[$,]/g. The strings in this app are "1,050 CC", not
+ * "$1,050" — a $-and-comma strip leaves " CC" behind and Number() returns NaN. Class
+ * Coins have no real-world value, so the app never prints a dollar sign.
+ *
+ * `integer: true` strips the dot rather than rounding: the invest field filters on every
+ * keystroke, so "12.5" becomes "125" and the user sees at once that it takes no dot.
+ *
+ * @param {string|number} value
+ * @param {{ integer?: boolean }} [options]
+ * @returns {number} 0 when unreadable — never NaN, because every caller feeds this
+ *   straight into arithmetic or into a controlled input.
+ */
+export function parseAmount(value, { integer = false } = {}) {
+  const cleaned = String(value ?? "").replace(integer ? /[^0-9]/g : /[^0-9.]/g, "");
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 // DEPT_STYLE / CAT_STYLE are keyed in Title Case ("Engineering"), while category in
 // the database is sometimes uppercase ("ENGINEERING") and sometimes not
 // ("Education") -> normalise.

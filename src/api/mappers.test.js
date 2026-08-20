@@ -15,6 +15,7 @@ import {
   toProjectUpdate,
   toCommentThread,
   toTier,
+  parseAmount,
 } from "./mappers";
 
 // A project row as Postgres actually returns it through node-postgres: note that
@@ -720,5 +721,48 @@ describe("archive fields", () => {
     expect(d.archived).toBe(true);
     expect(d.archivedBy).toBeNull();
     expect(d.archivedByName).toBeNull();
+  });
+});
+
+describe("parseAmount", () => {
+  // The inverse of money(): money(1050) === "1,050 CC".
+  it("reads back what money() writes", () => {
+    expect(parseAmount("1,050 CC")).toBe(1050);
+  });
+
+  it("keeps the decimal part by default", () => {
+    expect(parseAmount("5000.00")).toBe(5000);
+    expect(parseAmount("1,234.56")).toBe(1234.56);
+  });
+
+  // CLAUDE.md's rule: strip /[^0-9.]/g, NOT /[$,]/g. The string is "1,050 CC", not
+  // "$1,050", so a $-and-comma strip leaves " CC" behind and Number() returns NaN.
+  it("strips a trailing unit, which a /[$,]/ strip would leave behind", () => {
+    expect(parseAmount("1,050 CC")).not.toBeNaN();
+    expect(String("1,050 CC").replace(/[$,]/g, "")).toBe("1050 CC");
+  });
+
+  it("drops the decimal point in integer mode", () => {
+    expect(parseAmount("250 CC", { integer: true })).toBe(250);
+  });
+
+  // ⚠️ Deliberately preserved from BackerInvestmentModal:19. The invest field filters on
+  // every keystroke, so "12.5" becomes "125" — the dot is stripped, not rounded. An
+  // investment is a whole number of Class Coins, and the user sees immediately that the
+  // field will not take a dot.
+  it("removes the dot rather than rounding, in integer mode", () => {
+    expect(parseAmount("12.5", { integer: true })).toBe(125);
+  });
+
+  it("returns 0 rather than NaN for junk", () => {
+    expect(parseAmount("")).toBe(0);
+    expect(parseAmount(null)).toBe(0);
+    expect(parseAmount(undefined)).toBe(0);
+    expect(parseAmount("abc")).toBe(0);
+    expect(parseAmount("1.2.3")).toBe(0);
+  });
+
+  it("passes a number through untouched", () => {
+    expect(parseAmount(1050)).toBe(1050);
   });
 });
