@@ -7,6 +7,7 @@ import {
   ROLE_BADGE,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
+import { parseAmount } from "../api/mappers";
 import { useAuth } from "../context/AuthContext";
 import { draftStorageKey } from "./draftStorageKey";
 import { isLinkable } from "../components/project/videoUrl";
@@ -1088,7 +1089,7 @@ export default function CreateProject() {
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
         category: toCategory(basicData.school),
-        goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
+        goal_amount: parseAmount(basicData.goal),
         image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
         team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
         challenge: story.challenge.trim(),
@@ -1110,7 +1111,7 @@ export default function CreateProject() {
         // saved levels that do not exist.
         tiers: tiers.map(tier => ({
           name: tier.name.trim(),
-          min_amount: Number(String(tier.amount).replace(/[^0-9]/g, "")) || 0,
+          min_amount: parseAmount(tier.amount, { integer: true }),
           bullets: tier.bullets.map(b => b.trim()).filter(Boolean),
         })),
       });

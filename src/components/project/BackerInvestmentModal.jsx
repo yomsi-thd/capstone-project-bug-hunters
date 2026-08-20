@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { parseAmount } from "../../api/mappers";
 import { meetsMinimum } from "./tierRules";
 
 const QUICK_AMOUNTS = [25, 50, 100];
@@ -16,9 +17,9 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
   const handleMax = () => setAmount(balance);
 
   const handleInputChange = (e) => {
-    const raw = e.target.value.replace(/[^0-9]/g, "");
-    const val = raw === "" ? 0 : Math.min(parseInt(raw, 10), balance);
-    setAmount(val);
+    // parseAmount returns 0 for an empty or unreadable field, which is exactly what the
+    // old `raw === "" ? 0 : parseInt(raw, 10)` produced — so the cap is all that is left.
+    setAmount(Math.min(parseAmount(e.target.value, { integer: true }), balance));
   };
 
   // Picking a level fills the minimum in for you. Typing MORE afterwards is fine;

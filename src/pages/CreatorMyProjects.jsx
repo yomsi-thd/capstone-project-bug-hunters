@@ -5,7 +5,7 @@ import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
 import * as projectApi from "../api/projectApi";
-import { toCreatorProject } from "../api/mappers";
+import { toCreatorProject, parseAmount } from "../api/mappers";
 import Header from "../components/layout/Header";
 
 const DEPT_STYLE = {
@@ -417,10 +417,10 @@ export default function CreatorMyProjects() {
   const activeFunding = liveProjects.filter(p => p.status === "Active").length;
   const totalRaised = liveProjects.reduce((sum, p) => {
     if (p.status === "Active") {
-      // toCreatorProject formats this as "10,625 CC", so strip everything that is not
-      // a digit or a decimal point rather than just "$" and ",".
-      const num = parseFloat(p.raised.replace(/[^0-9.]/g, ""));
-      return sum + num;
+      // toCreatorProject formats this as "10,625 CC"; parseAmount knows to strip the
+      // unit as well as the separator, and returns 0 rather than NaN on a bad row —
+      // one NaN here would turn the whole total into NaN.
+      return sum + parseAmount(p.raised);
     }
     return sum;
   }, 0);

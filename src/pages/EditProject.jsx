@@ -11,7 +11,7 @@ import { isLinkable } from "../components/project/videoUrl";
 import SupportLevels from "../components/project/SupportLevels";
 import { initials } from "../components/ui/initials";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
-import { toTier } from "../api/mappers";
+import { toTier, parseAmount } from "../api/mappers";
 
 // The three optional story sections ProjectDetail renders under the blurb. Kept in the
 // Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
@@ -245,7 +245,7 @@ function TabTiers({ projectId }) {
 
     const payload = {
       name: draft.name.trim(),
-      min_amount: Number(String(draft.amount).replace(/[^0-9]/g, "")) || 0,
+      min_amount: parseAmount(draft.amount, { integer: true }),
       bullets: draft.bullets.map(b => b.trim()).filter(Boolean),
     };
 
@@ -433,9 +433,10 @@ export default function EditProject({ project, onClose }) {
           // derived from it, so `School of ${dept}` produced "School of School of design"
           // for anything created through the form.
           school: project.category || EDIT_PROJECT_INITIAL_DATA.school,
-          // toCreatorProject hands this over as "12,500 CC", so strip every non-digit —
-          // stripping only "$" and "," would leave " CC" in the number input.
-          goal: project.goal ? String(project.goal).replace(/[^0-9.]/g, "") : EDIT_PROJECT_INITIAL_DATA.goal,
+          // toCreatorProject hands this over as "12,500 CC". Kept as a STRING: it binds
+          // to a controlled <input value=...>, and a number is fine there but undefined
+          // would make the input uncontrolled.
+          goal: project.goal ? String(parseAmount(project.goal)) : EDIT_PROJECT_INITIAL_DATA.goal,
           // description comes from the API (projects.description).
           proposition: project.description || project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
           // toCreatorProject passes these through from the story columns; "" when unset.
@@ -477,7 +478,7 @@ export default function EditProject({ project, onClose }) {
         // Was `project.category ?? basicData.school`, which always won — the School
         // dropdown looked editable but every change to it was thrown away on save.
         category: toCategory(basicData.school),
-        goal_amount: Number(String(basicData.goal).replace(/[^0-9.]/g, "")) || 0,
+        goal_amount: parseAmount(basicData.goal),
         image_url: project.img || "",
         team_members: team,
         // The column is funding_usage; the form field is called `funding`.
