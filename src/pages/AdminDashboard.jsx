@@ -218,7 +218,7 @@ export default function AdminDashboard() {
               { label: "Pending Approvals", value: liveProjects.filter(p => p.status === "Pending").length, icon: "📋", accent: false },
               { label: "Archived",          value: archivedCount,                                         icon: "🗄", accent: false },
             ].map(c => (
-              <div key={c.label} className={`bg-white rounded-xl p-6 border ${c.accent ? "border-brand" : "border-gray-200"}`} style={{ borderWidth: c.accent ? "1.5px" : "1px" }}>
+              <div key={c.label} className={`bg-white rounded-xl p-6 ${c.accent ? "border-[1.5px] border-brand" : "border border-gray-200"}`}>
                 <div className="flex justify-between items-start mb-2">
                   <div className={`text-[13px] font-semibold ${c.accent ? "text-brand" : "text-gray-400"}`}>{c.label}</div>
                   <span className="text-lg">{c.icon}</span>
@@ -319,7 +319,7 @@ export default function AdminDashboard() {
                         <td className="px-5 py-3.5">
                           <div className="flex items-center gap-2">
                             <span className="text-[13px] font-bold text-brand w-8">{p.pct}%</span>
-                            <div className="flex-1 h-1 bg-gray-100 rounded-full" style={{ minWidth: "80px" }}>
+                            <div className="flex-1 h-1 bg-gray-100 rounded-full min-w-20">
                               <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min(p.pct, 100)}%` }} />
                             </div>
                             <span className="text-[11px] text-gray-400 whitespace-nowrap">{p.raised} / {p.goal}</span>

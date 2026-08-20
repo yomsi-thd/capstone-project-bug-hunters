@@ -63,7 +63,7 @@ function ProjectReview({ project, onBack, onApprove, onReject }) {
             {/* Gallery. A submission may have no images at all — falling straight to
                 project.gallery[0] is what used to crash this whole screen. Show the
                 cover image, then the gallery, then a placeholder. */}
-            <div className="rounded-xl overflow-hidden mb-3 relative bg-gray-100" style={{ height: "220px" }}>
+            <div className="rounded-xl overflow-hidden mb-3 relative bg-gray-100 h-[220px]">
               {(project.gallery?.[0] || project.img) ? (
                 <img src={project.gallery?.[0] || project.img} alt={project.title} className="w-full h-full object-cover" />
               ) : (
