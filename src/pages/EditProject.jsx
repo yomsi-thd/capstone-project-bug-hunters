@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Modal from "../components/ui/Modal";
 import {
   EDIT_PROJECT_TABS as TABS,
   SCHOOLS,
@@ -511,9 +512,20 @@ export default function EditProject({ project, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 font-sans p-4">
+    // panelScroll={false}: this dialog is a column with a fixed header and tab bar and a
+    // scrolling body. Letting the whole panel scroll would carry the tabs off the top.
+    //
+    // ⚠️ closable={false} is deliberate, and it PRESERVES the behaviour this dialog always
+    // had. Every other modal in the app closes on a backdrop click; this one does not,
+    // because it is a large form holding unsaved edits — a stray click beside it would
+    // throw away everything typed since the dialog opened, with no confirmation and no
+    // undo. The × and CANCEL CHANGES are the deliberate ways out.
+    //
+    // (This was listed as an inconsistency to fix when the shared Modal was planned.
+    //  Reading the form again, it is not one: it is the only dialog here with unsaved work
+    //  in it, so it is the only one that should be hard to dismiss by accident.)
+    <Modal onClose={onClose} closable={false} maxWidth={660} panelScroll={false} panelClassName="flex max-h-[90vh] flex-col overflow-hidden font-sans">
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700;800&display=swap" rel="stylesheet" />
-      <div className="bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col w-full max-w-[660px]" style={{ maxHeight: "90vh" }}>
 
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
@@ -562,7 +574,6 @@ export default function EditProject({ project, onClose }) {
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

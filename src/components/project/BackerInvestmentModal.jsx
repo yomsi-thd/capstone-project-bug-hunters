@@ -1,3 +1,4 @@
+import Modal from "../ui/Modal";
 import { useState } from "react";
 import { parseAmount } from "../../api/mappers";
 import { meetsMinimum } from "./tierRules";
@@ -38,24 +39,7 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
   const isValid = amount > 0 && amount <= balance && !belowMinimum;
 
   return (
-    <div
-      onClick={onClose}
-      className="lp-overlay"
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 1000, padding: "16px",
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        className="lp-modal"
-        style={{
-          background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "550px",
-          maxHeight: "90vh", overflowY: "auto",
-          borderTop: "5px solid var(--color-brand)",
-        }}
-      >
+    <Modal onClose={onClose} maxWidth={550} panelClassName="border-t-[5px] border-brand">
         {/* Header */}
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -336,7 +320,6 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

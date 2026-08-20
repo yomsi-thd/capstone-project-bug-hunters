@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Modal from "../components/ui/Modal";
 import { RoleBadgeList } from "../components/ui/RoleBadge";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
@@ -62,8 +63,10 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
     roles.some(r => !user.roles.includes(r));
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={saving ? undefined : onClose}>
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[480px] overflow-y-auto max-h-full" onClick={e => e.stopPropagation()}>
+    // closable={!saving} keeps hieu's guard: the dialog cannot be dismissed while the
+    // role change is being written, so nobody closes it mid-request and is left unsure
+    // whether it went through.
+    <Modal onClose={onClose} closable={!saving} maxWidth={480}>
         {/* Header */}
         <div className="flex justify-between items-center px-7 py-5 border-b border-gray-100">
           <h2 className="text-[18px] font-bold text-gray-900">Manage Access</h2>
@@ -156,8 +159,7 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
             {saving ? "SAVING…" : "SAVE ROLES"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

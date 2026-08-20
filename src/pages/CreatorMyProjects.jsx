@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -547,14 +548,11 @@ export default function CreatorMyProjects() {
           EditProject and PostUpdateModal — that is also what resets the reason box
           between projects, so it needs no effect. */}
       {archiveTarget && (
-        <div
-          className="lp-overlay fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onClick={() => { setArchiveTarget(null); setActionError(null); }}
+        <Modal
+          onClose={() => { setArchiveTarget(null); setActionError(null); }}
+          maxWidth={440}
+          panelClassName="p-6"
         >
-          <div
-            className="lp-modal bg-white rounded-xl shadow-2xl w-full max-w-[440px] p-6"
-            onClick={e => e.stopPropagation()}
-          >
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Archive Project</h2>
             <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
               <span className="font-bold text-gray-900">"{archiveTarget.title}"</span> will be
@@ -600,8 +598,7 @@ export default function CreatorMyProjects() {
                 {archiving ? "Archiving…" : "Archive"}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </>
   );

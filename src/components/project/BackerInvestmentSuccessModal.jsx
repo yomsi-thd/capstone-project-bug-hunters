@@ -1,3 +1,5 @@
+import Modal from "../ui/Modal";
+
 import { Link } from "react-router-dom";
 
 function genTransactionId() {
@@ -9,24 +11,7 @@ export default function BackerInvestmentSuccessModal({ amount, onClose, transact
   const txId = transactionId || genTransactionId();
 
   return (
-    <div
-      onClick={onClose}
-      className="lp-overlay"
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 1000, padding: "16px",
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        className="lp-modal"
-        style={{
-          background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "420px",
-          borderTop: "5px solid var(--color-brand)", padding: "40px 32px 28px",
-          textAlign: "center",
-        }}
-      >
+    <Modal onClose={onClose} maxWidth={420} panelClassName="border-t-[5px] border-brand px-8 pt-10 pb-7 text-center">
         {/* Success icon */}
         <div style={{
           width: "60px", height: "60px", borderRadius: "50%",
@@ -89,7 +74,6 @@ export default function BackerInvestmentSuccessModal({ amount, onClose, transact
             TRANSACTION ID: {txId}
           </span>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

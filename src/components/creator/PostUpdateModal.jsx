@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Modal from "../ui/Modal";
 import * as projectApi from "../../api/projectApi";
 
 /**
@@ -37,11 +38,7 @@ export default function PostUpdateModal({ project, onClose, onPosted }) {
   };
 
   return (
-    <div className="lp-overlay fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div
-        className="lp-modal bg-white rounded-xl w-full max-w-[500px] p-6 relative shadow-2xl overflow-y-auto max-h-full"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal onClose={onClose} maxWidth={500} panelClassName="p-6">
         <button onClick={onClose} className="absolute top-4 right-4 bg-transparent border-none text-xl text-gray-400 hover:text-gray-600 cursor-pointer">×</button>
 
         <h2 className="text-lg font-extrabold text-gray-900 mb-1">Post Project Update</h2>
@@ -96,7 +93,6 @@ export default function PostUpdateModal({ project, onClose, onPosted }) {
             {posting ? "POSTING…" : "POST UPDATE"}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

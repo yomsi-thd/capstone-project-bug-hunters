@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import Modal from "../components/ui/Modal";
 import { useNavigate } from "react-router-dom";
 import {
   CREATE_PROJECT_STEPS as STEPS,
@@ -242,8 +243,10 @@ function clearDraftFromStorage(key) {
 // for; the slot is gone rather than left empty for the next half-finished feature.
 function SubmitSuccessModal({ title, onGoToProjects }) {
   return (
-    <div className="lp-overlay fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="lp-modal bg-white rounded-xl shadow-2xl w-full max-w-[460px] p-7 text-center">
+    // closable={false} preserves the whole point of this dialog: there is deliberately no
+    // path back to the wizard, only GO TO MY PROJECTS. A dismissable backdrop would drop
+    // the creator back onto a form whose project has already been submitted.
+    <Modal maxWidth={460} closable={false} panelClassName="p-7 text-center">
         <div className="w-14 h-14 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5">
             <path d="M20 6 9 17l-5-5" />
@@ -263,8 +266,7 @@ function SubmitSuccessModal({ title, onGoToProjects }) {
         >
           GO TO MY PROJECTS
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }
 

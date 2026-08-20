@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import Modal from "../components/ui/Modal";
 import { useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import * as adminApi from "../api/adminApi";
@@ -392,14 +393,7 @@ export default function AdminDashboard() {
 
       {/* Archive Confirmation Modal — the ordinary "take it down" action. */}
       {archiveTarget && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onClick={closeModals}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-[440px] p-6"
-            onClick={e => e.stopPropagation()}
-          >
+        <Modal onClose={closeModals} maxWidth={440} panelClassName="p-6">
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Archive Project</h2>
             <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
               <span className="font-bold text-gray-900">"{archiveTarget.title}"</span> will be
@@ -451,20 +445,12 @@ export default function AdminDashboard() {
                 {busy ? "Archiving…" : "Archive"}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {/* Permanent Delete Modal — only reachable from the Archived bin. */}
       {deleteTarget && (
-        <div
-          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
-          onClick={closeModals}
-        >
-          <div
-            className="bg-white rounded-xl shadow-2xl w-full max-w-[420px] p-6"
-            onClick={e => e.stopPropagation()}
-          >
+        <Modal onClose={closeModals} maxWidth={420} panelClassName="p-6">
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Delete Permanently</h2>
             <p className="text-[14px] text-gray-500 leading-relaxed mb-4">
               <span className="font-bold text-gray-900">"{deleteTarget.title}"</span> will be
@@ -503,8 +489,7 @@ export default function AdminDashboard() {
                 {busy ? "Deleting…" : "Delete forever"}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

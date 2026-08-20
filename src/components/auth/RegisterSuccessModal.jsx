@@ -1,21 +1,11 @@
+import Modal from "../ui/Modal";
+
 export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null }) {
   return (
-    <div
-      className="lp-overlay"
-      style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        zIndex: 1000, padding: "16px",
-      }}
-    >
-      <div
-        className="lp-modal"
-        style={{
-          background: "#fff", borderRadius: "10px", width: "100%", maxWidth: "420px",
-          borderTop: "5px solid var(--color-brand)", padding: "40px 32px 28px",
-          textAlign: "center",
-        }}
-      >
+    // closable={false} is deliberate and must stay: this dialog has no onClose, because
+    // the ONLY way out is GO TO LOGIN. Letting a click on the backdrop dismiss it would
+    // strand the user on the registration form with an account that already exists.
+    <Modal maxWidth={420} closable={false} panelClassName="border-t-[5px] border-brand px-8 pt-10 pb-7 text-center">
         <div style={{
           width: "60px", height: "60px", borderRadius: "50%",
           background: "var(--color-brand)", display: "flex", alignItems: "center",
@@ -76,7 +66,6 @@ export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null
         >
           GO TO LOGIN
         </button>
-      </div>
-    </div>
+    </Modal>
   );
 }
