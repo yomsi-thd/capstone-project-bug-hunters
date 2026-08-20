@@ -76,10 +76,10 @@ export default function Register() {
   return (
     <>
     <AuthLayout isMobile={isMobile}>
-      <h1 style={{ fontSize: "18px", fontWeight: 700, color: "#333", textAlign: "center", margin: "0 0 4px" }}>
+      <h1 className="mx-0 mt-0 mb-1 text-center text-[18px] font-bold text-neutral-800">
         Create your account
       </h1>
-      <p style={{ fontSize: "13px", color: "#999", textAlign: "center", margin: "0 0 24px" }}>
+      <p className="mx-0 mt-0 mb-6 text-center text-[13px] text-neutral-400">
         Join RMIT Launchpad and start validating ideas.
       </p>
 
@@ -123,34 +123,37 @@ export default function Register() {
         {/* Account type: Backer is granted to everyone; Creator is an
             approval-gated request. Admin is intentionally NOT self-requestable
             here — it's provisioned by an existing admin (least privilege). */}
-        <div style={{ marginBottom: "22px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.08em", color: "#888", marginBottom: "10px" }}>
+        <div className="mb-[22px]">
+          <div className="mb-2.5 text-[11px] font-bold tracking-[0.08em] text-neutral-500">
             ACCOUNT TYPE
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-            <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#777", cursor: "default" }}>
+          <div className="flex flex-col gap-2.5">
+            {/* Backer is checked and disabled: everyone signs up as one. The row keeps
+                cursor-default and a lighter text colour so it reads as a statement rather
+                than a control somebody failed to click. */}
+            <label className="flex cursor-default items-start gap-2 text-[13px] text-neutral-500">
               <input
                 type="checkbox"
                 checked
                 disabled
-                style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", marginTop: "1px", flexShrink: 0 }}
+                className="mt-px h-[15px] w-[15px] shrink-0 accent-brand"
               />
               <span>
-                <strong style={{ color: "#333" }}>Backer</strong> — support and invest in projects{" "}
-                <span style={{ color: "#aaa" }}>(default, always on)</span>
+                <strong className="text-neutral-800">Backer</strong> — support and invest in projects{" "}
+                <span className="text-neutral-400">(default, always on)</span>
               </span>
             </label>
 
-            <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#555", cursor: "pointer" }}>
+            <label className="flex cursor-pointer items-start gap-2 text-[13px] text-neutral-600">
               <input
                 type="checkbox"
                 checked={requestCreator}
                 onChange={e => setRequestCreator(e.target.checked)}
-                style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
+                className="mt-px h-[15px] w-[15px] shrink-0 cursor-pointer accent-brand"
               />
               <span>
-                <strong style={{ color: "#333" }}>Creator</strong> — publish and edit your own projects
-                <span style={{ display: "block", fontSize: "12px", color: "#999", marginTop: "2px" }}>
+                <strong className="text-neutral-800">Creator</strong> — publish and edit your own projects
+                <span className="mt-0.5 block text-[12px] text-neutral-400">
                   Requires admin approval before you can publish.
                 </span>
               </span>
@@ -158,55 +161,34 @@ export default function Register() {
           </div>
         </div>
 
-        <div style={{ marginBottom: "22px" }}>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", fontSize: "13px", color: "#555", cursor: "pointer" }}>
+        <div className="mb-[22px]">
+          <label className="flex cursor-pointer items-start gap-2 text-[13px] text-neutral-600">
             <input
               type="checkbox"
               checked={agreeTerms}
               onChange={e => { setAgreeTerms(e.target.checked); setErrors(p => ({ ...p, agreeTerms: null })); }}
-              style={{ width: "15px", height: "15px", accentColor: "var(--color-brand)", cursor: "pointer", marginTop: "1px", flexShrink: 0 }}
+              className="mt-px h-[15px] w-[15px] shrink-0 cursor-pointer accent-brand"
             />
             <span>
               I agree to the{" "}
-              <Link to="#" style={{ color: "var(--color-brand)", fontWeight: 600, textDecoration: "none" }}>Terms of Service</Link>
+              <Link to="#" className="font-semibold text-brand no-underline">Terms of Service</Link>
               {" "}and{" "}
-              <Link to="#" style={{ color: "var(--color-brand)", fontWeight: 600, textDecoration: "none" }}>Privacy Policy</Link>
+              <Link to="#" className="font-semibold text-brand no-underline">Privacy Policy</Link>
             </span>
           </label>
           {errors.agreeTerms && (
-            <div style={{ fontSize: "12px", color: "var(--color-brand)", marginTop: "5px" }}>{errors.agreeTerms}</div>
+            <div className="mt-[5px] text-[12px] text-brand">{errors.agreeTerms}</div>
           )}
         </div>
 
         <button
           type="submit"
           disabled={isSubmitting}
-          style={{
-            width: "100%", background: isSubmitting ? "#e88a8a" : "var(--color-brand)",
-            color: "#fff", border: "none", borderRadius: "8px",
-            fontSize: "14px", fontWeight: 700, letterSpacing: "0.04em",
-            padding: "14px", cursor: isSubmitting ? "default" : "pointer",
-            transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          }}
-          onMouseEnter={e => {
-            if (isSubmitting) return;
-            e.currentTarget.style.background = "#aa0000";
-            e.currentTarget.style.transform = "translateY(-1px)";
-            e.currentTarget.style.boxShadow = "0 6px 16px rgba(204,0,0,0.3)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.background = isSubmitting ? "#e88a8a" : "var(--color-brand)";
-            e.currentTarget.style.transform = "translateY(0)";
-            e.currentTarget.style.boxShadow = "none";
-          }}
+          className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-brand p-3.5 text-[14px] font-bold tracking-[0.04em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.3)] disabled:cursor-default disabled:bg-[#e88a8a] disabled:hover:translate-y-0 disabled:hover:bg-[#e88a8a] disabled:hover:shadow-none"
         >
           {isSubmitting ? (
             <>
-              <span className="lp-spin" style={{
-                width: "14px", height: "14px", border: "2px solid rgba(255,255,255,0.4)",
-                borderTopColor: "#fff", borderRadius: "50%", display: "inline-block",
-              }} />
+              <span className="lp-spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white" />
               CREATING ACCOUNT...
             </>
           ) : "CREATE ACCOUNT"}
@@ -214,46 +196,28 @@ export default function Register() {
       </form>
 
       {/* Divider */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", margin: "26px 0" }}>
-        <div style={{ flex: 1, height: "1px", background: "#eee" }} />
-        <span style={{ fontSize: "11px", color: "#aaa", fontWeight: 600 }}>OR</span>
-        <div style={{ flex: 1, height: "1px", background: "#eee" }} />
+      <div className="my-[26px] flex items-center gap-3">
+        <div className="h-px flex-1 bg-neutral-100" />
+        <span className="text-[11px] font-semibold text-neutral-400">OR</span>
+        <div className="h-px flex-1 bg-neutral-100" />
       </div>
 
       {/* SSO button */}
       <button
         type="button"
         onClick={() => {/* TODO: integrate RMIT SSO */}}
-        style={{
-          width: "100%", background: "#1a1a3d", color: "#fff", border: "none",
-          borderRadius: "8px", fontSize: "13px", fontWeight: 700, letterSpacing: "0.03em",
-          padding: "13px", cursor: "pointer",
-          display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          transition: "background 0.15s, transform 0.12s, box-shadow 0.12s",
-        }}
-        onMouseEnter={e => {
-          e.currentTarget.style.background = "#0d0d28";
-          e.currentTarget.style.transform = "translateY(-1px)";
-          e.currentTarget.style.boxShadow = "0 6px 16px rgba(26,26,61,0.35)";
-        }}
-        onMouseLeave={e => {
-          e.currentTarget.style.background = "#1a1a3d";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
+        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-[#1a1a3d] p-[13px] text-[13px] font-bold tracking-[0.03em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-[#0d0d28] hover:shadow-[0_6px_16px_rgba(26,26,61,0.35)]"
       >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>
         SIGN UP WITH RMIT SSO
       </button>
 
       {/* Login link */}
-      <p style={{ textAlign: "center", fontSize: "13px", color: "#777", marginTop: "24px", marginBottom: 0 }}>
+      <p className="mt-6 mb-0 text-center text-[13px] text-neutral-500">
         Already have an account?{" "}
         <Link
           to="/login"
-          style={{ color: "var(--color-brand)", fontWeight: 700, textDecoration: "none", transition: "opacity 0.15s" }}
-          onMouseEnter={e => e.currentTarget.style.opacity = "0.7"}
-          onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+          className="font-bold text-brand no-underline transition-opacity hover:opacity-70"
         >
           Login
         </Link>
