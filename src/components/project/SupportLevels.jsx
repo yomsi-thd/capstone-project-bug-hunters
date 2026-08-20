@@ -1,3 +1,5 @@
+import EmptyState from "../ui/EmptyState";
+
 /**
  * The read-only list of a project's Support Levels.
  *
@@ -20,13 +22,11 @@ export default function SupportLevels({ levels, emptyMessage, compact = false })
 
   if (list.length === 0) {
     return (
-      <div style={{ padding: compact ? "16px 0" : "40px 0", textAlign: "center", color: "#aaa" }}>
-        <div style={{ fontSize: compact ? "22px" : "32px", marginBottom: "8px" }}>◎</div>
-        <div style={{ fontSize: "14px", fontWeight: 600 }}>No support levels yet</div>
-        <div style={{ fontSize: "13px", marginTop: "4px", color: "#bbb" }}>
-          {emptyMessage || "The creator has not set any levels for this project."}
-        </div>
-      </div>
+      <EmptyState
+        compact={compact}
+        title="No support levels yet"
+        detail={emptyMessage || "The creator has not set any levels for this project."}
+      />
     );
   }
 

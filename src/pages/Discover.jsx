@@ -4,6 +4,7 @@ import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
+import EmptyState from "../components/ui/EmptyState";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 // FILTERS / FILTER_TAGS are UI config, not data — they still come from the mock.
@@ -554,11 +555,12 @@ export default function Discover() {
             {visibleProjects.length > 0 ? (
               visibleProjects.map(p => <ProjectCard key={p.id} project={p} />)
             ) : (
-              <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "48px 24px", color: "#aaa" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>No projects found</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>Try a different filter or search term</div>
-              </div>
+              <EmptyState
+                className="col-span-full py-12"
+                icon="🔍"
+                title="No projects found"
+                detail="Try a different filter or search term"
+              />
             )}
           </div>
 

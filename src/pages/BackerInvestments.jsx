@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
+import EmptyState from "../components/ui/EmptyState";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as classCoinApi from "../api/classCoinApi";
@@ -301,11 +302,12 @@ export default function BackerInvestments() {
               Loading your investments…
             </div>
           ) : loadError ? (
-            <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
-              <div style={{ fontSize: "32px", marginBottom: "8px" }}>⚠️</div>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#a11" }}>Could not load your investments</div>
-              <div style={{ fontSize: "13px", marginTop: "4px" }}>{loadError}</div>
-            </div>
+            <EmptyState
+              className="py-15"
+              icon="⚠️"
+              title={<span className="text-red-700">Could not load your investments</span>}
+              detail={loadError}
+            />
           ) : investments.length > 0 ? (
             <>
               {/* Local filter — sits right above the list it filters. */}
@@ -336,11 +338,12 @@ export default function BackerInvestments() {
                   <InvestmentCard key={inv.id} investment={inv} isMobile={isMobile} />
                 ))
               ) : (
-                <div style={{ textAlign: "center", padding: "48px 20px", color: "#aaa" }}>
-                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600 }}>No investments match “{query}”</div>
-                  <div style={{ fontSize: "13px", marginTop: "4px" }}>Try a different search term</div>
-                </div>
+                <EmptyState
+                  className="py-12"
+                  icon="🔍"
+                  title={`No investments match “${query}”`}
+                  detail="Try a different search term"
+                />
               )}
             </>
           ) : (
@@ -349,21 +352,19 @@ export default function BackerInvestments() {
                for them — the Header does not even offer them a balance. Same rule as the
                nav: canInvest, not isLoggedIn. */
             canInvest ? (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>You haven't backed any projects yet</div>
-                <div style={{ fontSize: "13px", marginTop: "4px" }}>
-                  Invest ClassCoins in a project and it will show up here.
-                </div>
-              </div>
+              <EmptyState
+                className="py-15"
+                icon="💼"
+                title="You haven't backed any projects yet"
+                detail="Invest ClassCoins in a project and it will show up here."
+              />
             ) : (
-              <div style={{ textAlign: "center", padding: "60px 20px", color: "#aaa" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>💼</div>
-                <div style={{ fontSize: "14px", fontWeight: 600 }}>This page is for backers</div>
-                <div style={{ fontSize: "13px", marginTop: "4px", lineHeight: 1.6 }}>
-                  Your account does not hold a Class Coin balance, so it cannot invest in
-                  projects.
-                </div>
+              <EmptyState
+                className="py-15"
+                icon="💼"
+                title="This page is for backers"
+                detail="Your account does not hold a Class Coin balance, so it cannot invest in projects."
+              >
                 {/* The CTA is gated on canCreate, not on "not canInvest": an account with
                     no roles at all reaches this branch too, and sending them to a page
                     the route guard rejects would just swap one dead end for another. */}
@@ -391,7 +392,7 @@ export default function BackerInvestments() {
                     GO TO MY PROJECTS
                   </Link>
                 )}
-              </div>
+              </EmptyState>
             )
           )
         ) : (

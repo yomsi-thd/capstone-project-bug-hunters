@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
+import EmptyState from "../components/ui/EmptyState";
 import { initials } from "../components/ui/initials";
 import CommentList from "../components/project/CommentList";
 import ProjectVideo from "../components/project/ProjectVideo";
@@ -515,15 +516,13 @@ export default function ProjectDetail() {
 
             {activeTab === "updates" && (
               updates.length === 0 ? (
-                <div style={{ padding: "40px 0", textAlign: "center", color: "#aaa" }}>
-                  <div style={{ fontSize: "32px", marginBottom: "8px" }}>📋</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600 }}>No updates yet</div>
-                  <div style={{ fontSize: "13px", marginTop: "4px" }}>
-                    {isOwner
-                      ? "Post one from My Projects to keep your backers in the loop."
-                      : "The creator has not posted an update for this project."}
-                  </div>
-                </div>
+                <EmptyState
+                  icon="📋"
+                  title="No updates yet"
+                  detail={isOwner
+                    ? "Post one from My Projects to keep your backers in the loop."
+                    : "The creator has not posted an update for this project."}
+                />
               ) : (
                 <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "18px" }}>
                   {updates.map(u => (
