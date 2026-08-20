@@ -1,8 +1,12 @@
 const pool = require("../config/db");
 
-// Create Project
-async function createProject(project) {
-    const result = await pool.query(
+// Create Project.
+// `client = pool` so projectService can wrap the project and its support levels in one
+// transaction — a project that saved but whose levels did not is the worst outcome
+// there, because the wizard latches after a successful submit and the creator would
+// believe the levels exist.
+async function createProject(project, client = pool) {
+    const result = await client.query(
         `
         INSERT INTO projects
         (
@@ -183,11 +187,20 @@ async function findBackersByCreatorId(userId) {
                u.full_name,
                SUM(ct.amount)::int                 AS total_amount,
                COUNT(DISTINCT ct.project_id)::int  AS project_count,
-               MAX(ct.created_at)                  AS last_invested_at
+               MAX(ct.created_at)                  AS last_invested_at,
+               -- The row is one PERSON across several investments, so it has to pick
+               -- ONE support level to show: the highest they ever chose. That is the
+               -- strongest signal they sent, and the one people describe themselves by.
+               MAX(t.min_amount)::int                                       AS top_tier_min,
+               (ARRAY_AGG(t.name ORDER BY t.min_amount DESC NULLS LAST))[1] AS top_tier_name
         FROM classcoin_transactions ct
         JOIN classcoins c ON c.id = ct.classcoin_id
         JOIN users u      ON u.id = c.user_id
         JOIN projects p   ON p.id = ct.project_id
+        -- LEFT, never a plain JOIN: most transactions have tier_id = NULL (everything
+        -- before 2026-08-20, plus every "no level — just support" choice), and an inner
+        -- join would delete those backers from this list entirely.
+        LEFT JOIN project_tiers t ON t.id = ct.tier_id
         WHERE p.creator_id = $1
           AND ct.type = 'INVEST'
         GROUP BY u.id, u.full_name

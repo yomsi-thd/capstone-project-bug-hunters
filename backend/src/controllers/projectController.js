@@ -383,16 +383,114 @@ async function deleteProjectUpdate(req, res) {
     }
 }
 
+// ─── Support levels (project_tiers) ─────────────────────────────────────────────
+
+async function getProjectTiers(req, res) {
+    try {
+
+        const tiers = await projectService.getProjectTiers(req.params.id, req.user);
+
+        res.status(200).json(tiers);
+
+    } catch (error) {
+
+        res.status(404).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function createTier(req, res) {
+    try {
+
+        const tier = await projectService.createTier(
+            req.params.id,
+            req.user.id,
+            req.user.roles,
+            req.body
+        );
+
+        res.status(201).json({
+            message: "Support level added",
+            tier
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function updateTier(req, res) {
+    try {
+
+        const tier = await projectService.updateTier(
+            req.params.id,
+            req.params.tierId,
+            req.user.id,
+            req.user.roles,
+            req.body
+        );
+
+        res.status(200).json({
+            message: "Support level updated",
+            tier
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
+async function deleteTier(req, res) {
+    try {
+
+        // `hidden` tells the UI which of the two things happened: a level nobody chose
+        // is really gone, one somebody chose is only hidden so their history still
+        // points at a row that exists.
+        const result = await projectService.deleteTier(
+            req.params.id,
+            req.params.tierId,
+            req.user.id,
+            req.user.roles
+        );
+
+        res.status(200).json({
+            message: result.hidden
+                ? "Hidden. Backers who chose it keep their history."
+                : "Support level deleted",
+            hidden: result.hidden
+        });
+
+    } catch (error) {
+
+        res.status(400).json({
+            message: error.message
+        });
+
+    }
+}
+
 async function investProject(req, res) {
     try {
         const userId = req.user.id;
         const projectId = req.params.id;
-        const { amount } = req.body;
+        // tierId is optional — "No level — just support" sends none.
+        const { amount, tierId } = req.body;
 
         const result = await projectService.investProject(
             userId,
             projectId,
-            amount
+            amount,
+            tierId ?? null
         );
 
         res.status(200).json(result);
@@ -426,5 +524,9 @@ module.exports = {
     getProjectUpdates,
     createProjectUpdate,
     deleteProjectUpdate,
-    investProject
+    investProject,
+    getProjectTiers,
+    createTier,
+    updateTier,
+    deleteTier
 };

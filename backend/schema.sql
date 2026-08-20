@@ -151,6 +151,40 @@ CREATE TABLE projects (
 CREATE INDEX idx_projects_archived ON projects (archived_at);
 
 
+-- ─── project_tiers ──────────────────────────────────────────────────────────
+-- Support Levels: "Support Levels" on screen, project_tiers in here. A level is a
+-- MINIMUM contribution plus the lines saying what choosing it SIGNALS - it is not
+-- a reward. The creator owes nothing (Class Coins have no real-world value and
+-- creators never receive them), which is exactly why there is no quantity, no
+-- delivery date and no "fulfilled" column: under this reading they have no
+-- meaning, rather than being deferred.
+--
+-- is_active exists because a level somebody has already chosen must never be
+-- deleted - their classcoin_transactions row points at it. Removing such a level
+-- hides it instead (projectService.deleteTier).
+--
+-- No UNIQUE (project_id, min_amount): the "no two levels at the same amount" rule
+-- applies only to ACTIVE levels, and is_active cannot go in the key. A UNIQUE
+-- would also block recreating a level at the price of a hidden one. Enforced in
+-- projectService instead.
+--
+-- No sort_order either: the order is min_amount ASC, id ASC. One source of truth,
+-- and no drag-and-drop to keep in step with it.
+CREATE TABLE project_tiers (
+    id          SERIAL PRIMARY KEY,
+    project_id  INTEGER      NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name        VARCHAR(100) NOT NULL,
+    min_amount  INTEGER      NOT NULL CHECK (min_amount > 0),
+    -- Array of strings, same jsonb treatment as projects.gallery and
+    -- projects.solution_bullets.
+    bullets     JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_project_tiers_project ON project_tiers (project_id);
+
+
 -- ─── classcoins / classcoin_transactions ────────────────────────────────────
 -- Class Coins are an internal popularity score with NO real-world value.
 -- Every account gets one wallet, seeded with 4500 CC at registration.
@@ -165,15 +199,27 @@ CREATE TABLE classcoins (
 -- type is one of INVEST / ADMIN_ADD / ADMIN_DEDUCT.
 -- project_id is SET NULL rather than CASCADE: deleting a project must not erase
 -- the record that a user once spent coins.
+-- tier_id is the Support Level the backer picked, and it is NULLABLE on purpose:
+-- choosing one is optional ("No level - just support"), and every transaction made
+-- before 2026-08-20 has none. It is stored at INVESTMENT TIME rather than derived
+-- later from the amount - min_amount is editable, so derived buckets would
+-- silently rewrite what somebody signalled.
+-- ON DELETE SET NULL here is a safety net, not a route the app uses: the service
+-- never hard-deletes a level that has transactions. It only fires when a whole
+-- project is permanently deleted, at which point project_id above is also SET NULL.
 CREATE TABLE classcoin_transactions (
     id            SERIAL PRIMARY KEY,
     classcoin_id  INTEGER     NOT NULL REFERENCES classcoins(id) ON DELETE CASCADE,
     project_id    INTEGER     REFERENCES projects(id) ON DELETE SET NULL,
+    tier_id       INTEGER     REFERENCES project_tiers(id) ON DELETE SET NULL,
     type          VARCHAR(20) NOT NULL,
     amount        INTEGER     NOT NULL,
     description   TEXT,
     created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_classcoin_transactions_tier
+    ON classcoin_transactions (tier_id);
 -- The investment flow deducts with `WHERE user_id = $1 AND balance >= $2
 -- RETURNING *` inside one transaction. Reading the balance first and checking it
 -- in JS is what allowed 8 concurrent invests to drive a wallet to -3500 CC.
@@ -262,37 +308,19 @@ CREATE INDEX idx_comments_project
 --    campaigns_id_seq and the primary key is campaigns_pkey. Cosmetic, but
 --    confusing when reading errors.
 --
--- 6. Reward tiers have no table at all. CreateProject still lets a creator type
---    them and drops them on submit — now the LAST place the app loses user input.
+-- 6. RESOLVED 2026-08-20 - support levels are real. project_tiers and
+--    classcoin_transactions.tier_id are declared above, and all three pieces this
+--    entry warned about were built together: the table, a level choice in the
+--    invest modal WITH a tier_id on the transaction, and the per-level backer
+--    count that replaced the "distribution across tiers" view nobody needed.
 --
---    ⚠️ Do not build this from the table alone. A tier is a MINIMUM contribution
---    (both forms already say so), and to report anything about tiers the system
---    also has to record which tier a given investment bought. Three pieces:
---
---      a) the table below;
---      b) a tier choice in the invest modal AND a tier_id on the transaction —
---         `classcoin_transactions` has no tier column and BackerInvestmentModal
---         has no concept of a tier, so without this the platform can never say
---         which Class Coins belong to which tier;
---      c) only then, any "distribution across tiers" view.
---
---    Store tier_id at investment time rather than deriving it from the amount:
---    the creator can edit min_amount later, and derived buckets would silently
---    rewrite history.
---
---    Also unresolved before (a): the two forms disagree on the shape. CreateProject
---    collects a privileges[] list, EditProject collects one description textarea.
---    Pick one; the sketch below assumes the textarea.
---
---      CREATE TABLE project_tiers (
---        id          SERIAL PRIMARY KEY,
---        project_id  INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
---        name        VARCHAR(100) NOT NULL,
---        min_amount  INTEGER NOT NULL,
---        description TEXT
---      );
---      ALTER TABLE classcoin_transactions
---        ADD COLUMN tier_id INTEGER REFERENCES project_tiers(id) ON DELETE SET NULL;
+--    Two things the old sketch got wrong, recorded so the reasoning is not lost:
+--      * It assumed the EditProject textarea shape. The LIST won - CreateProject
+--        already collected one, so the textarea was the form losing structure.
+--        The column is `bullets JSONB`, and EditProject was rebuilt to match.
+--      * It called them rewards. They are not: nobody is owed anything, which is
+--        what removes the need for quantity / delivery date / fulfilment state.
+--        Design record: docs/superpowers/specs/2026-08-19-support-levels-design.md
 --
 --    (Items 7 and the old review_note note are resolved and no longer listed.
 --     `review_note` landed 2026-08-11 and `video_url` on 2026-08-18; both are

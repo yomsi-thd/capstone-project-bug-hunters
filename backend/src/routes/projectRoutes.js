@@ -108,6 +108,37 @@ router.delete(
     projectController.deleteProjectUpdate
 );
 
+// Support levels ("project_tiers" in the database — the UI wording can still change,
+// the column names should not). Reading is public and follows the project's own
+// visibility rule; writing is checked against the project's creator inside the service,
+// so there is no authorize() here either.
+//
+// All four sit under "/:id/…", so none of them is at risk of the trap that once killed
+// GET /projects/my — only a STATIC first segment has to be declared above "/:id".
+//
+// authOptional, not authenticate: the project page is public, but a token that is
+// present and broken still 401s so axios gets its chance to refresh. Downgrading an
+// expired token to "anonymous" would 404 a creator on their own pending project.
+router.get("/:id/tiers", authenticateOptional, projectController.getProjectTiers);
+
+router.post(
+    "/:id/tiers",
+    authenticate,
+    projectController.createTier
+);
+
+router.put(
+    "/:id/tiers/:tierId",
+    authenticate,
+    projectController.updateTier
+);
+
+router.delete(
+    "/:id/tiers/:tierId",
+    authenticate,
+    projectController.deleteTier
+);
+
 router.post(
     "/:id/invest",
     authenticate,

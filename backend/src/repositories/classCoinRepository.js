@@ -77,9 +77,10 @@ async function createTransaction(transaction, client = pool) {
             project_id,
             type,
             amount,
-            description
+            description,
+            tier_id
         )
-        VALUES ($1,$2,$3,$4,$5)
+        VALUES ($1,$2,$3,$4,$5,$6)
         RETURNING *;
         `,
         [
@@ -87,7 +88,12 @@ async function createTransaction(transaction, client = pool) {
             transaction.project_id,
             transaction.type,
             transaction.amount,
-            transaction.description
+            transaction.description,
+            // The support level the backer picked, stored at investment time rather
+            // than derived later from the amount: min_amount is editable, so buckets
+            // worked out afterwards would silently rewrite what somebody signalled.
+            // NULL is the normal case — choosing a level is optional.
+            transaction.tier_id ?? null
         ]
     );
 
@@ -136,10 +142,19 @@ async function getInvestmentsByUser(userId) {
                SUM(ct.amount)::int AS invested_amount,
                COUNT(*)::int       AS investment_count,
                MIN(ct.created_at)  AS first_invested_at,
-               MAX(ct.created_at)  AS last_invested_at
+               MAX(ct.created_at)  AS last_invested_at,
+               -- One card covers several investments, so it shows ONE support level:
+               -- the highest this backer ever chose for this project. Same rule as
+               -- projectRepository.findBackersByCreatorId, so the two never disagree.
+               MAX(t.min_amount)::int                                       AS top_tier_min,
+               (ARRAY_AGG(t.name ORDER BY t.min_amount DESC NULLS LAST))[1] AS top_tier_name
         FROM classcoin_transactions ct
         JOIN classcoins c ON c.id = ct.classcoin_id
         JOIN projects   p ON p.id = ct.project_id
+        -- LEFT, never a plain JOIN. tier_id is NULL for every transaction made before
+        -- support levels existed and for every "just support" choice; an inner join
+        -- would empty this page for almost everybody.
+        LEFT JOIN project_tiers t ON t.id = ct.tier_id
         WHERE c.user_id = $1
           AND ct.type = 'INVEST'
         GROUP BY p.id
