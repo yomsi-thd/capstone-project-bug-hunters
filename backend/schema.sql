@@ -29,7 +29,7 @@ CREATE TABLE users (
     -- e.g. "PhD Candidate, RMIT University". Optional.
     title       VARCHAR(150),
     is_active   BOOLEAN       NOT NULL DEFAULT TRUE,
-    created_at  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 -- NOTE: email is compared exactly, so sign-in is case-sensitive by design
 -- (findByEmail uses `WHERE email = $1`). See the known issues below.
@@ -61,8 +61,8 @@ CREATE TABLE refresh_tokens (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     token       TEXT      NOT NULL UNIQUE,
-    expires_at  TIMESTAMP NOT NULL,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    expires_at  TIMESTAMPTZ NOT NULL,
+    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -80,8 +80,8 @@ CREATE TABLE creator_requests (
     -- No ON DELETE action on purpose: deleting a reviewer must not silently
     -- erase who reviewed what.
     reviewed_by  INTEGER      REFERENCES users(id),
-    reviewed_at  TIMESTAMP,
-    created_at   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
+    reviewed_at  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
 );
 
 
@@ -144,8 +144,8 @@ CREATE TABLE projects (
     -- Required when an admin archives someone else's project — they cannot undo
     -- it themselves, so they are at least told why.
     archive_reason    TEXT,
-    created_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-    updated_at        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP
+    created_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
+    updated_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_projects_archived ON projects (archived_at);
@@ -192,8 +192,8 @@ CREATE TABLE classcoins (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER   NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     balance     INTEGER   NOT NULL DEFAULT 4500,
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- type is one of INVEST / ADMIN_ADD / ADMIN_DEDUCT.
@@ -215,7 +215,7 @@ CREATE TABLE classcoin_transactions (
     type          VARCHAR(20) NOT NULL,
     amount        INTEGER     NOT NULL,
     description   TEXT,
-    created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+    created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_classcoin_transactions_tier
@@ -267,24 +267,67 @@ CREATE INDEX idx_comments_project
 -- lost. Each is safe to run against the live database when the team agrees.
 -- ============================================================================
 --
--- 1. TIMESTAMP WITHOUT TIME ZONE on the older tables.
---    CURRENT_TIMESTAMP stores the database's local time (UTC+7) while
---    node-postgres reads it back as UTC, so values come out 7 hours off. It was
---    caught when a comment posted seconds earlier rendered as "7 hours ago".
---    project_updates and comments already use TIMESTAMPTZ. The rest do not, and
---    refresh_tokens.expires_at is where it actually bites — tokens expire at the
---    wrong moment.
+-- 1. RESOLVED 2026-08-21 — TIMESTAMP WITHOUT TIME ZONE on the older tables.
 --
---      ALTER TABLE users                  ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
---      ALTER TABLE projects               ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
---      ALTER TABLE projects               ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'UTC';
---      ALTER TABLE classcoins             ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
---      ALTER TABLE classcoins             ALTER COLUMN updated_at TYPE TIMESTAMPTZ USING updated_at AT TIME ZONE 'UTC';
---      ALTER TABLE classcoin_transactions ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
---      ALTER TABLE creator_requests       ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+--    All ten columns were migrated on the live database with
+--    scripts/migrate-timestamptz.cjs (one transaction). The CREATE TABLE statements
+--    above now declare TIMESTAMPTZ, so a fresh build of this file matches the live
+--    database. Verified after the run: no naive timestamp columns remain,
+--    refresh_tokens' expires_at - created_at gap went 175.00 h -> 168.00 h (exactly 7
+--    days), and an investment stored at 2026-08-07 02:16 UTC — one of the 63 rows that
+--    displayed a day early — now renders as "7 Aug 2026" through GET
+--    /classcoins/investments instead of "6 Aug 2026".
+--
+--    ⚠️ KEEP THE TWO GROUPS BELOW. They are the record of WHY the migration is not one
+--    blanket clause, and the same distinction applies to any naive column added later.
+--
+--    ⚠️ THE MECHANISM BELOW WAS WRONG IN EVERY EARLIER VERSION OF THIS FILE, and the
+--    wrong version pointed the migration at the wrong timezone. Measured against the
+--    live database on 2026-08-21 (scripts/probe-timestamp-drift.cjs):
+--
+--      * The database runs in UTC (current_setting('TimeZone') = 'UTC'), so
+--        CURRENT_TIMESTAMP writes a UTC wall clock.
+--      * Node runs at UTC+7 and node-postgres parses `timestamp without time zone`
+--        as LOCAL time, so a UTC value is re-read 7 hours in the PAST.
+--      * Effect on screen: 63 of 81 classcoin_transactions rows (78%) show the wrong
+--        calendar day.
+--
+--    ⚠️ THERE ARE TWO GROUPS AND THEY NEED OPPOSITE FIXES. The repair depends on who
+--    WROTE the column, not on which table it is in:
+--
+--    (a) Written by the DATABASE — DEFAULT CURRENT_TIMESTAMP, or `SET x =
+--        CURRENT_TIMESTAMP` inside an UPDATE. The stored wall clock is UTC.
+--
+--      ALTER TABLE users                  ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE projects               ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE projects               ALTER COLUMN updated_at  TYPE TIMESTAMPTZ USING updated_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE classcoins             ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE classcoins             ALTER COLUMN updated_at  TYPE TIMESTAMPTZ USING updated_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE classcoin_transactions ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
+--      ALTER TABLE creator_requests       ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
 --      ALTER TABLE creator_requests       ALTER COLUMN reviewed_at TYPE TIMESTAMPTZ USING reviewed_at AT TIME ZONE 'UTC';
---      ALTER TABLE refresh_tokens         ALTER COLUMN expires_at TYPE TIMESTAMPTZ USING expires_at AT TIME ZONE 'UTC';
---      ALTER TABLE refresh_tokens         ALTER COLUMN created_at TYPE TIMESTAMPTZ USING created_at AT TIME ZONE 'UTC';
+--      ALTER TABLE refresh_tokens         ALTER COLUMN created_at  TYPE TIMESTAMPTZ USING created_at  AT TIME ZONE 'UTC';
+--
+--    (b) Written by NODE — a JS Date handed to the driver, which serialises it with a
+--        +07:00 offset that Postgres DROPS when casting into a naive column. The stored
+--        wall clock is therefore UTC+7, and 'UTC' here would push the value 7 hours
+--        FURTHER into the future instead of repairing it.
+--
+--        refresh_tokens.expires_at is the only such column
+--        (authService.js builds `new Date()` + 7 days; every other value comes from
+--        CURRENT_TIMESTAMP). Proof: expires_at - created_at averages 175.00 h across
+--        all 158 rows (min 174.9997, max 175.0022) where 7 days is 168 h — the extra
+--        7 h is exactly the frame mismatch.
+--
+--      ALTER TABLE refresh_tokens         ALTER COLUMN expires_at  TYPE TIMESTAMPTZ USING expires_at  AT TIME ZONE 'Asia/Ho_Chi_Minh';
+--
+--    ⚠️ expires_at does NOT misbehave today: Node both writes and reads it, so the same
+--    wrong assumption cancels out (0.00 h round-trip drift). It starts lying the moment
+--    the app is deployed to a UTC host such as Render, which is why this migration
+--    belongs BEFORE the deploy, not after.
+--
+--    Runnable version of all ten statements, in one transaction, with before/after
+--    measurements: scripts/migrate-timestamptz.cjs (git-ignored).
 --
 -- 2. Duplicate constraints on the live database, omitted above because they are
 --    exact copies of ones already declared:
