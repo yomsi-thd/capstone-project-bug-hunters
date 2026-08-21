@@ -39,13 +39,23 @@ async function getMyInvestments(req, res) {
     }
 }
 
-// Add ClassCoins (Development/Admin)
+// Add ClassCoins. ADMIN-only - see the guard in classCoinRoutes.
+//
+// The wallet to credit is named in the BODY, not taken from the token. Reading
+// req.user.id here was the whole bug (fixed 2026-08-21): the route had no role guard
+// either, so ANY signed-in user could POST /classcoins/add and mint Class Coins into
+// their own wallet. An admin crediting their own wallet is also meaningless - the point
+// of the endpoint is to top somebody else up.
 async function addCoins(req, res) {
     try {
-        const { amount } = req.body;
+        const { user_id: userId, amount } = req.body;
+
+        if (!userId) {
+            throw new Error("user_id is required - name the account to credit.");
+        }
 
         const classCoin = await classCoinService.addCoins(
-            req.user.id,
+            userId,
             amount
         );
 
@@ -60,13 +70,18 @@ async function addCoins(req, res) {
     }
 }
 
-// Deduct ClassCoins (Development/Admin)
+// Deduct ClassCoins. ADMIN-only, and the wallet is named in the body for the same
+// reasons as addCoins above.
 async function deductCoins(req, res) {
     try {
-        const { amount } = req.body;
+        const { user_id: userId, amount } = req.body;
+
+        if (!userId) {
+            throw new Error("user_id is required - name the account to debit.");
+        }
 
         const classCoin = await classCoinService.deductCoins(
-            req.user.id,
+            userId,
             amount
         );
 
