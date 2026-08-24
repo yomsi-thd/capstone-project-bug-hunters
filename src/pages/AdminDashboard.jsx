@@ -196,7 +196,19 @@ export default function AdminDashboard() {
       <div className="flex-1 flex flex-col min-w-0">
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
-          <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900 mb-1">Project Management</h1>
+          {/* The button sits beside the page title, where CreatorSidebar already puts
+              NEW PROJECT — not in the sidebar, which lists destinations rather than
+              actions. An admin owns no projects, so the wizard it opens always files
+              the project under a creator they pick in step 1. */}
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
+            <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900">Project Management</h1>
+            <button
+              onClick={() => navigate("/create-project")}
+              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2.5 text-[12px] font-bold tracking-wide cursor-pointer transition-colors shrink-0"
+            >
+              + CREATE FOR A CREATOR
+            </button>
+          </div>
           <p className="text-[14px] text-gray-400 mb-7">Oversee and manage all academic crowdfunding initiatives.</p>
 
           {loading && (
@@ -294,7 +306,17 @@ export default function AdminDashboard() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-5 py-3.5 text-[13px] text-gray-500">{p.creator}</td>
+                        <td className="px-5 py-3.5 text-[13px] text-gray-500">
+                          {p.creator}
+                          {/* The owner is the creator either way; this says an admin
+                              typed it in for them. Null for everything a creator
+                              submitted, so the column is unchanged for those rows. */}
+                          {p.createdByAdminId != null && (
+                            <div className="text-[11px] text-blue-700">
+                              filed by {p.createdByAdminName || "an admin"}
+                            </div>
+                          )}
+                        </td>
                         <td className="px-5 py-3.5">
                           <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${s.text}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${s.dot}`} />{p.status}

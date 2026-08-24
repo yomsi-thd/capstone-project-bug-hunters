@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import Header from "../components/layout/Header";
 import Avatar from "../components/ui/Avatar";
 import * as adminApi from "../api/adminApi";
@@ -11,8 +12,58 @@ import {
   ADMIN_NAV_ITEMS as NAV_ITEMS,
 } from "../mock";
 
+/**
+ * Was this project filed by the admin who is currently looking at it?
+ *
+ * `createdByAdminId` is null for every project a creator made themselves, so this is
+ * false for almost everything — which is the point: the rule only bites on the
+ * on-behalf projects the admin role separation introduced.
+ */
+function isOwnFiling(project, viewerId) {
+  return (
+    project?.createdByAdminId != null &&
+    Number(project.createdByAdminId) === Number(viewerId)
+  );
+}
+
+/**
+ * The one line that tells a reviewer an admin filed this project rather than its owner.
+ *
+ * Two audiences, two messages: the admin who filed it is told why the verdict buttons
+ * are gone, and every other admin is told who filed it before they decide. Both matter
+ * — a project that arrives in the queue via an admin is not the same thing as one a
+ * creator submitted, and nothing else on screen would say so.
+ */
+function OnBehalfNote({ project, viewerId, className = "" }) {
+  if (project?.createdByAdminId == null) return null;
+
+  const mine = isOwnFiling(project, viewerId);
+
+  return (
+    <div
+      className={`rounded-lg border px-3 py-2 text-[12px] leading-relaxed ${
+        mine
+          ? "bg-amber-50 border-amber-200 text-amber-800"
+          : "bg-blue-50 border-blue-200 text-blue-800"
+      } ${className}`}
+    >
+      {mine ? (
+        <>
+          You created this project on behalf of <strong>{project.creator}</strong>.
+          Another admin needs to review it.
+        </>
+      ) : (
+        <>
+          Created on behalf of <strong>{project.creator}</strong> by{" "}
+          <strong>{project.createdByAdminName || "another admin"}</strong>.
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Project Review Page ──
-function ProjectReview({ project, onBack, onApprove, onReject }) {
+function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
   const [feedback, setFeedback] = useState("");
 
   // Loaded here rather than carried on the queue row: GET /admin/projects does not join
@@ -99,41 +150,52 @@ function ProjectReview({ project, onBack, onApprove, onReject }) {
             {/* Review Decision */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-3">Review Decision</h3>
-              <div className="mb-4">
-                <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">FEEDBACK TO CREATOR</label>
-                <textarea
-                  value={feedback}
-                  onChange={e => setFeedback(e.target.value)}
-                  placeholder="Provide constructive feedback or instructions for required changes..."
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors min-h-[100px] resize-y leading-relaxed"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => onApprove(project.id)}
-                    className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors flex items-center gap-2"
-                  >
-                    ✓ APPROVE PROJECT
-                  </button>
-                  {/* Was "REQUEST CHANGES" while the list row called the identical
-                      action "REJECT" (2026-08-18: settled on REJECT). Both call
-                      rejectProject and both land on status = REJECTED; the schema is
-                      CHECK (status IN ('PENDING','APPROVED','REJECTED')) with no
-                      CHANGES_REQUESTED, so the softer wording described a state that
-                      does not exist. The note below says what actually happens. */}
-                  <button
-                    onClick={() => onReject(project.id, feedback)}
-                    className="bg-white border border-gray-300 text-gray-600 rounded-md px-5 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2"
-                  >
-                    ✕ REJECT PROJECT
-                  </button>
+
+              <OnBehalfNote project={project} viewerId={viewerId} className="mb-4" />
+
+              {/* Hidden, not disabled. A greyed-out APPROVE says "no" without saying
+                  why, and the why is the whole content here — the note above is what
+                  the reader needs. The backend refuses this too (projectService
+                  .assertNotOwnReview): the UI is not a security boundary. */}
+              {isOwnFiling(project, viewerId) ? null : (
+                <>
+                <div className="mb-4">
+                  <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">FEEDBACK TO CREATOR</label>
+                  <textarea
+                    value={feedback}
+                    onChange={e => setFeedback(e.target.value)}
+                    placeholder="Provide constructive feedback or instructions for required changes..."
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors min-h-[100px] resize-y leading-relaxed"
+                  />
                 </div>
-                <p className="text-[11px] text-gray-400 max-w-[230px] text-right leading-relaxed">
-                  Approving publishes the project to Discover. Rejecting sends it back to
-                  the creator with your feedback — they can revise it and resubmit.
-                </p>
-              </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => onApprove(project.id)}
+                      className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-5 py-2.5 text-[13px] font-bold cursor-pointer transition-colors flex items-center gap-2"
+                    >
+                      ✓ APPROVE PROJECT
+                    </button>
+                    {/* Was "REQUEST CHANGES" while the list row called the identical
+                        action "REJECT" (2026-08-18: settled on REJECT). Both call
+                        rejectProject and both land on status = REJECTED; the schema is
+                        CHECK (status IN ('PENDING','APPROVED','REJECTED')) with no
+                        CHANGES_REQUESTED, so the softer wording described a state that
+                        does not exist. The note below says what actually happens. */}
+                    <button
+                      onClick={() => onReject(project.id, feedback)}
+                      className="bg-white border border-gray-300 text-gray-600 rounded-md px-5 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2"
+                    >
+                      ✕ REJECT PROJECT
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-gray-400 max-w-[230px] text-right leading-relaxed">
+                    Approving publishes the project to Discover. Rejecting sends it back to
+                    the creator with your feedback — they can revise it and resubmit.
+                  </p>
+                </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -193,6 +255,10 @@ const QUEUES = [
 
 export default function AdminApprovals() {
   const navigate = useNavigate();
+  // Which admin is reading. An admin may not approve or reject a project they filed on
+  // a creator's behalf, and this is the id that decision compares against.
+  const { user } = useAuth();
+  const viewerId = user?.id ?? null;
   const [activeNav, setActiveNav] = useState("approvals");
   const [queue, setQueue] = useState("projects");
   const [projects, setProjects] = useState([]);
@@ -364,6 +430,7 @@ export default function AdminApprovals() {
           <ProjectReview
             project={reviewTarget}
             onBack={() => setReviewTarget(null)}
+            viewerId={viewerId}
             onApprove={handleApprove}
             onReject={handleReject}
           />
@@ -536,6 +603,15 @@ export default function AdminApprovals() {
                     <td className="px-5 py-3.5">
                       <div className="text-[13px] font-semibold text-gray-900">{p.creator}</div>
                       <div className="text-[11px] text-gray-400">{p.email}</div>
+                      {/* Only ever rendered for an on-behalf project, so the column
+                          looks exactly as it did for everything a creator submitted. */}
+                      {p.createdByAdminId != null && (
+                        <div className="text-[11px] text-blue-700 mt-0.5">
+                          {isOwnFiling(p, viewerId)
+                            ? "Filed by you — another admin must review"
+                            : `Filed by ${p.createdByAdminName || "another admin"}`}
+                        </div>
+                      )}
                     </td>
                     {/* Dept */}
                     <td className="px-5 py-3.5">
@@ -572,7 +648,11 @@ export default function AdminApprovals() {
                         {/* Quick reject, deliberately with no note — for obvious spam.
                             To tell the creator WHY, open REVIEW and use the feedback box
                             there; that text is stored on the project now. */}
-                        {p.status !== "Changes Requested" && (
+                        {/* Both verdict buttons vanish on a project this admin filed
+                            themselves — the note in the Creator column says why. The
+                            service refuses it as well; this only saves the reader from
+                            learning the rule by bouncing off a 400. */}
+                        {!isOwnFiling(p, viewerId) && p.status !== "Changes Requested" && (
                           <button
                             onClick={() => handleReject(p.id, "")}
                             title="Reject without feedback — use REVIEW to explain why"
@@ -581,7 +661,7 @@ export default function AdminApprovals() {
                             REJECT
                           </button>
                         )}
-                        {p.status !== "Approved" && (
+                        {!isOwnFiling(p, viewerId) && p.status !== "Approved" && (
                           <button
                             onClick={() => handleApprove(p.id)}
                             className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer transition-colors"

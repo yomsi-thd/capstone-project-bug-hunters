@@ -16,7 +16,11 @@ import {
 // before ticking the box. Kept next to the modal rather than in mock/ because it is
 // prose about this screen, not configuration anything else reads.
 const ROLE_HINTS = {
-  ADMIN:   "Reviews and approves projects, manages every account. A superuser — this also grants everything CREATOR does.",
+  // Rewritten 2026-08-24 with the role separation. The old line ("a superuser — this
+  // also grants everything CREATOR does") became untrue the moment canCreate stopped
+  // including admin, and a hint that lies is worse than no hint on the one screen where
+  // roles are handed out.
+  ADMIN:   "Reviews and approves projects, manages every account. Owns nothing: no Class Coins, no projects of their own. Can create a project on behalf of a creator.",
   CREATOR: "Starts projects and posts updates on them.",
   BACKER:  "Holds a Class Coin balance and can invest in projects.",
 };
@@ -53,10 +57,26 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
   // would teach the same rule far later.
   const isSelf = user.id === currentUserId;
 
+  // An admin account holds ADMIN and NOTHING else (2026-08-24): it owns no projects
+  // and no Class Coins, so ADMIN+CREATOR and ADMIN+BACKER describe an account the rest
+  // of the app has no shape for. adminService.updateUserRoles refuses those too.
+  //
+  // Ticking resolves the conflict instead of blocking the click: ADMIN clears the other
+  // two, and either of the other two clears ADMIN. A checkbox that silently does
+  // nothing is the worst of the three options.
   const toggle = (role) => {
     if (isSelf && role === "ADMIN") return;
-    setRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
+    setRoles(prev => {
+      if (prev.includes(role)) return prev.filter(r => r !== role);
+      if (role === "ADMIN") return ["ADMIN"];
+      return [...prev.filter(r => r !== "ADMIN"), role];
+    });
   };
+
+  // ⚠️ The two rules meet on your OWN account: ADMIN cannot be removed (self-lockout)
+  // and cannot be combined (the rule above), so every box is locked and there is no
+  // valid set left to move to. Saying so beats three dead checkboxes.
+  const selfLocked = isSelf && roles.includes("ADMIN");
 
   const changed =
     roles.length !== user.roles.length ||
@@ -104,7 +124,9 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
             <div className="flex flex-col gap-2">
               {ROLES.map(role => {
                 const checked = roles.includes(role);
-                const locked = isSelf && role === "ADMIN";
+                // Own-account ADMIN is locked as before; the other two lock as well
+                // once ADMIN is on, because there is no combination to move to.
+                const locked = (isSelf && role === "ADMIN") || (selfLocked && role !== "ADMIN");
                 return (
                   <label
                     key={role}
@@ -125,13 +147,36 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
                       <span className="block text-[13px] font-bold text-gray-900">{role}</span>
                       <span className="block text-[11px] text-gray-500 leading-relaxed">
                         {ROLE_HINTS[role]}
-                        {locked && " — you cannot remove your own admin access."}
+                        {/* A sentence, not an em-dash tail: ROLE_HINTS.ADMIN now ends
+                            in a full stop, so the old " — …" clause read as a fragment
+                            glued onto it. */}
+                        {isSelf && role === "ADMIN" && " You cannot remove your own admin access."}
                       </span>
                     </span>
                   </label>
                 );
               })}
             </div>
+
+            {/* Ticking ADMIN silently unticks the other two, so say so. A control that
+                changes two OTHER controls without a word is the same problem as a
+                disabled button with no reason — it just fails in the opposite
+                direction. Not shown on your own account: `selfLocked` below explains
+                that case, and two notes at once would compete. */}
+            {!selfLocked && roles.includes("ADMIN") && (
+              <p className="text-[12px] text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mt-3">
+                An admin account holds ADMIN alone — CREATOR and BACKER were cleared.
+                Untick ADMIN to give them back.
+              </p>
+            )}
+
+            {selfLocked && (
+              <p className="text-[12px] text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mt-3">
+                Your own account is locked to ADMIN. You cannot remove your own admin
+                access, and an admin account holds no other role — so there is nothing
+                here to change. Another admin can edit your roles from this screen.
+              </p>
+            )}
 
             {roles.length === 0 && (
               <p className="text-[12px] text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-2 mt-3">

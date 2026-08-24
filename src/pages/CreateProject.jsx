@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Modal from "../components/ui/Modal";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import {
   CREATE_PROJECT_STEPS as STEPS,
   SCHOOLS,
@@ -8,7 +8,10 @@ import {
   ROLE_BADGE,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
-import { parseAmount } from "../api/mappers";
+// Only reached when the signed-in account is an admin filing on somebody's behalf —
+// see the guarded effect below. A creator never calls an admin route from this page.
+import * as adminApi from "../api/adminApi";
+import { parseAmount, toAdminUser } from "../api/mappers";
 import { useAuth } from "../context/AuthContext";
 import { draftStorageKey } from "./draftStorageKey";
 import { isLinkable } from "../components/project/videoUrl";
@@ -241,11 +244,19 @@ function clearDraftFromStorage(key) {
 // were not saved" - the last thing in the app that admitted to discarding user input.
 // Support levels are saved with the project now, so there is nothing left to apologise
 // for; the slot is gone rather than left empty for the next half-finished feature.
-function SubmitSuccessModal({ title, onGoToProjects }) {
+// `adminFiling` flips this dialog for an admin who filed the project for somebody else.
+// ⚠️ The CTA has to change with it: /creator-my-projects is behind canCreate, which an
+// admin no longer holds, so the old button would have ended the whole on-behalf flow on
+// the "no access" screen.
+// ⚠️ The BUTTON reads `adminFiling`, not `onBehalf`, even though the two agree in
+// practice: the label and the destination must come from one value, or a missing owner
+// name would leave the button saying "MY PROJECTS" while it navigates to the admin
+// dashboard. `onBehalf` is only the owner's name for the sentence above it.
+function SubmitSuccessModal({ title, onBehalf, adminFiling, onGoToProjects }) {
   return (
     // closable={false} preserves the whole point of this dialog: there is deliberately no
-    // path back to the wizard, only GO TO MY PROJECTS. A dismissable backdrop would drop
-    // the creator back onto a form whose project has already been submitted.
+    // path back to the wizard, only the one CTA below. A dismissable backdrop would drop
+    // the submitter back onto a form whose project has already been submitted.
     <Modal maxWidth={460} closable={false} panelClassName="p-7 text-center">
         <div className="w-14 h-14 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5">
@@ -260,11 +271,19 @@ function SubmitSuccessModal({ title, onGoToProjects }) {
           an admin approves it, and appears on Discover once they do.
         </p>
 
+        {onBehalf && (
+          <p className="text-[13px] text-gray-500 leading-relaxed mt-3">
+            It belongs to <span className="font-semibold text-gray-700">{onBehalf}</span> and is in
+            their My Projects. Another admin has to review it — you cannot approve a
+            project you filed.
+          </p>
+        )}
+
         <button
           onClick={onGoToProjects}
           className="w-full bg-brand hover:bg-red-800 text-white border-none rounded-md px-6 py-3 text-[13px] font-bold tracking-wide cursor-pointer transition-colors mt-6"
         >
-          GO TO MY PROJECTS
+          {adminFiling ? "GO TO PROJECT MANAGEMENT" : "GO TO MY PROJECTS"}
         </button>
     </Modal>
   );
@@ -295,12 +314,62 @@ function StepIndicator({ steps, current }) {
   );
 }
 
-function Step1({ data, setData }) {
+/**
+ * "Project owner", shown ONLY to an admin.
+ *
+ * An admin owns nothing, so the wizard they open has to name the creator the project
+ * will belong to. A creator filing their own project sees step 1 exactly as before —
+ * not one extra field, not one extra line of explanation.
+ *
+ * The list is every ACTIVE account holding CREATOR. An empty list is answered with the
+ * instruction rather than an empty dropdown: granting CREATOR is a separate, deliberate
+ * action in User Management, and the service refuses any other target anyway.
+ */
+function OwnerPicker({ creators, loading, error, ownerId, setOwnerId }) {
+  return (
+    <div className="border border-blue-200 bg-blue-50/60 rounded-lg p-4">
+      <label className="text-[11px] font-bold text-blue-900 tracking-widest block mb-1.5">
+        PROJECT OWNER
+      </label>
+      <p className="text-[12px] text-blue-800 mb-2.5 leading-relaxed">
+        You are creating this project on behalf of a creator. It will belong to them —
+        it appears in their My Projects and never in yours.
+      </p>
+
+      {loading ? (
+        <div className="text-[13px] text-blue-800">Loading creator accounts…</div>
+      ) : error ? (
+        <div className="text-[13px] text-red-700">{error}</div>
+      ) : creators.length === 0 ? (
+        <div className="text-[13px] text-blue-900 leading-relaxed">
+          No creator accounts yet — grant the CREATOR role in{" "}
+          <Link to="/admin-user-management" className="font-bold underline">User Management</Link>{" "}
+          first.
+        </div>
+      ) : (
+        <select
+          value={ownerId}
+          onChange={e => setOwnerId(e.target.value)}
+          className="w-full border border-blue-200 rounded-md px-3 py-2.5 text-[14px] outline-none focus:border-brand bg-white transition-colors"
+        >
+          <option value="">Select the creator this project belongs to…</option>
+          {creators.map(c => (
+            <option key={c.id} value={c.id}>{c.name} — {c.email}</option>
+          ))}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function Step1({ data, setData, ownerPicker }) {
   return (
     <div>
       <h1 className="text-[32px] font-extrabold text-black mb-2">Basic Information</h1>
       <p className="text-[14px] text-gray-500 mb-7 leading-relaxed">Establish the core identity of your initiative. These details help potential backers understand the academic context and primary goal of your project.</p>
       <div className="flex flex-col gap-5">
+        {/* Null for a creator, so this step is byte-for-byte what it always was. */}
+        {ownerPicker}
         <div>
           <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">PROJECT TITLE</label>
           <input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} placeholder="e.g., Sustainable Urban Micro-Grids" className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[14px] outline-none focus:border-brand transition-colors" />
@@ -767,11 +836,21 @@ function Step4({ tiers, setTiers }) {
   );
 }
 
-function Step5({ basicData, story, media, team, tiers, onEdit }) {
+function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
   return (
     <div>
       <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Review & Submit</h2>
       <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Confirm everything is ready before sending your project for approval.</p>
+
+      {/* The last screen before data is written under somebody else's name, so it says
+          whose name that is rather than leaving it to be remembered from step 1. */}
+      {owner && (
+        <div className="border border-blue-200 bg-blue-50 rounded-lg px-4 py-3 mb-4 text-[13px] text-blue-900 leading-relaxed">
+          This project will belong to <strong>{owner.name}</strong> ({owner.email}).
+          You are creating it on their behalf.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
         <section className="bg-white border border-gray-200 rounded-xl p-5">
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -898,9 +977,15 @@ export default function CreateProject() {
   // is never handed to whoever signs in next on the same machine. Plain derived value,
   // not a ref: user.id cannot change while this page is mounted (the route sits behind
   // RequireAccess, and signing out unmounts it).
-  const { user } = useAuth();
+  const { user, canCreateForOthers } = useAuth();
   const draftKey = draftStorageKey(user?.id);
   const storedDraft = getStoredDraft(draftKey);
+  // Who the project will belong to. Only ever set by an admin — a creator owns what
+  // they create, and the service refuses a creator who sends creator_id at all.
+  const [ownerId, setOwnerId] = useState(storedDraft?.ownerId ?? "");
+  const [creators, setCreators] = useState([]);
+  const [creatorsLoading, setCreatorsLoading] = useState(false);
+  const [creatorsError, setCreatorsError] = useState(null);
   const [step, setStep] = useState(storedDraft?.step ?? 1);
   const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", goal: "", proposition: "" });
   const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", galleryImages: [] });
@@ -948,13 +1033,51 @@ export default function CreateProject() {
 
     saveDraftToStorage(draftKey, {
       step,
+      ownerId,
       basicData,
       story,
       media: serializeMedia(media),
       team,
       tiers,
     });
-  }, [draftKey, basicData, story, media, step, team, tiers, isSubmitted]);
+  }, [draftKey, ownerId, basicData, story, media, step, team, tiers, isSubmitted]);
+
+  // Only an admin can call GET /admin/users, and only an admin needs this list, so the
+  // request never fires for a creator.
+  useEffect(() => {
+    if (!canCreateForOthers) return;
+
+    let cancelled = false;
+    (async () => {
+      // Inside the async body, not in the effect body: a synchronous setState there
+      // costs an extra render pass for nothing (react-hooks/set-state-in-effect).
+      setCreatorsLoading(true);
+      try {
+        const rows = await adminApi.getAllUsers();
+        if (cancelled) return;
+        // Active CREATOR accounts only — exactly the two conditions the service checks
+        // before it will accept the id, so the dropdown cannot offer a choice the
+        // submit would then refuse.
+        setCreators(
+          (rows || [])
+            .map(toAdminUser)
+            .filter(u => u.isActive && u.roles.includes("CREATOR"))
+        );
+        setCreatorsError(null);
+      } catch (err) {
+        if (!cancelled) {
+          setCreators([]);
+          setCreatorsError(
+            err.response?.data?.message || err.message || "Could not load creator accounts"
+          );
+        }
+      } finally {
+        if (!cancelled) setCreatorsLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [canCreateForOthers]);
 
   useEffect(() => {
     if (!hasRestoredDraft) return;
@@ -972,8 +1095,22 @@ export default function CreateProject() {
     };
   }, [media.coverImage, media.galleryImages]);
 
+  // The chosen creator as a whole record, for the lines that name them: step 5's
+  // confirmation and the success dialog. Null for a creator filing their own project,
+  // and null for an admin who has not chosen yet — both of which read as "no on-behalf
+  // banner", which is right in each case.
+  const selectedOwner =
+    canCreateForOthers && ownerId
+      ? creators.find(c => String(c.id) === String(ownerId)) || null
+      : null;
+
   const validateStep = targetStep => {
     if (targetStep === 1) {
+      // First, because it decides whose project this is — everything below describes
+      // that project. A creator never reaches this branch: the flag is admin-only.
+      if (canCreateForOthers && !String(ownerId)) {
+        return "Choose which creator this project will belong to.";
+      }
       if (!hasText(basicData.title)) return "Add a project title before continuing.";
       if (!hasText(basicData.school)) return "Choose a school or department before continuing.";
       const goalValue = Number(String(basicData.goal).replace(/[^\d.]/g, ""));
@@ -1057,6 +1194,7 @@ export default function CreateProject() {
     // back from a reload with The Challenge / Our Solution / How Your Funding Helps blank.
     saveDraftToStorage(draftKey, {
       step,
+      ownerId,
       basicData,
       story,
       media: serializeMedia(media),
@@ -1092,6 +1230,9 @@ export default function CreateProject() {
         description: basicData.proposition.trim(),
         category: toCategory(basicData.school),
         goal_amount: parseAmount(basicData.goal),
+        // Sent ONLY by an admin. The service refuses a creator who sends it and refuses
+        // an admin who does not — it is never an optional extra on either side.
+        ...(canCreateForOthers ? { creator_id: Number(ownerId) } : {}),
         image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
         team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
         challenge: story.challenge.trim(),
@@ -1141,11 +1282,25 @@ export default function CreateProject() {
     // underneath — which is exactly how a second click produced a duplicate project.
     // Success is a modal now, and leaving for My Projects is the only way out of it.
     switch (step) {
-      case 1: return <Step1 data={basicData} setData={setBasicData} />;
+      case 1: return (
+        <Step1
+          data={basicData}
+          setData={setBasicData}
+          ownerPicker={canCreateForOthers ? (
+            <OwnerPicker
+              creators={creators}
+              loading={creatorsLoading}
+              error={creatorsError}
+              ownerId={ownerId}
+              setOwnerId={setOwnerId}
+            />
+          ) : null}
+        />
+      );
       case 2: return <Step2 media={media} setMedia={setMedia} story={story} setStory={setStory} />;
       case 3: return <Step3 team={team} setTeam={setTeam} />;
       case 4: return <Step4 tiers={tiers} setTiers={setTiers} />;
-      case 5: return <Step5 basicData={basicData} story={story} media={media} team={team} tiers={tiers} onEdit={goToStep} />;
+      case 5: return <Step5 basicData={basicData} story={story} media={media} team={team} tiers={tiers} owner={selectedOwner} onEdit={goToStep} />;
       default: return <div className="text-gray-400 text-sm">Step {step} — coming soon.</div>;
     }
   };
@@ -1208,7 +1363,11 @@ export default function CreateProject() {
       {isSubmitted && (
         <SubmitSuccessModal
           title={basicData.title.trim()}
-          onGoToProjects={() => navigate("/creator-my-projects")}
+          onBehalf={selectedOwner?.name || null}
+          adminFiling={canCreateForOthers}
+          onGoToProjects={() =>
+            navigate(canCreateForOthers ? "/admin-dashboard" : "/creator-my-projects")
+          }
         />
       )}
     </div>
