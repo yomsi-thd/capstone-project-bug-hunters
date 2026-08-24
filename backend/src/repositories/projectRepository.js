@@ -26,9 +26,10 @@ async function createProject(project, client = pool) {
             funding_usage,
             gallery,
             solution_bullets,
-            video_url
+            video_url,
+            created_by_admin_id
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
         RETURNING *
         `,
         [
@@ -50,7 +51,10 @@ async function createProject(project, client = pool) {
             JSON.stringify(project.solution_bullets ?? []),
             // A link, not a file. The wizard has always REQUIRED a video and had
             // nowhere to put it (schema.sql known issue #7) — this is that column.
-            project.video_url
+            project.video_url,
+            // NULL unless an ADMIN filed this for the creator named in creator_id.
+            // projectService.resolveOwnership is the only thing that ever sets it.
+            project.created_by_admin_id ?? null
         ]
     );
 
@@ -69,10 +73,15 @@ async function findAll() {
                u.email     AS creator_email,
                -- The admin dashboard lists archived projects too, and has to name who
                -- archived each one before offering RESTORE / DELETE PERMANENTLY.
-               a.full_name AS archived_by_name
+               a.full_name AS archived_by_name,
+               -- Who FILED it, when that was not the owner. The reviewer needs the
+               -- name on screen ("Created on behalf by …") and AdminApprovals needs
+               -- the id to hide APPROVE/REJECT from the admin who filed it.
+               b.full_name AS created_by_admin_name
         FROM projects p
         LEFT JOIN users u ON u.id = p.creator_id
         LEFT JOIN users a ON a.id = p.archived_by
+        LEFT JOIN users b ON b.id = p.created_by_admin_id
         ORDER BY p.created_at DESC
         `
     );

@@ -4,6 +4,7 @@ const projectUpdateRepository = require("../repositories/projectUpdateRepository
 const commentRepository = require("../repositories/commentRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
 const tierRepository = require("../repositories/tierRepository");
+const userRepository = require("../repositories/userRepository");
 
 // projects.start_date / end_date have always existed but createProject never wrote
 // them, so every project came back with both null -> ProjectDetail showed "—" for
@@ -39,6 +40,23 @@ function isAdminRole(roles) {
     return Array.isArray(roles) && roles.includes("ADMIN");
 }
 
+/**
+ * A "this does not exist" error, tagged so the controller does not have to guess.
+ *
+ * Every other error thrown out of this service means "your request is not allowed",
+ * which is a 400. Only this one is a 404, and approveProject/rejectProject are the
+ * first handlers that can produce both — they used to answer 404 for everything, which
+ * was fine while "not found" was their only failure.
+ *
+ * ⚠️ The alternative, matching on the message text in the controller, silently flips
+ * the status the day somebody rewords the sentence. The status belongs to the error.
+ */
+function notFound(message) {
+    const err = new Error(message);
+    err.status = 404;
+    return err;
+}
+
 // An archived project is frozen: no edits, no investments, no comments, no updates,
 // no approve/reject. Freezing edits is not tidiness — it is what makes "restore puts
 // the project back at its previous status without re-approval" safe. If editing while
@@ -49,6 +67,29 @@ function assertNotArchived(project) {
 
     if (project.archived_at) {
         throw new Error("This project is archived. Restore it first.");
+    }
+}
+
+/**
+ * An admin who filed a project on behalf of a creator may not also be the one who
+ * approves or rejects it. Everything this platform is worth sits in the moderation
+ * step, so one person doing both sides of it is a real conflict of interest — and
+ * before `created_by_admin_id` existed there was no trace in the database to check
+ * against, because creator_id points at the creator by then.
+ *
+ * Deliberately NOT applied to resubmitProject: resubmitting is the owner exercising
+ * their right to be looked at again, not a verdict.
+ */
+function assertNotOwnReview(project, adminId) {
+
+    if (
+        project.created_by_admin_id != null &&
+        Number(project.created_by_admin_id) === Number(adminId)
+    ) {
+        throw new Error(
+            "You created this project on behalf of its owner, " +
+            "so another admin has to review it."
+        );
     }
 }
 
@@ -286,13 +327,77 @@ async function deleteTier(projectId, tierId, userId, roles) {
     return { hidden: false };
 }
 
+/**
+ * Who ends up OWNING the project, and who gets recorded as having filed it.
+ *
+ * An admin no longer owns anything (the lecturer's rule, 2026-08-21): they may only
+ * create a project ON BEHALF OF a creator, and ownership goes to that creator. So the
+ * rule is read from the CALLER's role first — `creator_id` in the body is optional for
+ * nobody: forbidden for a creator, required for an admin.
+ *
+ * ⚠️ An admin who sends no creator_id is REFUSED rather than defaulted to themselves.
+ * Defaulting is the one path in this flow that could quietly mint "a project owned by
+ * an admin", which is exactly what the rule exists to remove. The `target is the admin`
+ * branch closes the remaining way round it: naming yourself.
+ *
+ * ⚠️ A creator who sends creator_id is REFUSED rather than having it ignored. Silently
+ * ignoring it is how a creator would file a project under someone else's name with
+ * nothing anywhere recording that they tried.
+ */
+async function resolveOwnership(userId, roles, data) {
+
+    const requestedOwnerId = data.creator_id ?? null;
+
+    if (!isAdminRole(roles)) {
+
+        if (requestedOwnerId != null) {
+            throw new Error("Only an admin can create a project on behalf of a creator.");
+        }
+
+        return { creator_id: userId, created_by_admin_id: null };
+    }
+
+    if (requestedOwnerId == null) {
+        throw new Error(
+            "An admin creates a project on behalf of a creator. " +
+            "Choose the creator it belongs to."
+        );
+    }
+
+    if (Number(requestedOwnerId) === Number(userId)) {
+        throw new Error("An admin cannot own a project.");
+    }
+
+    const target = await userRepository.findById(requestedOwnerId);
+
+    if (!target) {
+        throw new Error("That creator account does not exist.");
+    }
+
+    if (target.is_active === false) {
+        throw new Error("That creator account is deactivated.");
+    }
+
+    const targetRoles = await userRepository.getUserRoles(target.id);
+
+    if (!targetRoles.includes("CREATOR")) {
+        throw new Error("That user is not a creator. Grant the CREATOR role first.");
+    }
+
+    return { creator_id: target.id, created_by_admin_id: userId };
+}
+
 // Create project
-async function createProject(userId, data) {
+async function createProject(userId, roles, data) {
 
     const { start, end } = resolveCampaignDates(data);
+    const ownership = await resolveOwnership(userId, roles, data);
 
     const project = {
-        creator_id: userId,
+        creator_id: ownership.creator_id,
+        // NULL for a creator's own project. Only set when an admin filed it, and it is
+        // what stops that same admin approving it later.
+        created_by_admin_id: ownership.created_by_admin_id,
         title: data.title,
         description: data.description,
         category: data.category,
@@ -537,28 +642,30 @@ async function deleteProject(projectId, userId, roles) {
 // The approval queue already filters archived projects out, so this guard covers the
 // stale-tab case: an admin left the queue open, someone archived a project meanwhile,
 // and the verdict would otherwise land silently on a project nobody can see.
-async function approveProject(id) {
+async function approveProject(id, adminId) {
 
     const existing = await projectRepository.findById(id);
 
     if (!existing) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertNotArchived(existing);
+    assertNotOwnReview(existing, adminId);
 
     return await projectRepository.approveProject(id);
 }
 
-async function rejectProject(id, note) {
+async function rejectProject(id, note, adminId) {
 
     const existing = await projectRepository.findById(id);
 
     if (!existing) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertNotArchived(existing);
+    assertNotOwnReview(existing, adminId);
 
     const trimmedNote = (note || "").trim();
 

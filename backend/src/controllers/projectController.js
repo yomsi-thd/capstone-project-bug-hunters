@@ -3,10 +3,12 @@ const projectService = require("../services/projectService");
 // Create Project
 const createProject = async (req, res) => {
     try {
-        const creatorId = req.user.id;
-
+        // (id, roles, body) — the same shape createProjectUpdate already uses. The
+        // service needs the roles because an ADMIN caller must name the creator the
+        // project belongs to, while a CREATOR caller must not.
         const project = await projectService.createProject(
-            creatorId,
+            req.user.id,
+            req.user.roles,
             req.body
         );
 
@@ -179,14 +181,22 @@ async function approveProject(req, res) {
 
         const project =
             await projectService.approveProject(
-                req.params.id
+                req.params.id,
+                // Who is reviewing. The service refuses when this is the same admin
+                // who filed the project on the creator's behalf.
+                req.user.id
             );
 
         res.json(project);
 
     } catch (error) {
 
-        res.status(404).json({
+        // 400 unless the service tagged the error 404 (projectService.notFound).
+        // These two used to answer 404 for every failure, which was fine while "Project
+        // not found" was the only one they could produce — they now also refuse an
+        // archived project and an admin reviewing what they filed themselves, and both
+        // of those are "your request is not allowed", not "there is nothing here".
+        res.status(error.status ?? 400).json({
             message: error.message
         });
 
@@ -202,14 +212,20 @@ async function rejectProject(req, res) {
         const project =
             await projectService.rejectProject(
                 req.params.id,
-                req.body?.note
+                req.body?.note,
+                req.user.id
             );
 
         res.json(project);
 
     } catch (error) {
 
-        res.status(404).json({
+        // 400 unless the service tagged the error 404 (projectService.notFound).
+        // These two used to answer 404 for every failure, which was fine while "Project
+        // not found" was the only one they could produce — they now also refuse an
+        // archived project and an admin reviewing what they filed themselves, and both
+        // of those are "your request is not allowed", not "there is nothing here".
+        res.status(error.status ?? 400).json({
             message: error.message
         });
 

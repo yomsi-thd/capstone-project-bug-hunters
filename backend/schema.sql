@@ -127,6 +127,15 @@ CREATE TABLE projects (
     -- branch was removed with this, because a 50MB file base64'd into this row would
     -- never have been sent anywhere.
     video_url         TEXT,
+    -- Set only when an ADMIN filed this project ON BEHALF OF the creator named in
+    -- creator_id. NULL = the creator made it themselves, i.e. every project created
+    -- before 2026-08-24, which is why no backfill was needed.
+    -- It exists so "the admin who filed a project cannot also approve it" can be
+    -- enforced: once creator_id points at the creator, this is the ONLY remaining
+    -- trace of who actually typed it in (projectService.approveProject/rejectProject).
+    -- SET NULL, not CASCADE — same reason as project_updates.author_id: deleting an
+    -- admin account must not delete somebody else's project, only the credit.
+    created_by_admin_id INTEGER     REFERENCES users(id) ON DELETE SET NULL,
     -- "RMIT Endorsed" badge. ADMIN-only (PATCH /projects/:id/endorse).
     endorsed          BOOLEAN       NOT NULL DEFAULT FALSE,
     -- ── Archive (soft delete). A SECOND axis, independent of `status` above.

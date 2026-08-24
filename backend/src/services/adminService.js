@@ -89,6 +89,20 @@ async function updateUserRoles(userId, roles, actingAdminId) {
         );
     }
 
+    // An admin account holds ADMIN and nothing else (lecturer's rule, 2026-08-21):
+    // it owns no projects and no Class Coins, so the combinations this refuses have
+    // no meaning left. Checked here as well as in the Manage Access modal because the
+    // UI is not a security boundary — the same pair of reasons as the self-lockout
+    // guard below.
+    // ⚠️ Placed BEFORE that guard on purpose: an admin editing their own account is
+    // caught by both, and this is the message that explains the rule.
+    if (wanted.includes("ADMIN") && wanted.length > 1) {
+        throw new Error(
+            "An admin account holds the ADMIN role only. Remove CREATOR/BACKER, " +
+            "or use a separate account for those."
+        );
+    }
+
     // Without this an admin can strip their own ADMIN role in one request and lock
     // the whole team out of the admin area, with no route left to undo it.
     if (Number(userId) === Number(actingAdminId) && !wanted.includes("ADMIN")) {

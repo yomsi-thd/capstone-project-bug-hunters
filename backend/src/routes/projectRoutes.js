@@ -6,10 +6,13 @@ const authenticate = require("../middlewares/authMiddleware");
 const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
 
-// ADMIN is included on purpose: the team treats admin as a superuser, and the nav bar
-// gates "START A PROJECT" on canCreate = creator OR admin. Dropping ADMIN here would
-// show admins a button that 403s only after they finish the whole form.
-// (Agreed with Hiếu on 2026-08-06.)
+// ADMIN is still here after the role separation (2026-08-24), but for the OPPOSITE
+// reason it was here before. It is no longer "admin is a superuser and may own
+// projects" — an admin owns nothing now. It is that an admin may file a project ON
+// BEHALF OF a creator, so they still have to get through this door.
+// The rule that an ADMIN caller MUST name the creator (and a CREATOR caller must not)
+// lives in projectService.resolveOwnership, not here: it needs to look the target
+// account up, which a route guard cannot do.
 router.post("/", authenticate, authorize("CREATOR", "ADMIN"), projectController.createProject);
 
 router.get("/", projectController.getAllApprovedProjects);
@@ -139,9 +142,14 @@ router.delete(
     projectController.deleteTier
 );
 
+// authorize("BACKER") added 2026-08-24 with the admin role separation. This route had
+// only `authenticate` since it shipped, so `canInvest` in AuthContext was purely a UI
+// gate: any signed-in account, admin or pure creator, could invest with one hand-made
+// request. "An admin owns nothing and invests in nothing" cannot be a frontend rule.
 router.post(
     "/:id/invest",
     authenticate,
+    authorize("BACKER"),
     projectController.investProject
 );
 
