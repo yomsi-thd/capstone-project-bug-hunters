@@ -201,10 +201,25 @@ export function AuthProvider({ children }) {
       isCreator,
       isAdmin,
       isBacker,
-      // Who can create/manage projects: Creators, plus Admins (superuser).
-      canCreate: isCreator || isAdmin,
-      // Creators alone cannot invest; Backers and Admins can.
-      canInvest: isBacker || isAdmin,
+      // ── Permissions ────────────────────────────────────────────────────────
+      // Admin is NOT a superuser any more (2026-08-24, the lecturer's rule): an
+      // admin account holds ADMIN alone, owns no projects and no Class Coins.
+      // Everything else in the app reads these flags rather than `roles`, which is
+      // what makes this the one file to change if the team reverses the decision.
+
+      // Owns and manages projects of their own. No "|| isAdmin".
+      canCreate: isCreator,
+      // Backers only. A pure creator still cannot invest, and now neither can an
+      // admin. The backend enforces it too — authorize("BACKER") on POST
+      // /projects/:id/invest — because this flag was never a security boundary.
+      canInvest: isBacker,
+      // MAY OPEN THE WIZARD FOR SOMEBODY ELSE. Splits the two ideas the old
+      // canCreate ran together: owning projects vs. being allowed to file one.
+      canCreateForOthers: isAdmin,
+      // The union, purely so RequireAccess can name ONE flag
+      // (it takes a permission string, not a list) and the /create-project route
+      // guard keeps agreeing with the buttons that lead to it.
+      canOpenProjectWizard: isCreator || isAdmin,
       balance: user?.balance ?? 0,
       // True when running on a mock account because the backend was unreachable —
       // the Header shows a marker so this is not mistaken for real data.

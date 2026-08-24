@@ -21,12 +21,15 @@ describe("getNavLinksForUser", () => {
     expect(l).not.toContain("My Investments");
   });
 
-  it("gives an admin (superuser) Admin Dashboard, My Projects and My Investments", () => {
+  it("gives an admin Admin Dashboard and NOTHING of their own", () => {
     const l = labels({ roles: ["admin"] });
     expect(l).toContain("Admin Dashboard");
-    // Admin is a superuser: canCreate is true, so it also manages projects.
-    expect(l).toContain("My Projects");
-    expect(l).toContain("My Investments");
+    // Both of these were here before the 2026-08-24 role separation. An admin owns no
+    // projects and holds no Class Coins now, so each link pointed at an empty page —
+    // and /creator-my-projects is behind canCreate, which an admin no longer has, so
+    // My Projects would have landed on the "no access" screen.
+    expect(l).not.toContain("My Projects");
+    expect(l).not.toContain("My Investments");
   });
 
   it("always ends with the Departments and About links", () => {

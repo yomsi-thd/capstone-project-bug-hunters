@@ -440,6 +440,31 @@ describe("toApprovalProject", () => {
   it("uppercases the department for ADMIN_APPROVAL_DEPT_STYLE", () => {
     expect(toApprovalProject(projectRow({ category: "science" })).dept).toBe("SCIENCE");
   });
+
+  it("carries who filed the project on the creator's behalf", () => {
+    const filed = projectRow({ created_by_admin_id: 3, created_by_admin_name: "Test Admin" });
+    // The id decides whether APPROVE/REJECT are hidden — an admin may not review a
+    // project they filed themselves — and the name is what the OTHER admin reads.
+    expect(toApprovalProject(filed).createdByAdminId).toBe(3);
+    expect(toApprovalProject(filed).createdByAdminName).toBe("Test Admin");
+    expect(toAdminProject(filed).createdByAdminId).toBe(3);
+    expect(toAdminProject(filed).createdByAdminName).toBe("Test Admin");
+  });
+
+  it("returns null for a project the creator made themselves", () => {
+    // Every project before 2026-08-24, and every one a creator files for themselves.
+    // Null is the signal that no on-behalf rule applies at all.
+    expect(toApprovalProject(projectRow()).createdByAdminId).toBeNull();
+    expect(toApprovalProject(projectRow()).createdByAdminName).toBeNull();
+  });
+
+  it("still gives the id when only the name join is missing", () => {
+    // GET /admin/projects joins the name; other reads return the bare column. The
+    // "hide the buttons" rule must not quietly stop working on a row without the join.
+    const noJoin = projectRow({ created_by_admin_id: 3 });
+    expect(toApprovalProject(noJoin).createdByAdminId).toBe(3);
+    expect(toApprovalProject(noJoin).createdByAdminName).toBeNull();
+  });
 });
 
 describe("toAdminUser", () => {

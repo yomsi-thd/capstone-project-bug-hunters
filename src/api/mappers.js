@@ -65,6 +65,23 @@ function toArchiveFields(row) {
   };
 }
 
+/**
+ * Who FILED the project, when that was not its owner.
+ *
+ * NULL for every project a creator made themselves, which is all of them before
+ * 2026-08-24. Both admin surfaces need it, for different reasons: the id decides
+ * whether APPROVE/REJECT are hidden (the admin who filed it may not review it), and
+ * the name is what the OTHER admin reads before deciding.
+ */
+function toOnBehalfFields(row) {
+  return {
+    createdByAdminId: row.created_by_admin_id ?? null,
+    // Only GET /admin/projects joins the name; a row without the join still gets the
+    // id, so the "hide the buttons" rule never depends on a JOIN being present.
+    createdByAdminName: row.created_by_admin_name || null,
+  };
+}
+
 /** Project row -> card on Discover and the listing grids. */
 export function toCard(row) {
   if (!row) return null;
@@ -257,6 +274,7 @@ export function toAdminProject(row) {
     goal: money(row.goal_amount),
     img: row.image_url || null,
     ...toArchiveFields(row),
+    ...toOnBehalfFields(row),
   };
 }
 
@@ -292,6 +310,7 @@ export function toApprovalProject(row) {
     // getProjectTiers. Removing the field would make a page in Khôi's area depend on
     // two changes landing together.
     tiers: [],
+    ...toOnBehalfFields(row),
   };
 }
 

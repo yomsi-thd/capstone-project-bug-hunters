@@ -69,15 +69,19 @@ function App() {
             state with a login call to action, which reads better than a redirect. */}
         <Route path="/investments" element={<BackerInvestments />} />
 
-        {/* ── Creators (and admins, who are superusers) ── */}
+        {/* ── Creators ──
+            Admins are no longer let in here (2026-08-24): they own no projects, so
+            both of these would be empty pages about somebody else's work. */}
         <Route path="/creator-dashboard" element={
           <RequireAccess permission="canCreate"><CreatorDashboard /></RequireAccess>
         } />
         <Route path="/creator-my-projects" element={
           <RequireAccess permission="canCreate"><CreatorMyProjects /></RequireAccess>
         } />
+        {/* The one creator route an admin KEEPS, because filing a project on behalf of
+            a creator uses the same wizard. canOpenProjectWizard = creator OR admin. */}
         <Route path="/create-project" element={
-          <RequireAccess permission="canCreate"><CreateProject /></RequireAccess>
+          <RequireAccess permission="canOpenProjectWizard"><CreateProject /></RequireAccess>
         } />
 
         {/* ── Admins only ── */}

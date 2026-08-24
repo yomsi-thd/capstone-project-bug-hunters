@@ -21,20 +21,25 @@ export function getNavLinks(isLoggedIn) {
 }
 
 // Role-aware nav links, derived from the current user's roles.
-//   Creator or Admin   -> My Projects   (Admin is a superuser)
-//   Backer or Admin    -> My Investments
+//   Admin    -> Admin Dashboard ONLY (of the role-specific links)
+//   Creator  -> My Projects
+//   Backer   -> My Investments
 // Logged out shows only the public links.
+//
+// ⚠️ Admin lost My Projects and My Investments on 2026-08-24. An admin owns no
+// projects and holds no Class Coins now, so both links led somewhere that has nothing
+// of theirs in it — and /creator-my-projects is behind canCreate, so the link would
+// have landed on the "no access" screen. Mirrors canCreate / canInvest in AuthContext.
 export function getNavLinksForUser(user) {
   const roles = user?.roles ?? [];
   const isAdmin = roles.includes("admin");
   const isCreator = roles.includes("creator");
-  const isBackerOrAdmin = roles.includes("backer") || isAdmin;
+  const isBacker = roles.includes("backer");
 
   const links = [{ label: "Discover", path: "/discover" }];
   if (isAdmin) links.push({ label: "Admin Dashboard", path: "/admin-dashboard" });
-  // Admin is a superuser (canCreate = creator||admin), so it manages projects too.
-  if (isCreator || isAdmin) links.push({ label: "My Projects", path: "/creator-my-projects" });
-  if (isBackerOrAdmin) links.push({ label: "My Investments", path: "/investments" });
+  if (isCreator) links.push({ label: "My Projects", path: "/creator-my-projects" });
+  if (isBacker) links.push({ label: "My Investments", path: "/investments" });
   links.push({ label: "Departments", path: "#" });
   links.push({ label: "About", path: "#" });
   return links;

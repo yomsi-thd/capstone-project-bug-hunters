@@ -87,19 +87,25 @@ describe("AuthContext", () => {
     await login(result, "creator1", "creator1@");
     expect(result.current.isCreator).toBe(true);
     expect(result.current.canCreate).toBe(true);
-    // A pure creator is not a backer -> no invest access. This is the key
-    // asymmetry: canInvest is backer|admin, not creator.
+    // A pure creator is not a backer -> no invest access.
     expect(result.current.canInvest).toBe(false);
+    // A creator opens the wizard for themselves, never for anybody else.
+    expect(result.current.canOpenProjectWizard).toBe(true);
+    expect(result.current.canCreateForOthers).toBe(false);
   });
 
-  it("logs in admin1 (superuser) with both create and invest access", async () => {
+  it("logs in admin1, who owns nothing but may file for a creator", async () => {
     const { result } = renderAuth();
     await login(result, "admin1", "admin1@");
     expect(result.current.isAdmin).toBe(true);
-    // Admin implies both creator-level and backer-level permissions.
-    expect(result.current.canCreate).toBe(true);
-    expect(result.current.canInvest).toBe(true);
-    // ...but isCreator stays literal role membership, not the derived permission.
+    // The 2026-08-24 role separation: an admin holds ADMIN alone, owns no projects
+    // and no Class Coins. Both of these were true before that date.
+    expect(result.current.canCreate).toBe(false);
+    expect(result.current.canInvest).toBe(false);
+    // What replaced it: an admin may open the wizard, but only on behalf of someone.
+    expect(result.current.canCreateForOthers).toBe(true);
+    expect(result.current.canOpenProjectWizard).toBe(true);
+    // isCreator stays literal role membership, not the derived permission.
     expect(result.current.isCreator).toBe(false);
   });
 

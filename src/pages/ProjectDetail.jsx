@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import Header from "../components/layout/Header";
 import Footer from "../components/layout/Footer";
 import DeadEndPage from "../components/layout/DeadEndPage";
@@ -331,7 +331,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -488,7 +488,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -548,7 +548,46 @@ function ArchivedBanner({ p, isOwner }) {
   );
 }
 
-function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
+/**
+ * The line under a disabled INVEST button, saying WHY it is disabled.
+ *
+ * The button has always greyed out for anyone who cannot invest, and the note beside it
+ * has always been the same "All or nothing funding model" — so a signed-out visitor,
+ * who is the most common reader of this page, met a dead control with nothing pointing
+ * at the way in. A pure creator got the same silence, and since 2026-08-24 so does an
+ * admin.
+ *
+ * The two cases are different and need different answers: signed out is a door with a
+ * key (sign in), while signed in without BACKER is a door that is not theirs — telling
+ * them to sign in would send them round a loop they cannot finish.
+ */
+function InvestBlockedNote({ isLoggedIn, from }) {
+  if (!isLoggedIn) {
+    return (
+      <p className="mx-0 mt-2 mb-0 text-center text-[11px] leading-relaxed text-neutral-500">
+        {/* state.from is what Login already honours, so they come back here rather
+            than being dropped on Discover after signing in. */}
+        <Link
+          to="/login"
+          state={{ from }}
+          className="font-bold text-brand underline underline-offset-2"
+        >
+          Sign in
+        </Link>{" "}
+        to invest in this project.
+      </p>
+    );
+  }
+
+  return (
+    <p className="mx-0 mt-2 mb-0 text-center text-[11px] leading-relaxed text-neutral-500">
+      Only backer accounts can invest — your account does not hold a Class Coin balance.
+    </p>
+  );
+}
+
+function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
+  const location = useLocation();
   return (
     // ⚠️ `sticky` is a PROP, not a breakpoint utility. On mobile and tablet this card is
     // injected into the flow above the tabs, and a sticky card there would follow the
@@ -627,10 +666,14 @@ function FundingSidebar({ p, canInvest, sticky, isOwner, onEdit, onInvest }) {
             INVEST IN THIS PROJECT
           </button>
 
-          <p className="mx-0 mt-2 mb-0 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-            All or nothing funding model.
-          </p>
+          {canInvest ? (
+            <p className="mx-0 mt-2 mb-0 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+              All or nothing funding model.
+            </p>
+          ) : (
+            <InvestBlockedNote isLoggedIn={isLoggedIn} from={location.pathname} />
+          )}
         </>
       )}
 
