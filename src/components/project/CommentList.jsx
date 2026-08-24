@@ -1,7 +1,68 @@
 import { useState } from "react";
 import CommentItem from "./CommentItem";
+import Modal from "../ui/Modal";
+import { canDeleteComment, repliesLostBy } from "./commentPermissions";
 
 const PREVIEW_COUNT = 3;
+
+// Confirmation for a delete, and the only warning anybody gets that a cascade is about to
+// take other people's replies with it. Top level rather than nested in CommentList, per the
+// repo's rule about defining components during render.
+function DeleteCommentDialog({ comment, busy, error, onCancel, onConfirm }) {
+  const lost = repliesLostBy(comment);
+
+  return (
+    <Modal onClose={busy ? undefined : onCancel} closable={!busy} maxWidth={460}>
+      <div className="p-6">
+        <h3 className="mx-0 mt-0 mb-2 text-[17px] font-extrabold text-neutral-900">
+          Delete this comment?
+        </h3>
+        <p className="mx-0 mt-0 mb-4 text-[13px] leading-relaxed text-neutral-600">
+          This cannot be undone — the comment is removed for good, not hidden.
+        </p>
+
+        {/* Shown so the person can see WHICH comment they are about to remove: an admin
+            moderating a long thread has no other way to tell two rows apart from here. */}
+        <blockquote className="m-0 mb-4 border-l-[3px] border-neutral-200 pl-3 text-[13px] leading-relaxed text-neutral-500">
+          <span className="font-semibold text-neutral-700">{comment.author}</span>
+          {" — "}
+          {comment.text.length > 180 ? `${comment.text.slice(0, 180)}…` : comment.text}
+        </blockquote>
+
+        {lost > 0 && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 text-[13px] leading-relaxed text-amber-900">
+            <strong className="font-bold">
+              {lost} {lost === 1 ? "reply" : "replies"} will be deleted too.
+            </strong>{" "}
+            Replies live underneath this comment and go with it, including any written by
+            other people.
+          </div>
+        )}
+
+        {error && <div className="mb-3 text-[12px] text-brand">{error}</div>}
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="cursor-pointer rounded-[5px] border border-neutral-200 bg-none px-4 py-2 text-[12px] font-semibold text-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            CANCEL
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy}
+            className="cursor-pointer rounded-[5px] border-none bg-brand px-5 py-2 text-[12px] font-bold tracking-[0.06em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_4px_12px_rgba(204,0,0,0.3)] disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:hover:translate-y-0 disabled:hover:bg-neutral-300 disabled:hover:shadow-none"
+          >
+            {busy ? "DELETING…" : "DELETE"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 /**
  * `onPost(text, parentId)` posts a comment and resolves true on success, so this
@@ -22,6 +83,13 @@ export default function CommentList({
   // Existing comments stay readable either way.
   locked = false,
   lockedMessage = "This discussion is closed.",
+  // `{ id, isAdmin }`, or null when signed out. Only used to decide which comments show a
+  // Delete button; posting is still gated by isLoggedIn above.
+  viewer = null,
+  // `onDelete(comment)` deletes it and resolves `true` on success, or the message to show
+  // on failure. The parent reloads the thread rather than removing the row locally — the
+  // cascade means the client cannot predict what is left.
+  onDelete,
 }) {
   // One flag for every "can this person post" check below, so the box, the button and
   // the reply forms can never disagree about it.
@@ -32,6 +100,34 @@ export default function CommentList({
   // id of the comment currently being replied to, or null.
   const [replyTo, setReplyTo] = useState(null);
   const [replyText, setReplyText] = useState("");
+  // The comment awaiting confirmation, or null. Holding the object rather than an id is
+  // what lets the dialog show the text and count the replies without searching the thread.
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+
+  // Deleting is deliberately NOT gated on `canPost`. That flag closes an archived
+  // project's thread to new posts, but abusive text does not become acceptable because a
+  // project was archived, and the backend allows the delete either way.
+  const allowDelete = (comment) => Boolean(onDelete) && canDeleteComment(viewer, comment);
+
+  const askDelete = (comment) => {
+    setDeleteError(null);
+    setPendingDelete(comment);
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete || deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    const result = await onDelete?.(pendingDelete);
+    setDeleting(false);
+    // The failure message has to appear IN the dialog, so it comes back through the return
+    // value rather than through the `error` prop, which renders under the post box where a
+    // reader looking at a modal would never see it.
+    if (result === true) setPendingDelete(null);
+    else setDeleteError(typeof result === "string" ? result : "Could not delete that comment. Please try again.");
+  };
 
   const visibleComments = expanded ? comments : comments.slice(0, PREVIEW_COUNT);
 
@@ -101,9 +197,19 @@ export default function CommentList({
       <div className="flex flex-col gap-5">
         {visibleComments.map(comment => (
           <div key={comment.id}>
-            <CommentItem comment={comment} />
+            <CommentItem
+              comment={comment}
+              canDelete={allowDelete(comment)}
+              onDelete={askDelete}
+            />
             {comment.replies?.map(reply => (
-              <CommentItem key={reply.id} comment={reply} isReply />
+              <CommentItem
+                key={reply.id}
+                comment={reply}
+                isReply
+                canDelete={allowDelete(reply)}
+                onDelete={askDelete}
+              />
             ))}
 
             {/* Replies are one level deep only — a reply has no Reply button of its
@@ -167,6 +273,18 @@ export default function CommentList({
             VIEW ALL {totalComments} COMMENTS
           </button>
         </div>
+      )}
+
+      {/* Mounted only while a delete is pending, same pattern as PostUpdateModal — that is
+          also what resets the dialog's error between two comments without an effect. */}
+      {pendingDelete && (
+        <DeleteCommentDialog
+          comment={pendingDelete}
+          busy={deleting}
+          error={deleteError}
+          onCancel={() => { setPendingDelete(null); setDeleteError(null); }}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );

@@ -84,7 +84,7 @@ function EndorsedBadge() {
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const { isLoggedIn, canInvest, balance, user, refreshBalance } = useAuth();
+  const { isLoggedIn, canInvest, balance, user, isAdmin, refreshBalance } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("about");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -131,6 +131,19 @@ export default function ProjectDetail() {
     } catch (err) {
       setCommentError(err.response?.data?.message || err.message || "Could not post your comment");
       return false;
+    }
+  };
+
+  // Resolves true, or the message for the confirmation dialog to show. Refetches rather
+  // than dropping the row locally: `comments.parent_id` is ON DELETE CASCADE, so deleting a
+  // top-level comment also removes its replies and only the server knows what is left.
+  const handleDeleteComment = async (comment) => {
+    try {
+      await projectApi.deleteComment(id, comment.id);
+      setCommentsVersion(v => v + 1);
+      return true;
+    } catch (err) {
+      return err.response?.data?.message || err.message || "Could not delete that comment";
     }
   };
 
@@ -436,6 +449,11 @@ export default function ProjectDetail() {
                     totalComments={comments.reduce((n, c) => n + 1 + c.replies.length, 0)}
                     isLoggedIn={isLoggedIn}
                     onPost={handlePostComment}
+                    onDelete={handleDeleteComment}
+                    // Only what the delete rule needs. Built inline rather than passing the
+                    // whole user so this page cannot start leaning on the session object
+                    // inside the thread.
+                    viewer={isLoggedIn ? { id: user?.id, isAdmin } : null}
                     error={commentError}
                     // The backend rejects comments on an archived project, so the box is
                     // closed here rather than letting the post fail. Reading stays open.
