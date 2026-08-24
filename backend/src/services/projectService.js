@@ -782,7 +782,7 @@ async function deleteComment(userId, roles, commentId) {
         throw new Error("Comment not found");
     }
 
-    const isAdmin = Array.isArray(roles) && roles.includes("ADMIN");
+    const isAdmin = isAdminRole(roles);
 
     if (comment.user_id !== userId && !isAdmin) {
         throw new Error("You can only delete your own comment.");
@@ -864,7 +864,7 @@ async function deleteProjectUpdate(userId, roles, updateId) {
     }
 
     const project = await projectRepository.findById(update.project_id);
-    const isAdmin = Array.isArray(roles) && roles.includes("ADMIN");
+    const isAdmin = isAdminRole(roles);
 
     if (project?.creator_id !== userId && !isAdmin) {
         throw new Error("Only the project's creator can delete an update.");
