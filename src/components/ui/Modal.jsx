@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 // The shared dialog frame.
 //
@@ -63,7 +64,22 @@ export default function Modal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [closable, onClose]);
 
-  return (
+  // ⚠️ Rendered into document.body, and this is load-bearing rather than tidiness.
+  //
+  // `position: fixed` is resolved against the nearest ancestor carrying a transform,
+  // filter, perspective, contain or will-change — not against the viewport. `.lp-reveal`
+  // leaves `transform: matrix(1,0,0,1,0,0)` behind once its entrance animation finishes,
+  // and an IDENTITY transform is still a transform for this purpose. So a Modal mounted
+  // inside a revealed block (measured on ProjectDetail 24/08: the panel landed at
+  // y = -414, entirely above the screen) shows a dark overlay and NO dialog.
+  //
+  // The nine modals that existed before this change all happened to be mounted at page
+  // level, outside any `.lp-*` wrapper, which is the only reason nobody had hit it. The
+  // portal removes the trap for every caller instead of asking each one to know about it.
+  //
+  // React still routes events through the React tree rather than the DOM tree, so the
+  // stopPropagation below and every caller's handlers behave exactly as before.
+  return createPortal(
     <div
       className="lp-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
       onClick={closable ? onClose : undefined}
@@ -77,6 +93,7 @@ export default function Modal({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
