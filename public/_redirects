@@ -1,0 +1,11 @@
+# Netlify/Cloudflare Pages SPA rewrite. NOT read by Render — Render's Static
+# Site takes its rewrite from the dashboard (Redirects/Rewrites tab), so this
+# file only matters if the frontend ever moves off Render.
+#
+# React Router 7 uses BrowserRouter, so without a rewrite a hard load of
+# /project/4 or F5 on /account asks the host for a file that does not exist
+# and gets the host's own 404 instead of NotFound.jsx.
+#
+# 200, not 301: a redirect would rewrite the address bar to /index.html and
+# the router would lose the path it was asked for.
+/*  /index.html  200

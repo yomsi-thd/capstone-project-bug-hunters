@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local env. VITE_API_URL lives here when pointing the dev server at a
+# deployed backend; backend/.gitignore already covers backend/.env.
+.env
+.env.local
+
 # CodeGraph
 .codegraph
 
