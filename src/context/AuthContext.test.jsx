@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 // AuthContext calls the backend before falling back to the mock accounts, so both
@@ -232,6 +232,45 @@ describe("AuthContext", () => {
       const { result } = renderAuth();
       await login(result, "student1", "student1@");
       expect(result.current.isMockSession).toBe(true);
+    });
+
+    // The fallback is a DEV convenience. A production build must report the
+    // outage instead, or Render's ~50s cold start reads as a wrong password.
+    // vi.stubEnv reaches import.meta.env, and unstubEnvs in afterEach puts it
+    // back so the surrounding tests keep their DEV behaviour.
+    describe("in a production build", () => {
+      afterEach(() => {
+        vi.unstubAllEnvs();
+      });
+
+      it("does NOT fall back to a mock account when the backend is unreachable", async () => {
+        vi.stubEnv("DEV", false);
+        const { result } = renderAuth();
+        // Valid mock credentials: if the fallback still ran, this would sign in.
+        const res = await login(result, "student1", "student1@");
+
+        expect(res.ok).toBe(false);
+        expect(result.current.isLoggedIn).toBe(false);
+        expect(result.current.isMockSession).toBe(false);
+      });
+
+      it("says the server is unreachable, not that the password is wrong", async () => {
+        vi.stubEnv("DEV", false);
+        const { result } = renderAuth();
+        const res = await login(result, "student1", "student1@");
+
+        expect(res.error).toMatch(/reach the server/i);
+        expect(res.error).not.toMatch(/password/i);
+      });
+
+      it("still surfaces a real 401 as a wrong password", async () => {
+        vi.stubEnv("DEV", false);
+        authApi.login.mockRejectedValue(httpError(401, "Invalid email or password"));
+        const { result } = renderAuth();
+        const res = await login(result, "TestStudent@test.com", "wrong");
+
+        expect(res.error).toBe("Invalid email or password");
+      });
     });
   });
 });

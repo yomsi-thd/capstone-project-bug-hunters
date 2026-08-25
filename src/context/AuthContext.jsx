@@ -125,7 +125,22 @@ export function AuthProvider({ children }) {
           error: err.response.data?.message || "Invalid email or password",
         };
       }
-      // No response => backend down / wrong port / CORS => use the mock accounts.
+      // No response => backend down / wrong port / CORS.
+      //
+      // In DEV that means the mock accounts, so the UI stays browsable with no
+      // backend running. In a PRODUCTION build it must NOT: on Render the free
+      // web service sleeps after 15 minutes and takes ~50s to wake, and a
+      // request that dies mid-wake reaches axios as a network error, exactly
+      // like a wrong port does. Falling back there turns "the server is still
+      // starting" into "Invalid username or password" for a password that is
+      // completely correct — the same disguised failure as the 5173/5174 trap,
+      // except nobody can see the port. Say what actually happened instead.
+      if (!import.meta.env.DEV) {
+        return {
+          ok: false,
+          error: "Cannot reach the server. It may be starting up — please try again in a moment.",
+        };
+      }
       return loginWithMock(id, password);
     }
 
