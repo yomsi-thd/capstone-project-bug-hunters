@@ -84,23 +84,23 @@ describe("PATCH /api/admin/users/:id/deactivate and /activate", () => {
 
     // Without this guard an admin can deactivate themselves and be signed out on the
     // next request with no route back — authenticate rejects an inactive account.
-    it("400 when an admin deactivates their own account", async () => {
+    it("403 when an admin deactivates their own account", async () => {
         const res = await as(admin.token).patch(`/api/admin/users/${admin.id}/deactivate`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
         expect(res.body.message).toBe("You cannot deactivate your own account.");
     });
 
-    it("400 on a repeated deactivate or activate", async () => {
+    it("409 on a repeated deactivate or activate", async () => {
         const victim = await makeUser({ roles: ["BACKER"] });
 
         await as(admin.token).patch(`/api/admin/users/${victim.id}/deactivate`);
 
-        expect((await as(admin.token).patch(`/api/admin/users/${victim.id}/deactivate`)).status).toBe(400);
+        expect((await as(admin.token).patch(`/api/admin/users/${victim.id}/deactivate`)).status).toBe(409);
 
         await as(admin.token).patch(`/api/admin/users/${victim.id}/activate`);
 
-        expect((await as(admin.token).patch(`/api/admin/users/${victim.id}/activate`)).status).toBe(400);
+        expect((await as(admin.token).patch(`/api/admin/users/${victim.id}/activate`)).status).toBe(409);
     });
 });
 
@@ -120,36 +120,39 @@ describe("PATCH /api/admin/users/:id/roles", () => {
         expect(stripped.body.user.roles).toEqual(["BACKER"]);
     });
 
-    it("400 when roles is not an array, or names a role that does not exist", async () => {
+    it("422 when roles is not an array, or names a role that does not exist", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
         const notArray = await as(admin.token).patch(`/api/admin/users/${user.id}/roles`).send({ roles: "ADMIN" });
         const unknown = await as(admin.token).patch(`/api/admin/users/${user.id}/roles`).send({ roles: ["WIZARD"] });
 
-        expect(notArray.status).toBe(400);
-        expect(unknown.status).toBe(400);
+        expect(notArray.status).toBe(422);
+        expect(unknown.status).toBe(422);
         expect(unknown.body.message).toContain("Unknown role(s): WIZARD");
+        expect(unknown.body.details).toEqual([{ field: "roles", message: "Unknown role(s): WIZARD" }]);
     });
 
     // An admin account holds ADMIN and nothing else: it owns no projects and no Class
     // Coins, so the combinations refused here have no meaning left.
-    it("400 for ADMIN combined with any other role", async () => {
+    it("409 for ADMIN combined with any other role", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
         const res = await as(admin.token)
             .patch(`/api/admin/users/${user.id}/roles`)
             .send({ roles: ["ADMIN", "BACKER"] });
 
-        expect(res.status).toBe(400);
+        // 409, not 422: every name in the set is real and spelled right. What is refused
+        // is the combination, which is a rule about the domain rather than the shape.
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("holds the ADMIN role only");
     });
 
-    it("400 when an admin removes their own ADMIN role", async () => {
+    it("403 when an admin removes their own ADMIN role", async () => {
         const res = await as(otherAdmin.token)
             .patch(`/api/admin/users/${otherAdmin.id}/roles`)
             .send({ roles: ["BACKER"] });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
         expect(res.body.message).toBe("You cannot remove your own ADMIN role.");
     });
 
@@ -160,7 +163,7 @@ describe("PATCH /api/admin/users/:id/roles", () => {
             .patch(`/api/admin/users/${otherAdmin.id}/roles`)
             .send({ roles: ["ADMIN", "CREATOR"] });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("holds the ADMIN role only");
     });
 });
@@ -231,7 +234,7 @@ describe("the creator-request queue", () => {
         expect(rows.map((r) => r.name)).toEqual(["BACKER"]);
     });
 
-    it("400 on a second verdict for the same request, and on an id that does not exist", async () => {
+    it("409 on a second verdict for the same request, and 404 on an id that does not exist", async () => {
         const applicant = await registerWanting(true);
 
         const queue = await as(admin.token).get("/api/admin/creator-requests");
@@ -241,9 +244,9 @@ describe("the creator-request queue", () => {
 
         const again = await as(admin.token).patch(`/api/admin/creator-requests/${row.id}/reject`);
 
-        expect(again.status).toBe(400);
+        expect(again.status).toBe(409);
         expect(again.body.message).toBe("Creator request has already been reviewed.");
 
-        expect((await as(admin.token).patch("/api/admin/creator-requests/99999999/approve")).status).toBe(400);
+        expect((await as(admin.token).patch("/api/admin/creator-requests/99999999/approve")).status).toBe(404);
     });
 });

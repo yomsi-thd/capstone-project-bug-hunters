@@ -57,38 +57,58 @@ describe("POST /api/projects", () => {
     // resolveOwnership reads the CALLER's role first. A creator who names someone else
     // is refused rather than having the field ignored: silently dropping it is how a
     // project ends up filed under another name with nothing recording the attempt.
-    it("400 when a creator names a creator_id", async () => {
+    it("403 when a creator names a creator_id", async () => {
         const res = await as(creator.token)
             .post("/api/projects")
             .send(validBody({ creator_id: otherCreator.id }));
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
         expect(res.body.message).toContain("Only an admin can create a project on behalf");
     });
 
-    it("400 when an admin omits creator_id", async () => {
+    // 422 with the field named: the body is readable, it is just missing something this
+    // caller has to supply. Everything else in resolveOwnership is a 403 (you may not) or
+    // a 409 (the account you named is unusable), and the three are worth telling apart.
+    it("422 with creator_id named when an admin omits it", async () => {
         const res = await as(admin.token).post("/api/projects").send(validBody());
 
-        expect(res.status).toBe(400);
-        expect(res.body.message).toContain("on behalf of a creator");
+        expect(res.status).toBe(422);
+        expect(res.body.code).toBe("VALIDATION_FAILED");
+        expect(res.body.details).toEqual([
+            { field: "creator_id", message: "Choose the creator this project belongs to." },
+        ]);
     });
 
-    it("400 when an admin names themselves", async () => {
+    it("403 when an admin names themselves", async () => {
         const res = await as(admin.token)
             .post("/api/projects")
             .send(validBody({ creator_id: admin.id }));
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
         expect(res.body.message).toBe("An admin cannot own a project.");
     });
 
-    it("400 when the named account is not a creator", async () => {
+    // 409: the account exists and the id is fine, but its current state - no CREATOR
+    // role - is what forbids the request. Same shape as "that account is deactivated".
+    it("409 when the named account is not a creator", async () => {
         const res = await as(admin.token)
             .post("/api/projects")
             .send(validBody({ creator_id: backer.id }));
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe("CONFLICT");
         expect(res.body.message).toContain("not a creator");
+    });
+
+    // 422, not 409: an id pointing at nothing is a bad VALUE, not a state conflict.
+    it("422 when creator_id names no account at all", async () => {
+        const res = await as(admin.token)
+            .post("/api/projects")
+            .send(validBody({ creator_id: 99999999 }));
+
+        expect(res.status).toBe(422);
+        expect(res.body.message).toBe("That creator account does not exist.");
     });
 
     it("201 on behalf of a creator, with ownership going to the creator", async () => {
@@ -101,18 +121,19 @@ describe("POST /api/projects", () => {
         expect(Number(res.body.project.created_by_admin_id)).toBe(admin.id);
     });
 
-    it("400 when end_date is not after start_date", async () => {
+    it("422 when end_date is not after start_date", async () => {
         const res = await as(creator.token)
             .post("/api/projects")
             .send(validBody({ start_date: "2026-09-01", end_date: "2026-08-01" }));
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
+        expect(res.body.code).toBe("VALIDATION_FAILED");
         expect(res.body.message).toBe("end_date must be after start_date.");
     });
 
     // Support levels are validated before the transaction opens, so a bad level costs
     // nothing — and, crucially, leaves no half-created project behind.
-    it("400 and creates nothing when a support level is invalid", async () => {
+    it("422 and creates nothing when a support level is invalid", async () => {
         const before = await pool.query("select count(*)::int as n from projects");
 
         const res = await as(creator.token)
@@ -121,7 +142,7 @@ describe("POST /api/projects", () => {
 
         const after = await pool.query("select count(*)::int as n from projects");
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         expect(after.rows[0].n).toBe(before.rows[0].n);
     });
 
@@ -184,12 +205,16 @@ describe("GET /api/projects/:id", () => {
         expect(res.body.message).toBe("Project not found");
     });
 
-    // A non-numeric id reaches Postgres as a bad integer cast. It answers 404 today only
-    // because getProjectById maps every failure to 404, not because anything checked it.
-    it("404 for a non-numeric id", async () => {
+    // A non-numeric id used to reach Postgres as a bad integer cast and answer 404 only
+    // because getProjectById mapped every failure to 404. It is now refused by
+    // numericParam before any query runs, at the same 404 - deliberately the same, since
+    // ProjectDetail shows its "Project not found" screen on exactly that status.
+    it("404 for a non-numeric id, checked before it reaches a query", async () => {
         const res = await request(app).get("/api/projects/not-a-number");
 
         expect(res.status).toBe(404);
+        expect(res.body.code).toBe("NOT_FOUND");
+        expect(res.body.message).toBe("Project not found");
     });
 });
 
@@ -233,33 +258,38 @@ describe("PUT /api/projects/:id", () => {
         expect(res.body.project.title).toBe("Renamed");
     });
 
-    // The three lines below are the example the restructure design leads with: a missing
-    // project, someone else's project and a database failure all answer 400 today, so a
-    // client cannot tell a user error from a system one.
-    it("400 (not 404) for a project that does not exist", async () => {
+    /**
+     * These three are the example the restructure design leads with. Until the error
+     * contract landed, a missing project, somebody else's project and a dead database
+     * all answered 400, so no client could tell a user's mistake from an outage.
+     */
+    it("404 for a project that does not exist", async () => {
         const res = await as(creator.token).put("/api/projects/99999999").send({ title: "x" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe("NOT_FOUND");
         expect(res.body.message).toBe("Project not found");
     });
 
-    it("400 (not 403) for somebody else's project", async () => {
+    it("403 for somebody else's project", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
         const res = await as(otherCreator.token).put(`/api/projects/${project.id}`).send({ title: "x" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
         expect(res.body.message).toBe("Unauthorized");
     });
 
     // updateProject compares creator_id to req.user.id and has no admin branch, so an
-    // admin editing someone's project is refused exactly like a stranger.
-    it("400 even for an admin", async () => {
+    // admin editing someone's project is refused exactly like a stranger. Behaviour left
+    // as it was; only the status is now honest about which of the three cases it is.
+    it("403 even for an admin", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
         const res = await as(admin.token).put(`/api/projects/${project.id}`).send({ title: "x" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 
     // Three cases, not two: absent leaves the column alone, text stores it, empty stores
@@ -328,7 +358,7 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
 
     // The conflict-of-interest rule. It is why the system needs a second admin account
     // at all: without one, an on-behalf project is stuck in the queue forever.
-    it("400 when the reviewing admin is the one who filed the project", async () => {
+    it("409 when the reviewing admin is the one who filed the project", async () => {
         const created = await as(admin.token)
             .post("/api/projects")
             .send(validBody({ creator_id: otherCreator.id }));
@@ -336,7 +366,8 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         const own = await as(admin.token).patch(`/api/projects/${created.body.project.id}/approve`);
         const other = await as(secondAdmin.token).patch(`/api/projects/${created.body.project.id}/approve`);
 
-        expect(own.status).toBe(400);
+        expect(own.status).toBe(409);
+        expect(own.body.code).toBe("CONFLICT");
         expect(own.body.message).toContain("another admin has to review it");
         expect(other.status).toBe(200);
     });
@@ -355,21 +386,21 @@ describe("PATCH /api/projects/:id/resubmit", () => {
         expect(res.body.project.review_note).toBeNull();
     });
 
-    it("400 from any status other than REJECTED", async () => {
+    it("409 from any status other than REJECTED", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const res = await as(creator.token).patch(`/api/projects/${project.id}/resubmit`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("Only a rejected project");
     });
 
-    it("400 for someone who is neither the creator nor an admin", async () => {
+    it("403 for someone who is neither the creator nor an admin", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "REJECTED" });
 
         const res = await as(otherCreator.token).patch(`/api/projects/${project.id}/resubmit`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 });
 
@@ -394,23 +425,23 @@ describe("PATCH /api/projects/:id/endorse", () => {
 });
 
 describe("DELETE /api/projects/:id", () => {
-    it("400 for an admin while the project is not archived", async () => {
+    it("409 for an admin while the project is not archived", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
         const res = await as(admin.token).delete(`/api/projects/${project.id}`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("Only an archived project");
     });
 
-    it("400 for the creator even once it is archived", async () => {
+    it("403 for the creator even once it is archived", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
         await as(creator.token).patch(`/api/projects/${project.id}/archive`).send({});
 
         const res = await as(creator.token).delete(`/api/projects/${project.id}`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
         expect(res.body.message).toBe("Unauthorized");
     });
 

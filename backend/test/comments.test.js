@@ -58,21 +58,22 @@ describe("POST /api/projects/:id/comments", () => {
         expect(res.status).toBe(401);
     });
 
-    it("400 on an empty body and on one over 2000 characters", async () => {
+    it("422 on an empty body and on one over 2000 characters", async () => {
         const empty = await as(backer.token).post(`/api/projects/${project.id}/comments`).send({ body: "   " });
         const huge = await as(backer.token)
             .post(`/api/projects/${project.id}/comments`)
             .send({ body: "x".repeat(2001) });
 
-        expect(empty.status).toBe(400);
+        expect(empty.status).toBe(422);
+        expect(empty.body.code).toBe("VALIDATION_FAILED");
         expect(empty.body.message).toBe("A comment cannot be empty.");
-        expect(huge.status).toBe(400);
+        expect(huge.status).toBe(422);
     });
 
-    it("400 for a project that does not exist", async () => {
+    it("404 for a project that does not exist", async () => {
         const res = await as(backer.token).post("/api/projects/99999999/comments").send({ body: "Hi" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
         expect(res.body.message).toBe("Project not found");
     });
 
@@ -93,7 +94,7 @@ describe("POST /api/projects/:id/comments", () => {
         expect(nested.body.comment.parent_id).toBe(top.id);
     });
 
-    it("400 when the parent belongs to another project", async () => {
+    it("422 when the parent belongs to another project", async () => {
         const elsewhere = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const foreign = await makeComment({ projectId: elsewhere.id, userId: backer.id });
 
@@ -101,7 +102,7 @@ describe("POST /api/projects/:id/comments", () => {
             .post(`/api/projects/${project.id}/comments`)
             .send({ body: "Hi", parent_id: foreign.id });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         expect(res.body.message).toContain("does not belong to this project");
     });
 });
@@ -124,27 +125,28 @@ describe("DELETE /api/projects/:id/comments/:commentId", () => {
     });
 
     // The product decision, not an oversight.
-    it("400 for the CREATOR of the project the comment sits on", async () => {
+    it("403 for the CREATOR of the project the comment sits on", async () => {
         const comment = await makeComment({ projectId: project.id, userId: backer.id });
 
         const res = await as(creator.token).delete(`/api/projects/${project.id}/comments/${comment.id}`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
         expect(res.body.message).toBe("You can only delete your own comment.");
     });
 
-    it("400 for an unrelated user", async () => {
+    it("403 for an unrelated user", async () => {
         const comment = await makeComment({ projectId: project.id, userId: backer.id });
 
         const res = await as(otherBacker.token).delete(`/api/projects/${project.id}/comments/${comment.id}`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
     });
 
-    it("400 for a comment that does not exist", async () => {
+    it("404 for a comment that does not exist", async () => {
         const res = await as(admin.token).delete(`/api/projects/${project.id}/comments/99999999`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
         expect(res.body.message).toBe("Comment not found");
     });
 
@@ -174,7 +176,7 @@ describe("DELETE /api/projects/:id/comments/:commentId", () => {
         const posting = await as(backer.token).post(`/api/projects/${archived.id}/comments`).send({ body: "Hi" });
         const deleting = await as(backer.token).delete(`/api/projects/${archived.id}/comments/${comment.id}`);
 
-        expect(posting.status).toBe(400);
+        expect(posting.status).toBe(409);
         expect(deleting.status).toBe(200);
     });
 });

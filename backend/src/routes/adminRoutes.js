@@ -4,6 +4,11 @@ const router = express.Router();
 const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 const adminController = require("../controllers/adminController");
+const { guardIdParams } = require("../http/numericParam");
+
+// :id is a user id on the /users routes and a request id on /creator-requests. Both are
+// SERIAL, and "not found" is the right answer for a value that can be neither.
+guardIdParams(router, { id: "Resource" });
 
 router.patch(
     "/users/:id/deactivate",

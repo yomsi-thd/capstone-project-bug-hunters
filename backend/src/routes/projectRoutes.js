@@ -5,6 +5,17 @@ const projectController = require("../controllers/projectController");
 const authenticate = require("../middlewares/authMiddleware");
 const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
+const { guardIdParams } = require("../http/numericParam");
+
+// Every id here is a SERIAL primary key, so anything that is not a positive integer
+// cannot name a row. Checked once, before any handler runs - see numericParam.js for
+// why the answer is 404 rather than 400.
+guardIdParams(router, {
+    id: "Project",
+    commentId: "Comment",
+    updateId: "Update",
+    tierId: "Support level",
+});
 
 // ADMIN is still here after the role separation (2026-08-24), but for the OPPOSITE
 // reason it was here before. It is no longer "admin is a superuser and may own

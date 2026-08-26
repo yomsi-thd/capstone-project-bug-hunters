@@ -5,6 +5,13 @@ const commentRepository = require("../repositories/commentRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
 const tierRepository = require("../repositories/tierRepository");
 const userRepository = require("../repositories/userRepository");
+const {
+    AppError,
+    notFound,
+    forbidden,
+    conflict,
+    validationFailed,
+} = require("../errors/AppError");
 
 // projects.start_date / end_date have always existed but createProject never wrote
 // them, so every project came back with both null -> ProjectDetail showed "—" for
@@ -18,7 +25,7 @@ function resolveCampaignDates(data) {
     const start = data.start_date ? new Date(data.start_date) : new Date();
 
     if (Number.isNaN(start.getTime())) {
-        throw new Error("start_date is not a valid date.");
+        throw validationFailed("start_date is not a valid date.");
     }
 
     const end = data.end_date
@@ -26,11 +33,11 @@ function resolveCampaignDates(data) {
         : new Date(start.getTime() + DEFAULT_CAMPAIGN_DAYS * 24 * 60 * 60 * 1000);
 
     if (Number.isNaN(end.getTime())) {
-        throw new Error("end_date is not a valid date.");
+        throw validationFailed("end_date is not a valid date.");
     }
 
     if (end <= start) {
-        throw new Error("end_date must be after start_date.");
+        throw validationFailed("end_date must be after start_date.");
     }
 
     return { start, end };
@@ -38,23 +45,6 @@ function resolveCampaignDates(data) {
 
 function isAdminRole(roles) {
     return Array.isArray(roles) && roles.includes("ADMIN");
-}
-
-/**
- * A "this does not exist" error, tagged so the controller does not have to guess.
- *
- * Every other error thrown out of this service means "your request is not allowed",
- * which is a 400. Only this one is a 404, and approveProject/rejectProject are the
- * first handlers that can produce both — they used to answer 404 for everything, which
- * was fine while "not found" was their only failure.
- *
- * ⚠️ The alternative, matching on the message text in the controller, silently flips
- * the status the day somebody rewords the sentence. The status belongs to the error.
- */
-function notFound(message) {
-    const err = new Error(message);
-    err.status = 404;
-    return err;
 }
 
 // An archived project is frozen: no edits, no investments, no comments, no updates,
@@ -66,7 +56,7 @@ function notFound(message) {
 function assertNotArchived(project) {
 
     if (project.archived_at) {
-        throw new Error("This project is archived. Restore it first.");
+        throw conflict("This project is archived. Restore it first.");
     }
 }
 
@@ -86,7 +76,7 @@ function assertNotOwnReview(project, adminId) {
         project.created_by_admin_id != null &&
         Number(project.created_by_admin_id) === Number(adminId)
     ) {
-        throw new Error(
+        throw conflict(
             "You created this project on behalf of its owner, " +
             "so another admin has to review it."
         );
@@ -121,7 +111,7 @@ function assertVisibleTo(project, viewer) {
     if (!isOwner && !isAdminRole(viewer?.roles)) {
         // Deliberately the same message as a missing row. "This exists but is pending
         // review" already tells a stranger the project exists.
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 }
 
@@ -156,11 +146,11 @@ function normaliseTier(input = {}) {
 function assertTierFields(tier) {
 
     if (!tier.name) {
-        throw new Error("A level needs a name.");
+        throw validationFailed("A level needs a name.");
     }
 
     if (tier.name.length > 100) {
-        throw new Error("A level name must be 100 characters or fewer.");
+        throw validationFailed("A level name must be 100 characters or fewer.");
     }
 
     if (!Number.isInteger(tier.min_amount) || tier.min_amount <= 0) {
@@ -168,11 +158,11 @@ function assertTierFields(tier) {
         // check (Number.isInteger && > 0), so they must not describe it differently —
         // a creator who gets past one and is refused by the other should read the same
         // sentence, not wonder whether they hit a second, stricter rule.
-        throw new Error("A level needs a minimum above 0 CC — a whole number of Class Coins.");
+        throw validationFailed("A level needs a minimum above 0 CC — a whole number of Class Coins.");
     }
 
     if (tier.bullets.length === 0) {
-        throw new Error("Add at least one line describing what this level signals.");
+        throw validationFailed("Add at least one line describing what this level signals.");
     }
 }
 
@@ -192,7 +182,7 @@ async function assertTierIsValid(projectId, tier, { excludeTierId = null } = {})
     );
 
     if (clash) {
-        throw new Error(`Another level already starts at ${tier.min_amount} CC.`);
+        throw conflict(`Another level already starts at ${tier.min_amount} CC.`);
     }
 }
 
@@ -207,7 +197,7 @@ function normaliseTierBatch(rawTiers) {
     const tiers = (Array.isArray(rawTiers) ? rawTiers : []).map(normaliseTier);
 
     if (tiers.length > MAX_TIERS) {
-        throw new Error(`A project can have at most ${MAX_TIERS} support levels.`);
+        throw conflict(`A project can have at most ${MAX_TIERS} support levels.`);
     }
 
     const seen = new Set();
@@ -217,7 +207,7 @@ function normaliseTierBatch(rawTiers) {
         assertTierFields(tier);
 
         if (seen.has(tier.min_amount)) {
-            throw new Error(`Another level already starts at ${tier.min_amount} CC.`);
+            throw conflict(`Another level already starts at ${tier.min_amount} CC.`);
         }
 
         seen.add(tier.min_amount);
@@ -239,11 +229,11 @@ async function loadProjectForTierWrite(projectId, userId, roles) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     if (Number(project.creator_id) !== Number(userId) && !isAdminRole(roles)) {
-        throw new Error("Only the project's creator can change its support levels.");
+        throw forbidden("Only the project's creator can change its support levels.");
     }
 
     assertNotArchived(project);
@@ -259,7 +249,7 @@ async function getProjectTiers(projectId, viewer = null) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertVisibleTo(project, viewer);
@@ -274,7 +264,7 @@ async function createTier(projectId, userId, roles, data) {
     const active = await tierRepository.countActiveByProjectId(projectId);
 
     if (active >= MAX_TIERS) {
-        throw new Error(`A project can have at most ${MAX_TIERS} support levels.`);
+        throw conflict(`A project can have at most ${MAX_TIERS} support levels.`);
     }
 
     const tier = normaliseTier(data);
@@ -293,7 +283,7 @@ async function updateTier(projectId, tierId, userId, roles, data) {
     const existing = await tierRepository.findForProject(tierId, projectId);
 
     if (!existing) {
-        throw new Error("Support level not found");
+        throw notFound("Support level not found");
     }
 
     const tier = normaliseTier(data);
@@ -315,7 +305,7 @@ async function deleteTier(projectId, tierId, userId, roles) {
     const existing = await tierRepository.findForProject(tierId, projectId);
 
     if (!existing) {
-        throw new Error("Support level not found");
+        throw notFound("Support level not found");
     }
 
     if (await tierRepository.hasTransactions(existing.id)) {
@@ -351,37 +341,38 @@ async function resolveOwnership(userId, roles, data) {
     if (!isAdminRole(roles)) {
 
         if (requestedOwnerId != null) {
-            throw new Error("Only an admin can create a project on behalf of a creator.");
+            throw forbidden("Only an admin can create a project on behalf of a creator.");
         }
 
         return { creator_id: userId, created_by_admin_id: null };
     }
 
     if (requestedOwnerId == null) {
-        throw new Error(
+        throw validationFailed(
             "An admin creates a project on behalf of a creator. " +
-            "Choose the creator it belongs to."
+            "Choose the creator it belongs to.",
+            [{ field: "creator_id", message: "Choose the creator this project belongs to." }]
         );
     }
 
     if (Number(requestedOwnerId) === Number(userId)) {
-        throw new Error("An admin cannot own a project.");
+        throw forbidden("An admin cannot own a project.");
     }
 
     const target = await userRepository.findById(requestedOwnerId);
 
     if (!target) {
-        throw new Error("That creator account does not exist.");
+        throw validationFailed("That creator account does not exist.");
     }
 
     if (target.is_active === false) {
-        throw new Error("That creator account is deactivated.");
+        throw conflict("That creator account is deactivated.");
     }
 
     const targetRoles = await userRepository.getUserRoles(target.id);
 
     if (!targetRoles.includes("CREATOR")) {
-        throw new Error("That user is not a creator. Grant the CREATOR role first.");
+        throw conflict("That user is not a creator. Grant the CREATOR role first.");
     }
 
     return { creator_id: target.id, created_by_admin_id: userId };
@@ -482,7 +473,7 @@ async function getProjectById(id, viewer = null) {
     const project = await projectRepository.findById(id);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertVisibleTo(project, viewer);
@@ -509,11 +500,17 @@ async function updateProject(projectId, userId, data) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     if (project.creator_id !== userId) {
-        throw new Error("Unauthorized");
+        // 403, where it used to be 400 alongside "no such project" and "the database is
+        // down" - the three cases this whole restructure exists to separate.
+        //
+        // Note there is still no admin branch: updateProject compares creator_id to
+        // req.user.id and nothing else, so an admin editing somebody's project is
+        // refused exactly like a stranger. That is existing behaviour, left alone.
+        throw forbidden("Unauthorized");
     }
 
     assertNotArchived(project);
@@ -553,18 +550,18 @@ async function archiveProject(projectId, userId, roles, reason) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     if (project.archived_at) {
-        throw new Error("This project is already archived.");
+        throw conflict("This project is already archived.");
     }
 
     const isAdmin = isAdminRole(roles);
     const isOwner = project.creator_id === userId;
 
     if (!isOwner && !isAdmin) {
-        throw new Error("Unauthorized");
+        throw forbidden("Unauthorized");
     }
 
     const trimmedReason = (reason || "").trim();
@@ -573,7 +570,7 @@ async function archiveProject(projectId, userId, roles, reason) {
     // (see restoreProject), so the creator is at least owed the reason. Archiving your
     // own project needs no justification.
     if (isAdmin && !isOwner && !trimmedReason) {
-        throw new Error("A reason is required when archiving another user's project.");
+        throw validationFailed("A reason is required when archiving another user's project.");
     }
 
     return await projectRepository.archiveProject(projectId, userId, trimmedReason);
@@ -590,11 +587,11 @@ async function restoreProject(projectId, userId, roles) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     if (!project.archived_at) {
-        throw new Error("This project is not archived.");
+        throw conflict("This project is not archived.");
     }
 
     const isAdmin = isAdminRole(roles);
@@ -602,7 +599,7 @@ async function restoreProject(projectId, userId, roles) {
     const isOwner = project.creator_id === userId;
 
     if (!isAdmin && !(isOwner && archivedBySelf)) {
-        throw new Error(
+        throw forbidden(
             "This project was archived by an administrator and can only be restored by one."
         );
     }
@@ -625,15 +622,15 @@ async function deleteProject(projectId, userId, roles) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     if (!isAdminRole(roles)) {
-        throw new Error("Unauthorized");
+        throw forbidden("Unauthorized");
     }
 
     if (!project.archived_at) {
-        throw new Error("Only an archived project can be permanently deleted. Archive it first.");
+        throw conflict("Only an archived project can be permanently deleted. Archive it first.");
     }
 
     await projectRepository.deleteProject(projectId);
@@ -684,7 +681,7 @@ async function resubmitProject(projectId, userId, roles) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertNotArchived(project);
@@ -692,14 +689,14 @@ async function resubmitProject(projectId, userId, roles) {
     const isAdmin = isAdminRole(roles);
 
     if (project.creator_id !== userId && !isAdmin) {
-        throw new Error("Only the project's creator can resubmit it.");
+        throw forbidden("Only the project's creator can resubmit it.");
     }
 
     // Only from REJECTED. Allowing it from PENDING would let someone bump their own
     // project around the queue, and from APPROVED it would take a live project off
     // Discover by accident.
     if (project.status !== "REJECTED") {
-        throw new Error("Only a rejected project can be resubmitted for review.");
+        throw conflict("Only a rejected project can be resubmitted for review.");
     }
 
     return await projectRepository.resubmitProject(projectId);
@@ -710,7 +707,7 @@ async function setProjectEndorsed(id, endorsed) {
     const project = await projectRepository.setEndorsed(id, Boolean(endorsed));
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     return project;
@@ -722,7 +719,7 @@ async function getProjectComments(projectId, viewer = null) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     // Hiding the project but not its discussion would leave the same content readable
@@ -737,17 +734,17 @@ async function createComment(userId, projectId, data) {
     const body = (data.body || "").trim();
 
     if (!body) {
-        throw new Error("A comment cannot be empty.");
+        throw validationFailed("A comment cannot be empty.");
     }
 
     if (body.length > 2000) {
-        throw new Error("A comment must be 2000 characters or fewer.");
+        throw validationFailed("A comment must be 2000 characters or fewer.");
     }
 
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     assertNotArchived(project);
@@ -758,7 +755,7 @@ async function createComment(userId, projectId, data) {
         const parent = await commentRepository.findById(data.parent_id);
 
         if (!parent || Number(parent.project_id) !== Number(projectId)) {
-            throw new Error("The comment being replied to does not belong to this project.");
+            throw validationFailed("The comment being replied to does not belong to this project.");
         }
 
         // The UI only draws one level of nesting, so a reply to a reply is attached to
@@ -779,13 +776,13 @@ async function deleteComment(userId, roles, commentId) {
     const comment = await commentRepository.findById(commentId);
 
     if (!comment) {
-        throw new Error("Comment not found");
+        throw notFound("Comment not found");
     }
 
     const isAdmin = isAdminRole(roles);
 
     if (comment.user_id !== userId && !isAdmin) {
-        throw new Error("You can only delete your own comment.");
+        throw forbidden("You can only delete your own comment.");
     }
 
     return await commentRepository.remove(commentId);
@@ -797,7 +794,7 @@ async function getProjectUpdates(projectId, viewer = null) {
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     // Same reason as the comments above: the updates are the project's content.
@@ -814,27 +811,27 @@ async function createProjectUpdate(userId, roles, projectId, data) {
     const body = (data.body || "").trim();
 
     if (!title) {
-        throw new Error("An update needs a title.");
+        throw validationFailed("An update needs a title.");
     }
 
     if (!body) {
-        throw new Error("An update needs some content.");
+        throw validationFailed("An update needs some content.");
     }
 
     if (title.length > 200) {
-        throw new Error("The title must be 200 characters or fewer.");
+        throw validationFailed("The title must be 200 characters or fewer.");
     }
 
     const project = await projectRepository.findById(projectId);
 
     if (!project) {
-        throw new Error("Project not found");
+        throw notFound("Project not found");
     }
 
     const isAdmin = isAdminRole(roles);
 
     if (project.creator_id !== userId && !isAdmin) {
-        throw new Error("Only the project's creator can post an update.");
+        throw forbidden("Only the project's creator can post an update.");
     }
 
     assertNotArchived(project);
@@ -844,7 +841,7 @@ async function createProjectUpdate(userId, roles, projectId, data) {
     // GET /projects/:id/updates is public, so if the project is later approved that
     // update surfaces with a timestamp from a period nobody could see it.
     if (project.status === "REJECTED") {
-        throw new Error("This project was not approved, so it cannot post updates. Revise it and resubmit for review.");
+        throw conflict("This project was not approved, so it cannot post updates. Revise it and resubmit for review.");
     }
 
     return await projectUpdateRepository.create({
@@ -860,14 +857,14 @@ async function deleteProjectUpdate(userId, roles, updateId) {
     const update = await projectUpdateRepository.findById(updateId);
 
     if (!update) {
-        throw new Error("Update not found");
+        throw notFound("Update not found");
     }
 
     const project = await projectRepository.findById(update.project_id);
     const isAdmin = isAdminRole(roles);
 
     if (project?.creator_id !== userId && !isAdmin) {
-        throw new Error("Only the project's creator can delete an update.");
+        throw forbidden("Only the project's creator can delete an update.");
     }
 
     return await projectUpdateRepository.remove(updateId);
@@ -878,7 +875,7 @@ async function deleteProjectUpdate(userId, roles, updateId) {
 async function investProject(userId, projectId, amount, tierId = null) {
 
     if (!amount || amount <= 0) {
-        throw new Error("Investment amount must be greater than 0.");
+        throw validationFailed("Investment amount must be greater than 0.");
     }
 
     const client = await pool.connect();
@@ -891,17 +888,17 @@ async function investProject(userId, projectId, amount, tierId = null) {
         const project = await projectRepository.findById(projectId, client);
 
         if (!project) {
-            throw new Error("Project not found.");
+            throw notFound("Project not found.");
         }
 
         if (project.status !== "APPROVED") {
-            throw new Error("Only approved projects can receive investments.");
+            throw conflict("Only approved projects can receive investments.");
         }
 
         // Checked inside the transaction alongside the status, so an archive landing
         // mid-flight rolls the investment back rather than funding a hidden project.
         if (project.archived_at) {
-            throw new Error("This project has been archived and is no longer accepting investments.");
+            throw conflict("This project has been archived and is no longer accepting investments.");
         }
 
         // Resolved INSIDE the transaction, for the same reason archived_at is: the
@@ -917,11 +914,11 @@ async function investProject(userId, projectId, amount, tierId = null) {
             tier = await tierRepository.findForProject(tierId, projectId, client);
 
             if (!tier || !tier.is_active) {
-                throw new Error("That support level is no longer available.");
+                throw conflict("That support level is no longer available.");
             }
 
             if (amount < tier.min_amount) {
-                throw new Error(`This level needs at least ${tier.min_amount} CC.`);
+                throw validationFailed(`This level needs at least ${tier.min_amount} CC.`);
             }
         }
 
@@ -933,7 +930,7 @@ async function investProject(userId, projectId, amount, tierId = null) {
         );
 
         if (!wallet) {
-            throw new Error("Insufficient ClassCoins.");
+            throw new AppError(409, "INSUFFICIENT_FUNDS", "Insufficient ClassCoins.");
         }
 
         // Increase project funding

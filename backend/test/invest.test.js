@@ -58,44 +58,48 @@ describe("POST /api/projects/:id/invest", () => {
         expect((await request(app).post(`/api/projects/${project.id}/invest`).send({ amount: 10 })).status).toBe(401);
     });
 
-    it("400 on a missing, zero or negative amount", async () => {
+    it("422 on a missing, zero or negative amount", async () => {
         const backer = await makeUser({ roles: ["BACKER"] });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const post = (body) => as(backer.token).post(`/api/projects/${project.id}/invest`).send(body);
 
-        expect((await post({})).status).toBe(400);
-        expect((await post({ amount: 0 })).status).toBe(400);
-        expect((await post({ amount: -50 })).status).toBe(400);
+        expect((await post({})).status).toBe(422);
+        expect((await post({ amount: 0 })).status).toBe(422);
+        expect((await post({ amount: -50 })).status).toBe(422);
     });
 
-    it("400 and no state change when the wallet is short", async () => {
+    it("409 INSUFFICIENT_FUNDS and no state change when the wallet is short", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 100 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const res = await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 500 });
 
-        expect(res.status).toBe(400);
+        // Its own code rather than a generic conflict: this is the one refusal a backer
+        // meets often enough that the UI may want to recognise it without reading the
+        // sentence.
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe("INSUFFICIENT_FUNDS");
         expect(res.body.message).toBe("Insufficient ClassCoins.");
         expect(await balanceOf(backer.id)).toBe(100);
         expect(await fundedAmount(project.id)).toBe(0);
     });
 
-    it("400 for a project that is not APPROVED", async () => {
+    it("409 for a project that is not APPROVED", async () => {
         const backer = await makeUser({ roles: ["BACKER"] });
         const pending = await makeProject({ creatorId: creator.id, status: "PENDING" });
 
         const res = await as(backer.token).post(`/api/projects/${pending.id}/invest`).send({ amount: 50 });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("Only approved projects");
     });
 
-    it("400 for a project that does not exist", async () => {
+    it("404 for a project that does not exist", async () => {
         const backer = await makeUser({ roles: ["BACKER"] });
 
         const res = await as(backer.token).post("/api/projects/99999999/invest").send({ amount: 50 });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
         expect(res.body.message).toBe("Project not found.");
     });
 });
@@ -125,7 +129,7 @@ describe("investing at a support level", () => {
         expect(res.body.transaction.tier_id).toBeNull();
     });
 
-    it("400 and no debit when the amount is under the level's minimum", async () => {
+    it("422 and no debit when the amount is under the level's minimum", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const tier = await makeTier({ projectId: project.id, minAmount: 500 });
@@ -134,12 +138,14 @@ describe("investing at a support level", () => {
             .post(`/api/projects/${project.id}/invest`)
             .send({ amount: 100, tierId: tier.id });
 
-        expect(res.status).toBe(400);
+        // 422, not 409: the level is available and unchanged. What is wrong is the
+        // amount in the body.
+        expect(res.status).toBe(422);
         expect(res.body.message).toBe("This level needs at least 500 CC.");
         expect(await balanceOf(backer.id)).toBe(1000);
     });
 
-    it("400 for a hidden level", async () => {
+    it("409 for a hidden level", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const tier = await makeTier({ projectId: project.id, minAmount: 100, isActive: false });
@@ -148,13 +154,13 @@ describe("investing at a support level", () => {
             .post(`/api/projects/${project.id}/invest`)
             .send({ amount: 150, tierId: tier.id });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toBe("That support level is no longer available.");
     });
 
     // Scoped to the project, so a level id belonging to another project cannot be
     // attached to this investment by editing the request body.
-    it("400 for a level belonging to another project", async () => {
+    it("409 for a level belonging to another project", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const elsewhere = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -164,7 +170,7 @@ describe("investing at a support level", () => {
             .post(`/api/projects/${project.id}/invest`)
             .send({ amount: 150, tierId: foreign.id });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
     });
 });
 
@@ -188,7 +194,7 @@ describe("eight investments racing for one wallet", () => {
         const results = await Promise.all(attempts);
 
         const succeeded = results.filter((res) => res.status === 200);
-        const refused = results.filter((res) => res.status === 400);
+        const refused = results.filter((res) => res.status === 409);
 
         expect(succeeded).toHaveLength(4);
         expect(refused).toHaveLength(4);

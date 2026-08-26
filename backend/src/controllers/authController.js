@@ -1,93 +1,41 @@
 const authService = require("../services/authService");
+const asyncHandler = require("../http/asyncHandler");
 
-async function register(req, res) {
+/**
+ * No try/catch anywhere in this file, and that is the point.
+ *
+ * Each of these used to end in `catch (error) { res.status(...) }` with a status chosen
+ * per handler — 400 for register, 401 for login, 401 for refresh, 400 for logout. The
+ * status is decided by the service now, at the line that knows what went wrong, and
+ * errorHandler is the only place that writes it.
+ */
 
-    try {
+const register = asyncHandler(async (req, res) => {
+    const { fullName, email, password, wantCreator } = req.body;
 
-        const { fullName, email, password, wantCreator } = req.body;
+    const user = await authService.register(fullName, email, password, wantCreator);
 
-        const user =
-            await authService.register(
-                fullName,
-                email,
-                password,
-                wantCreator
-            );
+    res.status(201).json(user);
+});
 
-        res.status(201).json(user);
+const login = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
 
-    } catch (error) {
+    const result = await authService.login(email, password);
 
-        res.status(400).json({
-            message: error.message
-        });
-    }
-}
+    res.json(result);
+});
 
-async function login(req, res) {
+const refreshToken = asyncHandler(async (req, res) => {
+    const result = await authService.refreshToken(req.body.refreshToken);
 
-    try {
+    res.json(result);
+});
 
-        const { email, password } = req.body;
+const logout = asyncHandler(async (req, res) => {
+    await authService.logout(req.body.refreshToken);
 
-        const result =
-            await authService.login(
-                email,
-                password
-            );
+    res.json({ message: "Logged out successfully" });
+});
 
-        res.json(result);
-
-    } catch (error) {
-
-        res.status(401).json({
-            message: error.message
-        });
-    }
-}
-
-async function refreshToken(req, res) {
-    try {
-
-        const { refreshToken } = req.body;
-
-        const result =
-            await authService.refreshToken(refreshToken);
-
-        res.json(result);
-
-    } catch (error) {
-
-        res.status(401).json({
-            message: error.message
-        });
-
-    }
-}
-
-async function logout(req, res) {
-    try {
-
-        const { refreshToken } = req.body;
-
-        await authService.logout(refreshToken);
-
-        res.json({
-            message: "Logged out successfully"
-        });
-
-    } catch (error) {
-
-        res.status(400).json({
-            message: error.message
-        });
-
-    }
-}
-
-module.exports = {
-    register,
-    login,
-    refreshToken,
-    logout
-};
+module.exports = { register, login, refreshToken, logout };

@@ -58,12 +58,12 @@ describe("PUT /api/users/profile", () => {
         expect(res.body.title).toBe("PhD Candidate");
     });
 
-    it("400 when the email already belongs to somebody else", async () => {
+    it("409 when the email already belongs to somebody else", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
         const res = await as(user.token).put("/api/users/profile").send({ fullName: "N", email: backer.email });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toBe("Email already exists");
     });
 
@@ -93,15 +93,21 @@ describe("PUT /api/users/change-password", () => {
         expect(withNew.status).toBe(200);
     });
 
-    it("400 when the old password is wrong", async () => {
+    // 422 rather than 401: the caller IS authenticated - they are holding a valid token
+    // for this very account. What is wrong is a value they typed, and naming the field is
+    // what lets the form put the error on the right input.
+    it("422 with the field named when the old password is wrong", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
         const res = await as(user.token)
             .put("/api/users/change-password")
             .send({ oldPassword: "nope", newPassword: "Brand5678" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         expect(res.body.message).toBe("Old password is incorrect");
+        expect(res.body.details).toEqual([
+            { field: "oldPassword", message: "Old password is incorrect" },
+        ]);
     });
 });
 
@@ -193,26 +199,30 @@ describe("POST /api/classcoins/add and /deduct", () => {
         expect(await balanceOf(target.id)).toBe(750);
     });
 
-    it("200 for an admin deducting, and 400 when the wallet is short", async () => {
+    it("200 for an admin deducting, and 409 when the wallet is short", async () => {
         const target = await makeUser({ roles: ["BACKER"], balance: 500 });
 
         const ok = await as(admin.token).post("/api/classcoins/deduct").send({ user_id: target.id, amount: 200 });
         const tooMuch = await as(admin.token).post("/api/classcoins/deduct").send({ user_id: target.id, amount: 10000 });
 
         expect(ok.status).toBe(200);
-        expect(tooMuch.status).toBe(400);
+        expect(tooMuch.status).toBe(409);
+        expect(tooMuch.body.code).toBe("INSUFFICIENT_FUNDS");
         expect(tooMuch.body.message).toBe("Insufficient ClassCoins");
         expect(await balanceOf(target.id)).toBe(300);
     });
 
     // The wallet is named in the body precisely so it cannot be taken from the token.
-    it("400 when no user_id is given, rather than falling back to the caller", async () => {
+    it("422 when no user_id is given, rather than falling back to the caller", async () => {
         const before = await balanceOf(admin.id);
 
         const res = await as(admin.token).post("/api/classcoins/add").send({ amount: 100 });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(422);
         expect(res.body.message).toContain("user_id is required");
+        expect(res.body.details).toEqual([
+            { field: "user_id", message: "Name the account to credit." },
+        ]);
         expect(await balanceOf(admin.id)).toBe(before);
     });
 });

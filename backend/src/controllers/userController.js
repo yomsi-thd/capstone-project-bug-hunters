@@ -1,98 +1,33 @@
-const userService =
-    require("../services/userService");
+const userService = require("../services/userService");
+const asyncHandler = require("../http/asyncHandler");
 
-async function getProfile(req, res) {
+const getProfile = asyncHandler(async (req, res) => {
+    const user = await userService.getProfile(req.user.id);
 
-    try {
+    res.json(user);
+});
 
-        const user =
-            await userService.getProfile(
-                req.user.id
-            );
+const updateProfile = asyncHandler(async (req, res) => {
+    // `title` is optional: leaving it out of the body keeps the stored value.
+    const { fullName, email, title } = req.body;
 
-        res.json(user);
+    const user = await userService.updateProfile(req.user.id, fullName, email, title);
 
-    } catch (err) {
+    res.json(user);
+});
 
-        res.status(500).json({
-            message: err.message
-        });
-    }
-}
+const changePassword = asyncHandler(async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
 
-async function updateProfile(req, res) {
+    const result = await userService.changePassword(req.user.id, oldPassword, newPassword);
 
-    try {
+    res.json(result);
+});
 
-        // `title` is optional: leaving it out of the body keeps the stored value.
-        const { fullName, email, title } = req.body;
+const deleteAccount = asyncHandler(async (req, res) => {
+    const user = await userService.deleteAccount(req.user.id);
 
-        const user =
-            await userService.updateProfile(
-                req.user.id,
-                fullName,
-                email,
-                title
-            );
+    res.status(200).json({ message: "Account deleted successfully", user });
+});
 
-        res.json(user);
-
-    } catch (err) {
-
-        res.status(400).json({
-            message: err.message
-        });
-    }
-}
-
-async function changePassword(req, res) {
-
-    try {
-
-        const {
-            oldPassword,
-            newPassword
-        } = req.body;
-
-        const result =
-            await userService.changePassword(
-                req.user.id,
-                oldPassword,
-                newPassword
-            );
-
-        res.json(result);
-
-    } catch (err) {
-
-        res.status(400).json({
-            message: err.message
-        });
-    }
-}
-
-async function deleteAccount(req, res) {
-
-    try {
-
-        const user = await userService.deleteAccount(req.user.id);
-
-        res.status(200).json({
-            message: "Account deleted successfully",
-            user
-        });
-
-    } catch (err) {
-
-        res.status(400).json({
-            message: err.message
-        });
-    }
-}
-
-module.exports = {
-    getProfile,
-    updateProfile,
-    changePassword,
-    deleteAccount
-};
+module.exports = { getProfile, updateProfile, changePassword, deleteAccount };

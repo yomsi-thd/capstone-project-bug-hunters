@@ -51,10 +51,11 @@ describe("POST /api/projects/:id/updates", () => {
         expect(res.status).toBe(201);
     });
 
-    it("400 for a creator who does not own the project", async () => {
+    it("403 for a creator who does not own the project", async () => {
         const res = await as(otherCreator.token).post(`/api/projects/${project.id}/updates`).send(body);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(403);
+        expect(res.body.code).toBe("FORBIDDEN");
         expect(res.body.message).toBe("Only the project's creator can post an update.");
     });
 
@@ -62,27 +63,27 @@ describe("POST /api/projects/:id/updates", () => {
         expect((await request(app).post(`/api/projects/${project.id}/updates`).send(body)).status).toBe(401);
     });
 
-    it("400 on a missing title or body, and on a title over 200 characters", async () => {
+    it("422 on a missing title or body, and on a title over 200 characters", async () => {
         const noTitle = await as(creator.token).post(`/api/projects/${project.id}/updates`).send({ body: "x" });
         const noBody = await as(creator.token).post(`/api/projects/${project.id}/updates`).send({ title: "x" });
         const longTitle = await as(creator.token)
             .post(`/api/projects/${project.id}/updates`)
             .send({ title: "t".repeat(201), body: "x" });
 
-        expect(noTitle.status).toBe(400);
-        expect(noBody.status).toBe(400);
-        expect(longTitle.status).toBe(400);
+        expect(noTitle.status).toBe(422);
+        expect(noBody.status).toBe(422);
+        expect(longTitle.status).toBe(422);
     });
 
     // An update is a public announcement. A rejected project is not on Discover and has
     // no audience, and if it were later approved the post would surface carrying a
     // timestamp from a period during which nobody could see it.
-    it("400 while the project is REJECTED", async () => {
+    it("409 while the project is REJECTED", async () => {
         const rejected = await makeProject({ creatorId: creator.id, status: "REJECTED" });
 
         const res = await as(creator.token).post(`/api/projects/${rejected.id}/updates`).send(body);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("cannot post updates");
     });
 });
@@ -101,11 +102,11 @@ describe("DELETE /api/projects/:id/updates/:updateId", () => {
         expect((await as(admin.token).delete(`/api/projects/${project.id}/updates/${theirs}`)).status).toBe(200);
     });
 
-    it("400 for another creator, and 400 for an update that does not exist", async () => {
+    it("403 for another creator, and 404 for an update that does not exist", async () => {
         const id = await postOne();
 
-        expect((await as(otherCreator.token).delete(`/api/projects/${project.id}/updates/${id}`)).status).toBe(400);
-        expect((await as(admin.token).delete(`/api/projects/${project.id}/updates/99999999`)).status).toBe(400);
+        expect((await as(otherCreator.token).delete(`/api/projects/${project.id}/updates/${id}`)).status).toBe(403);
+        expect((await as(admin.token).delete(`/api/projects/${project.id}/updates/99999999`)).status).toBe(404);
     });
 
     // author_id is ON DELETE SET NULL, not CASCADE, on purpose: deleting a user must

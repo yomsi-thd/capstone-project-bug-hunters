@@ -1,24 +1,27 @@
 const pool = require("../config/db");
 const userRepository = require("../repositories/userRepository");
 const creatorRequestRepository = require("../repositories/creatorRequestRepository");
+const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
 
 async function deactivateUser(userId, actingAdminId) {
 
     const user = await userRepository.findById(userId);
 
     if (!user) {
-        throw new Error("User not found");
+        throw notFound("User not found");
     }
 
     // Same rule as updateUserRoles refusing to strip your own ADMIN role: authenticate
     // rejects an inactive account, so an admin who deactivates themselves is signed out
     // on their next request with no route left to undo it.
     if (Number(userId) === Number(actingAdminId)) {
-        throw new Error("You cannot deactivate your own account.");
+        // 403: an admin may deactivate users, just not this one. The refusal is about
+        // the caller's relationship to the target, which is what FORBIDDEN means.
+        throw forbidden("You cannot deactivate your own account.");
     }
 
     if (!user.is_active) {
-        throw new Error("User is already deactivated");
+        throw conflict("User is already deactivated");
     }
 
     return await userRepository.updateStatus(userId, false);
@@ -29,11 +32,11 @@ async function activateUser(userId) {
     const user = await userRepository.findById(userId);
 
     if (!user) {
-        throw new Error("User not found");
+        throw notFound("User not found");
     }
 
     if (user.is_active) {
-        throw new Error("User is already active");
+        throw conflict("User is already active");
     }
 
     return await userRepository.updateStatus(userId, true);
@@ -49,7 +52,7 @@ async function getUserById(userId) {
     const user = await userRepository.findById(userId);
 
     if (!user) {
-        throw new Error("User not found");
+        throw notFound("User not found");
     }
 
     return user;
@@ -67,7 +70,10 @@ async function getAllCreatorRequests() {
 async function updateUserRoles(userId, roles, actingAdminId) {
 
     if (!Array.isArray(roles)) {
-        throw new Error("roles must be an array, e.g. { \"roles\": [\"BACKER\", \"CREATOR\"] }");
+        throw validationFailed(
+            "roles must be an array, e.g. { \"roles\": [\"BACKER\", \"CREATOR\"] }",
+            [{ field: "roles", message: "Send an array of role names." }]
+        );
     }
 
     const wanted = [...new Set(
@@ -77,15 +83,18 @@ async function updateUserRoles(userId, roles, actingAdminId) {
     const user = await userRepository.findById(userId);
 
     if (!user) {
-        throw new Error("User not found");
+        throw notFound("User not found");
     }
 
     const validRoles = await userRepository.findAllRoleNames();
     const unknown = wanted.filter(role => !validRoles.includes(role));
 
     if (unknown.length > 0) {
-        throw new Error(
-            `Unknown role(s): ${unknown.join(", ")}. Valid roles: ${validRoles.join(", ")}`
+        // 422: the shape is right, the values are not. `details` names the field so a
+        // form can put the error on the control that produced it.
+        throw validationFailed(
+            `Unknown role(s): ${unknown.join(", ")}. Valid roles: ${validRoles.join(", ")}`,
+            [{ field: "roles", message: `Unknown role(s): ${unknown.join(", ")}` }]
         );
     }
 
@@ -97,7 +106,10 @@ async function updateUserRoles(userId, roles, actingAdminId) {
     // ⚠️ Placed BEFORE that guard on purpose: an admin editing their own account is
     // caught by both, and this is the message that explains the rule.
     if (wanted.includes("ADMIN") && wanted.length > 1) {
-        throw new Error(
+        // 409, not 422: every name in the set is real and spelled correctly. What is
+        // refused is the COMBINATION, which is a rule about the domain rather than about
+        // the shape of the request - the same line the whole error table draws.
+        throw conflict(
             "An admin account holds the ADMIN role only. Remove CREATOR/BACKER, " +
             "or use a separate account for those."
         );
@@ -106,7 +118,7 @@ async function updateUserRoles(userId, roles, actingAdminId) {
     // Without this an admin can strip their own ADMIN role in one request and lock
     // the whole team out of the admin area, with no route left to undo it.
     if (Number(userId) === Number(actingAdminId) && !wanted.includes("ADMIN")) {
-        throw new Error("You cannot remove your own ADMIN role.");
+        throw forbidden("You cannot remove your own ADMIN role.");
     }
 
     const client = await pool.connect();
@@ -141,11 +153,11 @@ async function approveCreatorRequest(requestId, adminId) {
     const request = await creatorRequestRepository.findById(requestId);
 
     if (!request) {
-        throw new Error("Creator request not found.");
+        throw notFound("Creator request not found.");
     }
 
     if (request.status !== "PENDING") {
-        throw new Error("Creator request has already been reviewed.");
+        throw conflict("Creator request has already been reviewed.");
     }
 
     const client = await pool.connect();
@@ -187,11 +199,11 @@ async function rejectCreatorRequest(requestId, adminId) {
     const request = await creatorRequestRepository.findById(requestId);
 
     if (!request) {
-        throw new Error("Creator request not found.");
+        throw notFound("Creator request not found.");
     }
 
     if (request.status !== "PENDING") {
-        throw new Error("Creator request has already been reviewed.");
+        throw conflict("Creator request has already been reviewed.");
     }
 
     return await creatorRequestRepository.reject(

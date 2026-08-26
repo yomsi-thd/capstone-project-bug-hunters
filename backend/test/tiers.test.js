@@ -67,25 +67,28 @@ describe("POST /api/projects/:id/tiers", () => {
         expect(byAdmin.status).toBe(201);
     });
 
-    it("400 for a creator who does not own the project, 401 signed out", async () => {
+    it("403 for a creator who does not own the project, 401 signed out", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const stranger = await as(otherCreator.token).post(`/api/projects/${project.id}/tiers`).send(level());
         const anonymous = await request(app).post(`/api/projects/${project.id}/tiers`).send(level());
 
-        expect(stranger.status).toBe(400);
+        expect(stranger.status).toBe(403);
+        expect(stranger.body.code).toBe("FORBIDDEN");
         expect(stranger.body.message).toContain("Only the project's creator");
         expect(anonymous.status).toBe(401);
     });
 
-    it("400 on a missing name, a non-integer minimum, and no bullets", async () => {
+    // 422: the level is well-formed JSON that says something unusable. These are the
+    // checks zod takes over later, at the same status, so nothing moves twice.
+    it("422 on a missing name, a non-integer minimum, and no bullets", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const post = (body) => as(creator.token).post(`/api/projects/${project.id}/tiers`).send(body);
 
-        expect((await post(level({ name: "  " }))).status).toBe(400);
-        expect((await post(level({ min_amount: 10.5 }))).status).toBe(400);
-        expect((await post(level({ min_amount: 0 }))).status).toBe(400);
-        expect((await post(level({ bullets: [] }))).status).toBe(400);
+        expect((await post(level({ name: "  " }))).status).toBe(422);
+        expect((await post(level({ min_amount: 10.5 }))).status).toBe(422);
+        expect((await post(level({ min_amount: 0 }))).status).toBe(422);
+        expect((await post(level({ bullets: [] }))).status).toBe(422);
     });
 
     // Worded identically to the frontend copy in tierRules.js. A creator who gets past
@@ -101,7 +104,7 @@ describe("POST /api/projects/:id/tiers", () => {
         );
     });
 
-    it("400 on a second ACTIVE level at the same minimum", async () => {
+    it("409 on a second ACTIVE level at the same minimum", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         await as(creator.token).post(`/api/projects/${project.id}/tiers`).send(level({ min_amount: 100 }));
@@ -110,7 +113,9 @@ describe("POST /api/projects/:id/tiers", () => {
             .post(`/api/projects/${project.id}/tiers`)
             .send(level({ name: "Another", min_amount: 100 }));
 
-        expect(res.status).toBe(400);
+        // 409, not 422: 100 is a perfectly good amount. What refuses it is another row.
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe("CONFLICT");
         expect(res.body.message).toBe("Another level already starts at 100 CC.");
     });
 
@@ -128,7 +133,7 @@ describe("POST /api/projects/:id/tiers", () => {
 
     // ⚠️ The max-5 check runs BEFORE field validation, so on a full project every
     // request is refused with "at most 5" whatever else is wrong with it.
-    it("400 once the project already has five levels, before any other check", async () => {
+    it("409 once the project already has five levels, before any other check", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         for (let i = 1; i <= MAX_TIERS; i += 1) {
@@ -137,13 +142,13 @@ describe("POST /api/projects/:id/tiers", () => {
 
         const res = await as(creator.token).post(`/api/projects/${project.id}/tiers`).send(level({ name: "" }));
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toBe("A project can have at most 5 support levels.");
     });
 
     // Levels follow updateProject's rule, NOT createProjectUpdate's: a rejected project
     // stays editable so the creator can revise it, and the levels are part of that.
-    it("201 on a REJECTED project, but 400 on an archived one", async () => {
+    it("201 on a REJECTED project, but 409 on an archived one", async () => {
         const rejected = await makeProject({ creatorId: creator.id, status: "REJECTED" });
         const archived = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -153,7 +158,8 @@ describe("POST /api/projects/:id/tiers", () => {
 
         const frozen = await as(creator.token).post(`/api/projects/${archived.id}/tiers`).send(level());
 
-        expect(frozen.status).toBe(400);
+        expect(frozen.status).toBe(409);
+        expect(frozen.body.code).toBe("CONFLICT");
         expect(frozen.body.message).toContain("archived");
     });
 });
@@ -174,14 +180,14 @@ describe("PUT /api/projects/:id/tiers/:tierId", () => {
 
     // Scoped to the project in the path, so a level id from another project cannot be
     // edited by putting it in this URL.
-    it("400 for a level belonging to a different project", async () => {
+    it("404 for a level belonging to a different project", async () => {
         const mine = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const elsewhere = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const foreign = await makeTier({ projectId: elsewhere.id });
 
         const res = await as(creator.token).put(`/api/projects/${mine.id}/tiers/${foreign.id}`).send(level());
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(404);
         expect(res.body.message).toBe("Support level not found");
     });
 

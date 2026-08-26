@@ -1,5 +1,7 @@
 const bcrypt = require("bcryptjs");
 
+const { conflict, unauthenticated, validationFailed } = require("../errors/AppError");
+
 const userRepository = require("../repositories/userRepository");
 const refreshTokenRepository = require("../repositories/refreshTokenRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
@@ -17,7 +19,9 @@ async function register(fullName, email, password, wantCreator) {
         await userRepository.findByEmail(email);
 
     if (existing) {
-        throw new Error("Email already exists");
+        // 409, not 400: the request is well-formed and understood, it just collides
+        // with a row that already exists.
+        throw conflict("Email already exists");
     }
 
     const hashedPassword =
@@ -48,14 +52,16 @@ async function login(email, password) {
         await userRepository.findByEmail(email);
 
     if (!user) {
-        throw new Error("Invalid email or password");
+        // Deliberately the same sentence for "no such email" and "wrong password":
+        // telling them apart is an account-enumeration oracle.
+        throw unauthenticated("Invalid email or password");
     }
 
     const match =
         await bcrypt.compare(password, user.password);
 
     if (!match) {
-        throw new Error("Invalid email or password");
+        throw unauthenticated("Invalid email or password");
     }
 
     const roles = await userRepository.getUserRoles(user.id);
@@ -88,7 +94,9 @@ async function login(email, password) {
 async function refreshToken(token) {
 
     if (!token) {
-        throw new Error("Refresh token is required");
+        throw validationFailed("Refresh token is required", [
+            { field: "refreshToken", message: "Send the refresh token in the body." },
+        ]);
     }
 
     // Check if token exists in database
@@ -96,21 +104,36 @@ async function refreshToken(token) {
         await refreshTokenRepository.findByToken(token);
 
     if (!storedToken) {
-        throw new Error("Invalid refresh token");
+        throw unauthenticated("Invalid refresh token");
     }
 
     //Check Expiration in database
     if (new Date() > storedToken.expires_at) {
         await refreshTokenRepository.deleteToken(token);
-        throw new Error("Refresh token expired");
+        throw unauthenticated("Refresh token expired");
     }
-    // Verify JWT
-    const payload = verifyRefreshToken(token);
+    // Verify JWT.
+    //
+    // Wrapped rather than left to throw: jsonwebtoken raises its own error type, which
+    // would now reach errorHandler as an unexpected failure and answer 500. The
+    // controller's old blanket catch turned every failure in here into a 401, and for
+    // this one that answer was right — a token whose signature or expiry does not check
+    // out is exactly "your session is not valid".
+    let payload;
+
+    try {
+        payload = verifyRefreshToken(token);
+    } catch {
+        throw unauthenticated("Invalid refresh token");
+    }
 
     const user = await userRepository.findById(payload.id);
 
     if (!user) {
-        throw new Error("User not found");
+        // 401, not 404. The caller is asking to renew THEIR session, and the session is
+        // what is gone - which is also what the frontend's interceptor needs to hear in
+        // order to clear storage rather than show a "not found" page.
+        throw unauthenticated("User not found");
     }
 
     const roles = await userRepository.getUserRoles(user.id);
@@ -126,7 +149,9 @@ async function refreshToken(token) {
 async function logout(token) {
 
     if (!token) {
-        throw new Error("Refresh token is required");
+        throw validationFailed("Refresh token is required", [
+            { field: "refreshToken", message: "Send the refresh token in the body." },
+        ]);
     }
 
     await refreshTokenRepository.deleteToken(token);

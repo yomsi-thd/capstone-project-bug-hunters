@@ -1,5 +1,6 @@
 const bcrypt = require("bcryptjs");
 const userRepository = require("../repositories/userRepository");
+const { notFound, conflict, validationFailed } = require("../errors/AppError");
 
 async function getProfile(userId) {
     return await userRepository.findById(userId);
@@ -11,13 +12,14 @@ async function updateProfile(userId, fullName, email, title) {
         await userRepository.findById(userId);
 
     if (!user)
-        throw new Error("User not found");
+        throw notFound("User not found");
 
     const existing =
         await userRepository.findByEmail(email);
 
     if (existing && existing.id !== userId)
-        throw new Error("Email already exists");
+        // 409: the address is real and usable, it just already belongs to somebody.
+        throw conflict("Email already exists");
 
     return await userRepository.updateProfile(
         userId,
@@ -38,7 +40,7 @@ async function changePassword(
         await userRepository.findById(userId);
 
     if (!user)
-        throw new Error("User not found");
+        throw notFound("User not found");
 
     const fullUser =
         await userRepository.findByEmail(user.email);
@@ -50,7 +52,12 @@ async function changePassword(
         );
 
     if (!match)
-        throw new Error("Old password is incorrect");
+        // 422 rather than 401: the caller IS authenticated - they are holding a valid
+        // token for this very account. What is wrong is a value they typed, and naming
+        // the field is what lets the form put the error on the right input.
+        throw validationFailed("Old password is incorrect", [
+            { field: "oldPassword", message: "Old password is incorrect" },
+        ]);
 
     const hashed =
         await bcrypt.hash(newPassword, 10);
@@ -70,7 +77,7 @@ async function deleteAccount(userId) {
     const user = await userRepository.findById(userId);
 
     if (!user) {
-        throw new Error("User not found");
+        throw notFound("User not found");
     }
 
     return await userRepository.deleteUser(userId);

@@ -40,7 +40,7 @@ describe("PATCH /api/projects/:id/archive", () => {
 
     // An admin archiving someone else's project locks the creator out of restoring it,
     // so the creator is at least owed the reason.
-    it("400 when an admin archives someone else's project with no reason", async () => {
+    it("422 when an admin archives someone else's project with no reason", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const withoutReason = await as(admin.token).patch(`/api/projects/${project.id}/archive`).send({});
@@ -48,22 +48,22 @@ describe("PATCH /api/projects/:id/archive", () => {
             .patch(`/api/projects/${project.id}/archive`)
             .send({ reason: "Duplicate submission." });
 
-        expect(withoutReason.status).toBe(400);
+        expect(withoutReason.status).toBe(422);
         expect(withoutReason.body.message).toContain("reason is required");
         expect(withReason.status).toBe(200);
         expect(withReason.body.project.archive_reason).toBe("Duplicate submission.");
     });
 
-    it("400 for an unrelated user, and 400 when it is already archived", async () => {
+    it("403 for an unrelated user, and 409 when it is already archived", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
-        expect((await as(backer.token).patch(`/api/projects/${project.id}/archive`).send({})).status).toBe(400);
+        expect((await as(backer.token).patch(`/api/projects/${project.id}/archive`).send({})).status).toBe(403);
 
         await as(creator.token).patch(`/api/projects/${project.id}/archive`).send({});
 
         const again = await as(creator.token).patch(`/api/projects/${project.id}/archive`).send({});
 
-        expect(again.status).toBe(400);
+        expect(again.status).toBe(409);
         expect(again.body.message).toBe("This project is already archived.");
     });
 });
@@ -84,25 +84,25 @@ describe("PATCH /api/projects/:id/restore", () => {
 
     // The asymmetry IS the feature: a creator may only undo an archive they performed.
     // Otherwise they could simply reverse a moderation decision.
-    it("400 for the creator when an ADMIN archived it, 200 for an admin", async () => {
+    it("403 for the creator when an ADMIN archived it, 200 for an admin", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         await as(admin.token).patch(`/api/projects/${project.id}/archive`).send({ reason: "Under review." });
 
         const byCreator = await as(creator.token).patch(`/api/projects/${project.id}/restore`);
 
-        expect(byCreator.status).toBe(400);
+        expect(byCreator.status).toBe(403);
         expect(byCreator.body.message).toContain("can only be restored by one");
 
         expect((await as(admin.token).patch(`/api/projects/${project.id}/restore`)).status).toBe(200);
     });
 
-    it("400 when the project is not archived", async () => {
+    it("409 when the project is not archived", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const res = await as(creator.token).patch(`/api/projects/${project.id}/restore`);
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toBe("This project is not archived.");
     });
 
@@ -130,17 +130,21 @@ describe("an archived project is frozen", () => {
         await as(creator.token).patch(`/api/projects/${project.id}/archive`).send({});
     });
 
+    // Every one of these is 409 CONFLICT now: the request is understood and the caller
+    // is allowed in principle, but the project's current state refuses it. That is
+    // exactly the distinction 409 exists to carry, and all six used to be 400.
     it("refuses an edit", async () => {
         const res = await as(creator.token).put(`/api/projects/${project.id}`).send({ title: "Sneaky" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe("CONFLICT");
         expect(res.body.message).toBe("This project is archived. Restore it first.");
     });
 
     it("refuses a comment", async () => {
         const res = await as(backer.token).post(`/api/projects/${project.id}/comments`).send({ body: "Hi" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
     });
 
     it("refuses a project update", async () => {
@@ -148,7 +152,7 @@ describe("an archived project is frozen", () => {
             .post(`/api/projects/${project.id}/updates`)
             .send({ title: "T", body: "B" });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
     });
 
     it("refuses a change to its support levels", async () => {
@@ -156,12 +160,12 @@ describe("an archived project is frozen", () => {
             .put(`/api/projects/${project.id}/tiers/${tier.id}`)
             .send({ name: "New", min_amount: 200, bullets: ["x"] });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
     });
 
     it("refuses approve and reject", async () => {
-        expect((await as(admin.token).patch(`/api/projects/${project.id}/approve`)).status).toBe(400);
-        expect((await as(admin.token).patch(`/api/projects/${project.id}/reject`).send({ note: "n" })).status).toBe(400);
+        expect((await as(admin.token).patch(`/api/projects/${project.id}/approve`)).status).toBe(409);
+        expect((await as(admin.token).patch(`/api/projects/${project.id}/reject`).send({ note: "n" })).status).toBe(409);
     });
 
     it("refuses an investment even once it is approved elsewhere", async () => {
@@ -171,7 +175,7 @@ describe("an archived project is frozen", () => {
 
         const res = await as(backer.token).post(`/api/projects/${approved.id}/invest`).send({ amount: 50 });
 
-        expect(res.status).toBe(400);
+        expect(res.status).toBe(409);
         expect(res.body.message).toContain("archived");
     });
 
@@ -180,6 +184,6 @@ describe("an archived project is frozen", () => {
 
         await as(creator.token).patch(`/api/projects/${rejected.id}/archive`).send({});
 
-        expect((await as(creator.token).patch(`/api/projects/${rejected.id}/resubmit`)).status).toBe(400);
+        expect((await as(creator.token).patch(`/api/projects/${rejected.id}/resubmit`)).status).toBe(409);
     });
 });

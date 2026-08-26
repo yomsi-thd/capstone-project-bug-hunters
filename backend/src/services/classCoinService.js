@@ -1,11 +1,12 @@
 const classCoinRepository = require("../repositories/classCoinRepository");
+const { AppError, notFound } = require("../errors/AppError");
 
 // Get ClassCoin account
 async function getClassCoin(userId) {
     const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
-        throw new Error("ClassCoin account not found");
+        throw notFound("ClassCoin account not found");
     }
 
     return classCoin;
@@ -16,7 +17,7 @@ async function getTransactions(userId) {
     const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
-        throw new Error("ClassCoin account not found");
+        throw notFound("ClassCoin account not found");
     }
 
     return await classCoinRepository.getTransactions(classCoin.id);
@@ -34,7 +35,7 @@ async function addCoins(userId, amount) {
     const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
-        throw new Error("ClassCoin account not found");
+        throw notFound("ClassCoin account not found");
     }
 
     await classCoinRepository.addBalance(userId, amount);
@@ -55,11 +56,14 @@ async function deductCoins(userId, amount) {
     const classCoin = await classCoinRepository.getBalance(userId);
 
     if (!classCoin) {
-        throw new Error("ClassCoin account not found");
+        throw notFound("ClassCoin account not found");
     }
 
     if (classCoin.balance < amount) {
-        throw new Error("Insufficient ClassCoins");
+        // Its own code, not a generic conflict: "you do not have enough" is the one
+        // refusal a backer meets often enough for the UI to want to recognise it
+        // without matching on the sentence.
+        throw new AppError(409, "INSUFFICIENT_FUNDS", "Insufficient ClassCoins");
     }
 
     await classCoinRepository.deductBalance(userId, amount);
