@@ -5,6 +5,7 @@ const projectRoutes = require("./routes/projectRoutes");
 const classCoinRoutes = require("./routes/classCoinRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cors = require("cors");
+const pool = require("./config/db");
 
 const app = express();
 
@@ -69,6 +70,40 @@ app.get("/", (req, res) => {
     res.json({
         message: "Backend is running"
     });
+});
+
+// The endpoint the uptime ping calls. Two jobs: hold Render awake, and prove the
+// DATABASE is reachable - which the route above cannot do.
+//
+// It exists because of an outage on 2026-08-26. The ping pointed at GET /api/projects,
+// which runs `SELECT *` and so carries every project's base64 gallery. That is harmless
+// at today's ~6 KB, but cron-job.org aborts any response past its size limit and records
+// it as "output too large" - so the endpoint most likely to grow without warning was
+// also the one holding the demo awake. This one's body is a fixed ~25 bytes and cannot
+// grow with the data.
+//
+// `SELECT 1` is the point, not decoration. `/` proves only that Node answers, which
+// wakes Render but NOT Supabase - and a free Supabase project pauses after about a week
+// idle, which from outside looks exactly like a broken backend. One round trip keeps
+// both awake.
+//
+// ⚠️ A failing database answers 503, not 200. A health check that says "ok" while the
+// database is down is a button that lies, and the team spent August deleting those. The
+// cost is real and accepted: if the database stays down for hours the ping fails
+// repeatedly and cron-job.org will disable the job, which then has to be re-enabled by
+// hand. That is still the better trade - a silent 200 would hide a paused database until
+// somebody opened the site during a demo.
+app.get("/api/health", async (req, res) => {
+    try {
+        await pool.query("SELECT 1");
+
+        res.status(200).json({ status: "ok", db: "up" });
+    } catch (error) {
+        // The only place this is diagnosable is Render's log tab, so say which half failed.
+        console.error("[health] database unreachable:", error.message);
+
+        res.status(503).json({ status: "error", db: "down" });
+    }
 });
 
 module.exports = app;
