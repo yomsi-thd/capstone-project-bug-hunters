@@ -3,7 +3,10 @@ import api from "./axios";
 export const getAllProjects = async () => {
   const response = await api.get("/projects");
 
-  return response.data;
+  // The API answers list endpoints with { items, total, limit, offset }. The envelope
+  // is unwrapped HERE so pages and mappers keep the plain array they were built
+  // against - eleven lines in this folder instead of a change in every page.
+  return response.data.items;
 };
 
 export const getProjectById = async (id) => {
@@ -16,7 +19,7 @@ export const getProjectById = async (id) => {
 export const getMyProjects = async () => {
   const response = await api.get("/projects/my");
 
-  return response.data;
+  return response.data.items;
 };
 
 // Everyone who has invested in any project the signed-in creator owns, biggest first.
@@ -25,7 +28,7 @@ export const getMyProjects = async () => {
 export const getMyBackers = async () => {
   const response = await api.get("/projects/my/backers");
 
-  return response.data;
+  return response.data.items;
 };
 
 export const approveProject = async (id) => {
@@ -99,7 +102,7 @@ export const deleteProject = async (id) => {
 export const getProjectComments = async (id) => {
   const response = await api.get(`/projects/${id}/comments`);
 
-  return response.data;
+  return response.data.items;
 };
 
 export const postComment = async (id, { body, parentId }) => {
@@ -129,7 +132,7 @@ export const endorseProject = async (id, endorsed) => {
 export const getProjectUpdates = async (id) => {
   const response = await api.get(`/projects/${id}/updates`);
 
-  return response.data;
+  return response.data.items;
 };
 
 export const postProjectUpdate = async (id, { title, body }) => {
@@ -150,7 +153,7 @@ export const deleteProjectUpdate = async (id, updateId) => {
 export const getProjectTiers = async (id) => {
   const response = await api.get(`/projects/${id}/tiers`);
 
-  return response.data;
+  return response.data.items;
 };
 
 // `tier` is { name, min_amount, bullets } — the same shape for both of these.

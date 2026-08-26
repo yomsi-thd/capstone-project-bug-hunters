@@ -1,5 +1,6 @@
 const classCoinService = require("../services/classCoinService");
 const asyncHandler = require("../http/asyncHandler");
+const { page } = require("../http/envelope");
 const { validationFailed } = require("../errors/AppError");
 const M = require("../validation/messages");
 
@@ -14,14 +15,14 @@ const getClassCoin = asyncHandler(async (req, res) => {
 const getTransactions = asyncHandler(async (req, res) => {
     const transactions = await classCoinService.getTransactions(req.user.id);
 
-    res.status(200).json(transactions);
+    res.status(200).json(page(transactions));
 });
 
 // One row per project this user has invested in, for My Investments.
 const getMyInvestments = asyncHandler(async (req, res) => {
     const investments = await classCoinService.getMyInvestments(req.user.id);
 
-    res.status(200).json(investments);
+    res.status(200).json(page(investments));
 });
 
 /**

@@ -6,6 +6,8 @@ const authorize = require("../middlewares/authorize");
 const adminController = require("../controllers/adminController");
 const { guardIdParams } = require("../http/numericParam");
 const { validateBody } = require("../validation/validate");
+const { validateQuery } = require("../validation/validate");
+const { paginationQuery } = require("../http/envelope");
 const { updateRolesSchema } = require("../validation/schemas/accountSchemas");
 
 // :id is a user id on the /users routes and a request id on /creator-requests. Both are
@@ -30,6 +32,7 @@ router.get(
     "/users",
     authenticate,
     authorize("ADMIN"),
+    validateQuery(paginationQuery),
     adminController.getAllUsers
 );
 

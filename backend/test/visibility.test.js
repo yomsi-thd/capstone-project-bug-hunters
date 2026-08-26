@@ -125,7 +125,7 @@ describe("an ARCHIVED project", () => {
 
         const res = await request(app).get("/api/projects");
 
-        expect(res.body.map((p) => p.id)).not.toContain(project.id);
+        expect(res.body.items.map((p) => p.id)).not.toContain(project.id);
     });
 });
 

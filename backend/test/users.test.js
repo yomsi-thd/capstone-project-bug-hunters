@@ -144,9 +144,8 @@ describe("GET /api/classcoins/transactions and /investments", () => {
 
         expect(transactions.status).toBe(200);
         expect(investments.status).toBe(200);
-        // Pinned: the envelope commit changes both shapes.
-        expect(Array.isArray(transactions.body)).toBe(true);
-        expect(Array.isArray(investments.body)).toBe(true);
+        expect(Array.isArray(transactions.body.items)).toBe(true);
+        expect(Array.isArray(investments.body.items)).toBe(true);
     });
 
     // One row per PROJECT, with the amounts summed — backing the same project three
@@ -159,7 +158,7 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         await as(investor.token).post(`/api/projects/${project.id}/invest`).send({ amount: 250 });
 
         const res = await as(investor.token).get("/api/classcoins/investments");
-        const row = res.body.filter((r) => Number(r.project_id) === project.id);
+        const row = res.body.items.filter((r) => Number(r.project_id) === project.id);
 
         expect(row).toHaveLength(1);
         expect(row[0].invested_amount).toBe(350);
@@ -177,7 +176,7 @@ describe("GET /api/classcoins/transactions and /investments", () => {
 
         const res = await as(investor.token).get("/api/classcoins/investments");
 
-        expect(res.body.map((r) => Number(r.project_id))).toContain(project.id);
+        expect(res.body.items.map((r) => Number(r.project_id))).toContain(project.id);
     });
 });
 

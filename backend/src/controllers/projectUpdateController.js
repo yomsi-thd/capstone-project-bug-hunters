@@ -1,12 +1,13 @@
 const projectUpdateService = require("../services/projectUpdateService");
 const asyncHandler = require("../http/asyncHandler");
+const { page } = require("../http/envelope");
 
 // Routes are unchanged: these still answer /api/projects/:id/updates.
 
 const getProjectUpdates = asyncHandler(async (req, res) => {
     const updates = await projectUpdateService.getProjectUpdates(req.params.id, req.user);
 
-    res.status(200).json(updates);
+    res.status(200).json(page(updates));
 });
 
 const createProjectUpdate = asyncHandler(async (req, res) => {

@@ -34,7 +34,7 @@ beforeAll(async () => {
 });
 
 describe("GET /api/projects/:id/tiers", () => {
-    it("200 and a bare array, readable signed out", async () => {
+    it("200 and an envelope, readable signed out", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         await makeTier({ projectId: project.id, minAmount: 250, name: "Champion" });
@@ -43,10 +43,9 @@ describe("GET /api/projects/:id/tiers", () => {
         const res = await request(app).get(`/api/projects/${project.id}/tiers`);
 
         expect(res.status).toBe(200);
-        // Pinned: the envelope commit changes this shape.
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(Array.isArray(res.body.items)).toBe(true);
         // Ordered by min_amount, with no sort_order column to drift out of step.
-        expect(res.body.map((t) => Number(t.min_amount))).toEqual([50, 250]);
+        expect(res.body.items.map((t) => Number(t.min_amount))).toEqual([50, 250]);
     });
 
     it("404 for a project that does not exist", async () => {

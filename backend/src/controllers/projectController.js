@@ -1,6 +1,7 @@
 const projectService = require("../services/projectService");
 const moderationService = require("../services/moderationService");
 const asyncHandler = require("../http/asyncHandler");
+const { page, pagination } = require("../http/envelope");
 
 /**
  * The project's own lifecycle. Comments, updates, support levels and investments moved
@@ -29,10 +30,14 @@ const createProject = asyncHandler(async (req, res) => {
     res.status(201).json({ message: "Project created successfully", project });
 });
 
+// One of only two endpoints that ACCEPT ?limit=&offset=. Without them it returns the
+// whole catalogue, exactly as it always has - Discover depends on that.
 const getAllApprovedProjects = asyncHandler(async (req, res) => {
-    const projects = await projectService.getAllApprovedProjects();
+    const { limit, offset } = pagination(req);
 
-    res.status(200).json(projects);
+    const { items, total } = await projectService.getAllApprovedProjects({ limit, offset });
+
+    res.status(200).json(page(items, { total, limit, offset }));
 });
 
 const getProjectById = asyncHandler(async (req, res) => {
@@ -48,14 +53,14 @@ const getProjectById = asyncHandler(async (req, res) => {
 const getMyProjects = asyncHandler(async (req, res) => {
     const projects = await projectService.getMyProjects(req.user.id);
 
-    res.status(200).json(projects);
+    res.status(200).json(page(projects));
 });
 
 // Everyone who has backed a project this user owns.
 const getMyBackers = asyncHandler(async (req, res) => {
     const backers = await projectService.getMyBackers(req.user.id);
 
-    res.status(200).json(backers);
+    res.status(200).json(page(backers));
 });
 
 const updateProject = asyncHandler(async (req, res) => {

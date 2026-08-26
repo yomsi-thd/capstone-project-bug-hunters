@@ -24,12 +24,11 @@ beforeAll(async () => {
 const body = { title: "Week one", body: "We built the first prototype." };
 
 describe("GET /api/projects/:id/updates", () => {
-    it("200 and a bare array, signed out", async () => {
+    it("200 and an envelope, signed out", async () => {
         const res = await request(app).get(`/api/projects/${project.id}/updates`);
 
         expect(res.status).toBe(200);
-        // Pinned: the envelope commit changes this shape.
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(Array.isArray(res.body.items)).toBe(true);
     });
 
     it("404 for a project that does not exist", async () => {

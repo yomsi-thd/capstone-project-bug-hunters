@@ -38,12 +38,12 @@ describe("the admin routes are ADMIN-only", () => {
 });
 
 describe("GET /api/admin/users and /users/:id", () => {
-    it("200 and a bare array", async () => {
+    it("200 and an envelope", async () => {
         const res = await as(admin.token).get("/api/admin/users");
 
         expect(res.status).toBe(200);
-        // Pinned: the envelope commit changes this shape.
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(Array.isArray(res.body.items)).toBe(true);
+        expect(res.body.total).toBe(res.body.items.length);
     });
 
     it("200 for one user, 404 for an id that does not exist", async () => {
@@ -65,7 +65,7 @@ describe("GET /api/admin/projects", () => {
         const res = await as(admin.token).get("/api/admin/projects");
 
         expect(res.status).toBe(200);
-        expect(res.body.map((p) => p.id)).toContain(pending.id);
+        expect(res.body.items.map((p) => p.id)).toContain(pending.id);
     });
 });
 
@@ -187,7 +187,7 @@ describe("the creator-request queue", () => {
         const res = await as(admin.token).get("/api/admin/creator-requests");
 
         expect(res.status).toBe(200);
-        expect(res.body.map((r) => r.user_id)).toContain(applicant.id);
+        expect(res.body.items.map((r) => r.user_id)).toContain(applicant.id);
     });
 
     it("not ticking it files nothing", async () => {
@@ -195,7 +195,7 @@ describe("the creator-request queue", () => {
 
         const res = await as(admin.token).get("/api/admin/creator-requests");
 
-        expect(res.body.map((r) => r.user_id)).not.toContain(applicant.id);
+        expect(res.body.items.map((r) => r.user_id)).not.toContain(applicant.id);
     });
 
     // Approving is the only route to CREATOR besides an admin assigning it by hand:
@@ -204,7 +204,7 @@ describe("the creator-request queue", () => {
         const applicant = await registerWanting(true);
 
         const queue = await as(admin.token).get("/api/admin/creator-requests");
-        const row = queue.body.find((r) => r.user_id === applicant.id);
+        const row = queue.body.items.find((r) => r.user_id === applicant.id);
 
         const approved = await as(admin.token).patch(`/api/admin/creator-requests/${row.id}/approve`);
 
@@ -222,7 +222,7 @@ describe("the creator-request queue", () => {
         const applicant = await registerWanting(true);
 
         const queue = await as(admin.token).get("/api/admin/creator-requests");
-        const row = queue.body.find((r) => r.user_id === applicant.id);
+        const row = queue.body.items.find((r) => r.user_id === applicant.id);
 
         expect((await as(admin.token).patch(`/api/admin/creator-requests/${row.id}/reject`)).status).toBe(200);
 
@@ -238,7 +238,7 @@ describe("the creator-request queue", () => {
         const applicant = await registerWanting(true);
 
         const queue = await as(admin.token).get("/api/admin/creator-requests");
-        const row = queue.body.find((r) => r.user_id === applicant.id);
+        const row = queue.body.items.find((r) => r.user_id === applicant.id);
 
         await as(admin.token).patch(`/api/admin/creator-requests/${row.id}/approve`);
 

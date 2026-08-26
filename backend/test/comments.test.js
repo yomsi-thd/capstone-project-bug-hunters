@@ -29,12 +29,12 @@ beforeAll(async () => {
 });
 
 describe("GET /api/projects/:id/comments", () => {
-    it("200 and a bare array, readable signed out", async () => {
+    it("200 and an envelope, readable signed out", async () => {
         const res = await request(app).get(`/api/projects/${project.id}/comments`);
 
         expect(res.status).toBe(200);
-        // Pinned: the envelope commit changes this shape and must change this line too.
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(Array.isArray(res.body.items)).toBe(true);
+        expect(res.body.total).toBe(res.body.items.length);
     });
 
     it("404 for a project that does not exist", async () => {

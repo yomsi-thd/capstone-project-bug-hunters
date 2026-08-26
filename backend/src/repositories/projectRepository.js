@@ -94,18 +94,38 @@ async function findAll() {
 // findAll (admin), findByCreatorId (My Projects) and findById (detail page) all keep
 // returning archived rows on purpose — those three are exactly where you go to see,
 // restore or permanently delete one.
-async function findAllApprovedProjects() {
+// `limit` is optional and there is deliberately no default. Discover loads the whole
+// catalogue and filters it client-side, so a default page size would silently reduce its
+// search box to the first page and report nothing wrong. See http/envelope.js.
+async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
         SELECT *
         FROM projects
         WHERE status = 'APPROVED'
           AND archived_at IS NULL
-        ORDER BY created_at DESC;
-        `
+        ORDER BY created_at DESC
+        ${limit == null ? "" : "LIMIT $1 OFFSET $2"};
+        `,
+        limit == null ? [] : [limit, offset]
     );
 
     return result.rows;
+}
+
+// Only ever called when a caller asked for a page - an unpaginated read already knows
+// its own total, and a second round trip for a number in hand would be waste.
+async function countApprovedProjects() {
+    const result = await pool.query(
+        `
+        SELECT COUNT(*)::int AS total
+        FROM projects
+        WHERE status = 'APPROVED'
+          AND archived_at IS NULL;
+        `
+    );
+
+    return result.rows[0].total;
 }
 
 // Get project by ID.
@@ -419,6 +439,7 @@ module.exports = {
     createProject,
     findAll,
     findAllApprovedProjects,
+    countApprovedProjects,
     findById,
     findByCreatorId,
     findBackersByCreatorId,

@@ -167,13 +167,16 @@ describe("POST /api/projects", () => {
 });
 
 describe("GET /api/projects", () => {
-    it("200 and a bare array, signed out", async () => {
+    it("200 and an envelope, signed out", async () => {
         const res = await request(app).get("/api/projects");
 
         expect(res.status).toBe(200);
-        // Pinned deliberately: the envelope commit turns this into
-        // { items, total, limit, offset } and must change this line with it.
-        expect(Array.isArray(res.body)).toBe(true);
+        expect(Array.isArray(res.body.items)).toBe(true);
+        expect(res.body.total).toBe(res.body.items.length);
+        // No limit was asked for, so none was applied. See http/envelope.js for why
+        // there is deliberately no default.
+        expect(res.body.limit).toBeNull();
+        expect(res.body.offset).toBe(0);
     });
 
     it("lists APPROVED projects only", async () => {
@@ -181,7 +184,7 @@ describe("GET /api/projects", () => {
         const hidden = await makeProject({ creatorId: creator.id, status: "PENDING", title: "Not listed" });
 
         const res = await request(app).get("/api/projects");
-        const ids = res.body.map((p) => p.id);
+        const ids = res.body.items.map((p) => p.id);
 
         expect(ids).toContain(project.id);
         expect(ids).not.toContain(hidden.id);
@@ -224,7 +227,7 @@ describe("GET /api/projects/my and /my/backers", () => {
         const theirs = await makeProject({ creatorId: creator.id, title: "Theirs" });
 
         const res = await as(otherCreator.token).get("/api/projects/my");
-        const ids = res.body.map((p) => p.id);
+        const ids = res.body.items.map((p) => p.id);
 
         expect(res.status).toBe(200);
         expect(ids).toContain(mine.id);
@@ -239,7 +242,7 @@ describe("GET /api/projects/my and /my/backers", () => {
 
         expect(projects.status).toBe(200);
         expect(backers.status).toBe(200);
-        expect(Array.isArray(backers.body)).toBe(true);
+        expect(Array.isArray(backers.body.items)).toBe(true);
     });
 
     it("401 signed out", async () => {

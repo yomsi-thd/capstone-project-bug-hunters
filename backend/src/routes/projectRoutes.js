@@ -13,6 +13,8 @@ const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
 const { guardIdParams } = require("../http/numericParam");
 const { validateBody } = require("../validation/validate");
+const { validateQuery } = require("../validation/validate");
+const { paginationQuery } = require("../http/envelope");
 const {
     createProjectSchema,
     updateProjectSchema,
@@ -43,7 +45,7 @@ guardIdParams(router, {
 // account up, which a route guard cannot do.
 router.post("/", authenticate, authorize("CREATOR", "ADMIN"), validateBody(createProjectSchema), projectController.createProject);
 
-router.get("/", projectController.getAllApprovedProjects);
+router.get("/", validateQuery(paginationQuery), projectController.getAllApprovedProjects);
 
 // Must come BEFORE "/:id", otherwise Express matches "/:id" with id = "my".
 // The path is "/my" (no :id) — the controller reads the creator from req.user.id.

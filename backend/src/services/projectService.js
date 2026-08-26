@@ -171,8 +171,14 @@ async function getAllProjects() {
     return await projectRepository.findAll();
 }
 
-async function getAllApprovedProjects() {
-    return await projectRepository.findAllApprovedProjects();
+async function getAllApprovedProjects({ limit = null, offset = 0 } = {}) {
+
+    const items = await projectRepository.findAllApprovedProjects({ limit, offset });
+
+    // Only pay for the COUNT when a page was actually asked for.
+    const total = limit == null ? items.length : await projectRepository.countApprovedProjects();
+
+    return { items, total };
 }
 
 // Get project by ID

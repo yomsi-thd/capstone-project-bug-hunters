@@ -1,5 +1,6 @@
 const tierService = require("../services/tierService");
 const asyncHandler = require("../http/asyncHandler");
+const { page } = require("../http/envelope");
 
 // Support levels. "Support Level" on screen, project_tiers in the database and `tier` in
 // the code - the wording may change again, the column names should not.
@@ -8,7 +9,7 @@ const asyncHandler = require("../http/asyncHandler");
 const getProjectTiers = asyncHandler(async (req, res) => {
     const tiers = await tierService.getProjectTiers(req.params.id, req.user);
 
-    res.status(200).json(tiers);
+    res.status(200).json(page(tiers));
 });
 
 const createTier = asyncHandler(async (req, res) => {

@@ -12,11 +12,14 @@ export const getBalance = async () => {
 export const getMyInvestments = async () => {
   const response = await api.get("/classcoins/investments");
 
-  return response.data;
+  // The API answers list endpoints with { items, total, limit, offset }. The envelope
+  // is unwrapped HERE so pages and mappers keep the plain array they were built
+  // against - eleven lines in this folder instead of a change in every page.
+  return response.data.items;
 };
 
 export const getTransactions = async () => {
   const response = await api.get("/classcoins/transactions");
 
-  return response.data;
+  return response.data.items;
 };

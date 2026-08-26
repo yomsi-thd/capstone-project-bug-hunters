@@ -1,12 +1,13 @@
 const commentService = require("../services/commentService");
 const asyncHandler = require("../http/asyncHandler");
+const { page } = require("../http/envelope");
 
 // Routes are unchanged: these still answer /api/projects/:id/comments.
 
 const getProjectComments = asyncHandler(async (req, res) => {
     const comments = await commentService.getProjectComments(req.params.id, req.user);
 
-    res.status(200).json(comments);
+    res.status(200).json(page(comments));
 });
 
 const createComment = asyncHandler(async (req, res) => {

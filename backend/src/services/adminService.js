@@ -42,9 +42,13 @@ async function activateUser(userId) {
     return await userRepository.updateStatus(userId, true);
 }
 
-async function getAllUsers() {
+async function getAllUsers({ limit = null, offset = 0 } = {}) {
 
-    return await userRepository.findAllUsers();
+    const items = await userRepository.findAllUsers({ limit, offset });
+
+    const total = limit == null ? items.length : await userRepository.countAllUsers();
+
+    return { items, total };
 }
 
 async function getUserById(userId) {

@@ -1,6 +1,7 @@
 const adminService = require("../services/adminService");
 const projectService = require("../services/projectService");
 const asyncHandler = require("../http/asyncHandler");
+const { page, pagination } = require("../http/envelope");
 
 const deactivateUser = asyncHandler(async (req, res) => {
     const user = await adminService.deactivateUser(req.params.id, req.user.id);
@@ -14,10 +15,14 @@ const activateUser = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "User activated successfully", user });
 });
 
+// The other endpoint that accepts ?limit=&offset=. The admin user list is the one place
+// that could plausibly grow past a screenful.
 const getAllUsers = asyncHandler(async (req, res) => {
-    const users = await adminService.getAllUsers();
+    const { limit, offset } = pagination(req);
 
-    res.status(200).json(users);
+    const { items, total } = await adminService.getAllUsers({ limit, offset });
+
+    res.status(200).json(page(items, { total, limit, offset }));
 });
 
 const getUserById = asyncHandler(async (req, res) => {
@@ -36,7 +41,7 @@ const updateUserRoles = asyncHandler(async (req, res) => {
 const getAllProjects = asyncHandler(async (req, res) => {
     const projects = await projectService.getAllProjects();
 
-    res.status(200).json(projects);
+    res.status(200).json(page(projects));
 });
 
 const getProjectById = asyncHandler(async (req, res) => {
@@ -51,7 +56,7 @@ const getProjectById = asyncHandler(async (req, res) => {
 const getAllCreatorRequests = asyncHandler(async (req, res) => {
     const requests = await adminService.getAllCreatorRequests();
 
-    res.status(200).json(requests);
+    res.status(200).json(page(requests));
 });
 
 const approveCreatorRequest = asyncHandler(async (req, res) => {

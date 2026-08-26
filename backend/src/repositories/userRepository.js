@@ -71,7 +71,7 @@ async function deleteUser(id) {
 // adminService.getAllUsers() calls this function, but it did not exist before
 // -> GET /api/admin/users returned "userRepository.findAllUsers is not a function".
 // Returns a roles array because the users table no longer has a role column.
-async function findAllUsers() {
+async function findAllUsers({ limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
         SELECT u.id,
@@ -88,10 +88,18 @@ async function findAllUsers() {
         LEFT JOIN roles r ON r.id = ur.role_id
         GROUP BY u.id
         ORDER BY u.id
-        `
+        ${limit == null ? "" : "LIMIT $1 OFFSET $2"}
+        `,
+        limit == null ? [] : [limit, offset]
     );
 
     return result.rows;
+}
+
+async function countAllUsers() {
+    const result = await pool.query(`SELECT COUNT(*)::int AS total FROM users`);
+
+    return result.rows[0].total;
 }
 
 async function getUserRoles(userId) {
@@ -201,6 +209,7 @@ module.exports = {
     updatePassword,
     deleteUser,
     findAllUsers,
+    countAllUsers,
     getUserRoles,
     assignRole,
     setUserRoles,
