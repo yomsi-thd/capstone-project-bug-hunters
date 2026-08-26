@@ -5,12 +5,19 @@ const router = express.Router();
 const authController =
     require("../controllers/authController");
 
-router.post("/register", authController.register);
+const { validateBody } = require("../validation/validate");
+const {
+    registerSchema,
+    loginSchema,
+    refreshTokenSchema,
+} = require("../validation/schemas/authSchemas");
 
-router.post("/login", authController.login);
+router.post("/register", validateBody(registerSchema), authController.register);
 
-router.post("/refresh", authController.refreshToken);
+router.post("/login", validateBody(loginSchema), authController.login);
 
-router.post("/logout", authController.logout);
+router.post("/refresh", validateBody(refreshTokenSchema), authController.refreshToken);
+
+router.post("/logout", validateBody(refreshTokenSchema), authController.logout);
 
 module.exports = router;

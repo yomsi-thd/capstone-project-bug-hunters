@@ -54,30 +54,28 @@ describe("POST /api/auth/register", () => {
     });
 
     /**
-     * ⚠️ A KNOWN INTERIM STATE, and the reason it is written down.
+     * The interim state is over: this is what the whole validation layer was for.
      *
-     * Nothing validates this body yet, so a missing password still fails on a NOT NULL
-     * constraint. It used to surface as 400 carrying the raw Postgres sentence; now it
-     * reaches errorHandler as an unexpected error and answers 500 with a generic one.
-     *
-     * 500 is the wrong status for a client mistake, and the zod commit turns it into
-     * 422 with `details` naming the field. It is accepted in between because the
-     * alternative is hand-rolled validation that the zod commit would delete again —
-     * and because the swap is not purely a downgrade: the old 400 echoed a database
-     * constraint message straight back to the caller.
-     *
-     * Not reachable from the UI: the Register page checks these fields first.
+     * It used to be 400 echoing a raw Postgres NOT NULL message at the caller, then
+     * briefly 500 with a generic one once the controllers stopped catching. Now it is
+     * 422 naming EVERY field that is wrong at once, which is the thing the API could
+     * never tell a client before — the service checked one field at a time, so a form
+     * could never mark more than one input.
      */
-    it("500 with a generic message when the body is incomplete (becomes 422 with zod)", async () => {
+    it("422 naming every missing field at once when the body is incomplete", async () => {
         const res = await request(app)
             .post("/api/auth/register")
             .send({ email: uniqueEmail("incomplete") });
 
-        expect(res.status).toBe(500);
-        expect(res.body.code).toBe("INTERNAL");
-        expect(res.body.message).toBe("Something went wrong on our side.");
-        // The leak that used to happen: the column name reached the client.
-        expect(JSON.stringify(res.body)).not.toContain("password");
+        expect(res.status).toBe(422);
+        expect(res.body.code).toBe("VALIDATION_FAILED");
+        expect(res.body.details).toEqual([
+            { field: "fullName", message: "A full name is required." },
+            { field: "password", message: "A password is required." },
+        ]);
+        expect(res.body.message).toBe("2 fields need attention.");
+        // The database's own words must never reach the client.
+        expect(JSON.stringify(res.body)).not.toContain("not-null");
     });
 });
 

@@ -1,6 +1,7 @@
 const classCoinService = require("../services/classCoinService");
 const asyncHandler = require("../http/asyncHandler");
 const { validationFailed } = require("../errors/AppError");
+const M = require("../validation/messages");
 
 // Get ClassCoin balance
 const getClassCoin = asyncHandler(async (req, res) => {
@@ -32,12 +33,15 @@ const getMyInvestments = asyncHandler(async (req, res) => {
  * ranking meaningless. An admin topping up their OWN wallet is not what the endpoint is
  * for either; after the role separation an admin has no balance at all.
  */
-function targetWallet(req, verb) {
+function targetWallet(req) {
     const { user_id: userId, amount } = req.body;
 
+    // The schema on the route catches this first. Kept as well, and worded from the same
+    // constant, because a controller should not depend on a middleware having run - and
+    // because two checks are fine while two wordings are not.
     if (!userId) {
-        throw validationFailed(`user_id is required - name the account to ${verb}.`, [
-            { field: "user_id", message: `Name the account to ${verb}.` },
+        throw validationFailed(M.WALLET_TARGET_REQUIRED, [
+            { field: "user_id", message: M.WALLET_TARGET_REQUIRED },
         ]);
     }
 
@@ -45,7 +49,7 @@ function targetWallet(req, verb) {
 }
 
 const addCoins = asyncHandler(async (req, res) => {
-    const { userId, amount } = targetWallet(req, "credit");
+    const { userId, amount } = targetWallet(req);
 
     const classCoin = await classCoinService.addCoins(userId, amount);
 
@@ -53,7 +57,7 @@ const addCoins = asyncHandler(async (req, res) => {
 });
 
 const deductCoins = asyncHandler(async (req, res) => {
-    const { userId, amount } = targetWallet(req, "debit");
+    const { userId, amount } = targetWallet(req);
 
     const classCoin = await classCoinService.deductCoins(userId, amount);
 

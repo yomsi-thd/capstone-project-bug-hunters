@@ -221,7 +221,7 @@ describe("POST /api/classcoins/add and /deduct", () => {
         expect(res.status).toBe(422);
         expect(res.body.message).toContain("user_id is required");
         expect(res.body.details).toEqual([
-            { field: "user_id", message: "Name the account to credit." },
+            { field: "user_id", message: "user_id is required - name the account to adjust." },
         ]);
         expect(await balanceOf(admin.id)).toBe(before);
     });

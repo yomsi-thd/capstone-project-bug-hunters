@@ -12,6 +12,7 @@ const {
     conflict,
     validationFailed,
 } = require("../errors/AppError");
+const M = require("../validation/messages");
 
 // projects.start_date / end_date have always existed but createProject never wrote
 // them, so every project came back with both null -> ProjectDetail showed "—" for
@@ -717,11 +718,11 @@ async function createComment(userId, projectId, data) {
     const body = (data.body || "").trim();
 
     if (!body) {
-        throw validationFailed("A comment cannot be empty.");
+        throw validationFailed(M.COMMENT_EMPTY);
     }
 
     if (body.length > 2000) {
-        throw validationFailed("A comment must be 2000 characters or fewer.");
+        throw validationFailed(M.COMMENT_TOO_LONG);
     }
 
     const project = await projectRepository.findById(projectId);
@@ -794,15 +795,15 @@ async function createProjectUpdate(userId, roles, projectId, data) {
     const body = (data.body || "").trim();
 
     if (!title) {
-        throw validationFailed("An update needs a title.");
+        throw validationFailed(M.UPDATE_TITLE_REQUIRED);
     }
 
     if (!body) {
-        throw validationFailed("An update needs some content.");
+        throw validationFailed(M.UPDATE_BODY_REQUIRED);
     }
 
     if (title.length > 200) {
-        throw validationFailed("The title must be 200 characters or fewer.");
+        throw validationFailed(M.UPDATE_TITLE_TOO_LONG);
     }
 
     const project = await projectRepository.findById(projectId);

@@ -6,6 +6,17 @@ const authenticate = require("../middlewares/authMiddleware");
 const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
 const { guardIdParams } = require("../http/numericParam");
+const { validateBody } = require("../validation/validate");
+const {
+    createProjectSchema,
+    updateProjectSchema,
+    archiveSchema,
+    rejectSchema,
+    endorseSchema,
+    commentSchema,
+    projectUpdateSchema,
+    investSchema,
+} = require("../validation/schemas/projectSchemas");
 
 // Every id here is a SERIAL primary key, so anything that is not a positive integer
 // cannot name a row. Checked once, before any handler runs - see numericParam.js for
@@ -24,7 +35,7 @@ guardIdParams(router, {
 // The rule that an ADMIN caller MUST name the creator (and a CREATOR caller must not)
 // lives in projectService.resolveOwnership, not here: it needs to look the target
 // account up, which a route guard cannot do.
-router.post("/", authenticate, authorize("CREATOR", "ADMIN"), projectController.createProject);
+router.post("/", authenticate, authorize("CREATOR", "ADMIN"), validateBody(createProjectSchema), projectController.createProject);
 
 router.get("/", projectController.getAllApprovedProjects);
 
@@ -44,14 +55,14 @@ router.get("/my/backers", authenticate, projectController.getMyBackers);
 // visitors out of every project page, which is the opposite of what this route is for.
 router.get("/:id", authenticateOptional, projectController.getProjectById);
 
-router.put("/:id", authenticate, projectController.updateProject);
+router.put("/:id", authenticate, validateBody(updateProjectSchema), projectController.updateProject);
 
 // Archive / restore / permanent delete — the two-step bin that replaced plain delete.
 // No authorize() guard on purpose: the rule is about OWNERSHIP, not role, and it is the
 // same pattern the project-updates and comment routes already use. archive is allowed
 // for the creator or an admin; restore is allowed for an admin, or for the creator only
 // when they were the one who archived it. Both are decided in projectService.
-router.patch("/:id/archive", authenticate, projectController.archiveProject);
+router.patch("/:id/archive", authenticate, validateBody(archiveSchema), projectController.archiveProject);
 
 router.patch("/:id/restore", authenticate, projectController.restoreProject);
 
@@ -70,6 +81,7 @@ router.patch(
     "/:id/reject",
     authenticate,
     authorize("ADMIN"),
+    validateBody(rejectSchema),
     projectController.rejectProject
 );
 
@@ -84,6 +96,7 @@ router.patch(
     "/:id/endorse",
     authenticate,
     authorize("ADMIN"),
+    validateBody(endorseSchema),
     projectController.endorseProject
 );
 
@@ -97,6 +110,7 @@ router.get("/:id/comments", authenticateOptional, projectController.getProjectCo
 router.post(
     "/:id/comments",
     authenticate,
+    validateBody(commentSchema),
     projectController.createComment
 );
 
@@ -113,6 +127,7 @@ router.get("/:id/updates", authenticateOptional, projectController.getProjectUpd
 router.post(
     "/:id/updates",
     authenticate,
+    validateBody(projectUpdateSchema),
     projectController.createProjectUpdate
 );
 
@@ -161,6 +176,7 @@ router.post(
     "/:id/invest",
     authenticate,
     authorize("BACKER"),
+    validateBody(investSchema),
     projectController.investProject
 );
 

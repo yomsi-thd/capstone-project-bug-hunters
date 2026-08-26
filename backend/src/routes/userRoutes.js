@@ -8,6 +8,12 @@ const userController =
 const authenticate =
     require("../middlewares/authMiddleware");
 
+const { validateBody } = require("../validation/validate");
+const {
+    updateProfileSchema,
+    changePasswordSchema,
+} = require("../validation/schemas/accountSchemas");
+
 router.get(
     "/profile",
     authenticate,
@@ -17,12 +23,14 @@ router.get(
 router.put(
     "/profile",
     authenticate,
+    validateBody(updateProfileSchema),
     userController.updateProfile
 );
 
 router.put(
     "/change-password",
     authenticate,
+    validateBody(changePasswordSchema),
     userController.changePassword
 );
 

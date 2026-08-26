@@ -4,6 +4,8 @@ const router = express.Router();
 const classCoinController = require("../controllers/classCoinController");
 const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
+const { validateBody } = require("../validation/validate");
+const { walletAdjustmentSchema } = require("../validation/schemas/accountSchemas");
 
 // Get balance
 router.get(
@@ -42,6 +44,7 @@ router.post(
     "/add",
     authenticate,
     authorize("ADMIN"),
+    validateBody(walletAdjustmentSchema),
     classCoinController.addCoins
 );
 
@@ -49,6 +52,7 @@ router.post(
     "/deduct",
     authenticate,
     authorize("ADMIN"),
+    validateBody(walletAdjustmentSchema),
     classCoinController.deductCoins
 );
 

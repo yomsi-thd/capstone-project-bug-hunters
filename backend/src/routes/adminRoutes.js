@@ -5,6 +5,8 @@ const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 const adminController = require("../controllers/adminController");
 const { guardIdParams } = require("../http/numericParam");
+const { validateBody } = require("../validation/validate");
+const { updateRolesSchema } = require("../validation/schemas/accountSchemas");
 
 // :id is a user id on the /users routes and a request id on /creator-requests. Both are
 // SERIAL, and "not found" is the right answer for a value that can be neither.
@@ -43,6 +45,7 @@ router.patch(
     "/users/:id/roles",
     authenticate,
     authorize("ADMIN"),
+    validateBody(updateRolesSchema),
     adminController.updateUserRoles
 );
 
