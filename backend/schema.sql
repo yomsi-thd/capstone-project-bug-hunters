@@ -111,7 +111,14 @@ CREATE TABLE projects (
     review_note       TEXT,
     start_date        DATE,
     end_date          DATE,
-    team_members      JSONB         NOT NULL DEFAULT '[]'::jsonb,
+    -- NULLABLE, unlike its two jsonb siblings below. That asymmetry is what the live
+    -- database really has, and this file's job is to reproduce it rather than to
+    -- improve on it; see known issue 8. Measured 2026-08-26 by building this file into
+    -- a throwaway schema and diffing information_schema.columns against public — it was
+    -- the ONLY difference in 11 tables, and it mattered because the backend test suite
+    -- now builds its database from here. A stricter test schema would refuse rows that
+    -- production accepts, which is a test that lies in the more dangerous direction.
+    team_members      JSONB         DEFAULT '[]'::jsonb,
     -- The long-form story rendered on the project page.
     challenge         TEXT,
     solution          TEXT,
@@ -377,3 +384,16 @@ CREATE INDEX idx_comments_project
 --    (Items 7 and the old review_note note are resolved and no longer listed.
 --     `review_note` landed 2026-08-11 and `video_url` on 2026-08-18; both are
 --     declared in the projects table above.)
+--
+-- 8. projects.team_members is NULLABLE while gallery and solution_bullets, which
+--    the code treats identically, are NOT NULL. Nothing writes NULL today —
+--    createProject coalesces with `|| []` and updateProject with `?? []` — so no
+--    row has one, and this is a tidiness migration rather than a fix:
+--
+--      UPDATE projects SET team_members = '[]'::jsonb WHERE team_members IS NULL;
+--      ALTER TABLE projects ALTER COLUMN team_members SET NOT NULL;
+--
+--    Deliberately NOT applied: it is a schema change, and the API restructure of
+--    2026-08-26 explicitly touches no schema. Recorded here because this file
+--    said NOT NULL until that date, which quietly made the test database stricter
+--    than the real one.
