@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+const withTransaction = require("../db/withTransaction");
 const projectRepository = require("../repositories/projectRepository");
 const projectUpdateRepository = require("../repositories/projectUpdateRepository");
 const commentRepository = require("../repositories/commentRepository");
@@ -420,15 +420,10 @@ async function createProject(userId, roles, data) {
         return await projectRepository.createProject(project);
     }
 
-    // Project + levels are one transaction, same shape as investProject. Half-saved is
-    // the worst outcome here: the wizard latches submitLockRef on success and sends the
-    // creator away, so they would believe the levels exist with no way to notice they
-    // do not.
-    const client = await pool.connect();
-
-    try {
-
-        await client.query("BEGIN");
+    // Project + levels are one transaction. Half-saved is the worst outcome here: the
+    // wizard latches submitLockRef on success and sends the creator away, so they would
+    // believe the levels exist with no way to notice they do not.
+    return await withTransaction(async (client) => {
 
         const createdProject =
             await projectRepository.createProject(project, client);
@@ -440,20 +435,8 @@ async function createProject(userId, roles, data) {
             );
         }
 
-        await client.query("COMMIT");
-
         return createdProject;
-
-    } catch (err) {
-
-        await client.query("ROLLBACK");
-        throw err;
-
-    } finally {
-
-        client.release();
-
-    }
+    });
 }
 
 // Get all projects
@@ -878,13 +861,10 @@ async function investProject(userId, projectId, amount, tierId = null) {
         throw validationFailed("Investment amount must be greater than 0.");
     }
 
-    const client = await pool.connect();
+    return await withTransaction(async (client) => {
 
-    try {
-
-        await client.query("BEGIN");
-
-        // Get project inside transaction
+        // Read inside the transaction, so an archive or a hidden level landing mid-flight
+        // rolls the whole thing back rather than being recorded against stale state.
         const project = await projectRepository.findById(projectId, client);
 
         if (!project) {
@@ -953,24 +933,11 @@ async function investProject(userId, projectId, amount, tierId = null) {
             client
         );
 
-        await client.query("COMMIT");
-
         return {
             message: "Investment successful.",
             transaction
         };
-
-    } catch (err) {
-
-        await client.query("ROLLBACK");
-        throw err;
-
-    } finally {
-
-        client.release();
-
-    }
-
+    });
 }
 
 module.exports = {

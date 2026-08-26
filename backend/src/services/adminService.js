@@ -1,4 +1,4 @@
-const pool = require("../config/db");
+const withTransaction = require("../db/withTransaction");
 const userRepository = require("../repositories/userRepository");
 const creatorRequestRepository = require("../repositories/creatorRequestRepository");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
@@ -121,26 +121,12 @@ async function updateUserRoles(userId, roles, actingAdminId) {
         throw forbidden("You cannot remove your own ADMIN role.");
     }
 
-    const client = await pool.connect();
-
-    try {
-
-        await client.query("BEGIN");
-
+    // setUserRoles deletes the whole set before inserting the new one, so a failure
+    // halfway would leave the account holding NO roles at all - locked out of everything
+    // rather than merely unchanged.
+    await withTransaction(async (client) => {
         await userRepository.setUserRoles(userId, wanted, client);
-
-        await client.query("COMMIT");
-
-    } catch (err) {
-
-        await client.query("ROLLBACK");
-        throw err;
-
-    } finally {
-
-        client.release();
-
-    }
+    });
 
     return {
         ...user,
@@ -160,11 +146,10 @@ async function approveCreatorRequest(requestId, adminId) {
         throw conflict("Creator request has already been reviewed.");
     }
 
-    const client = await pool.connect();
-
-    try {
-
-        await client.query("BEGIN");
+    // Granting the role and marking the request reviewed are one step or neither: a
+    // request marked APPROVED without the role is invisible to the queue afterwards, so
+    // nobody would ever notice the creator never got it.
+    return await withTransaction(async (client) => {
 
         await userRepository.assignRole(
             request.user_id,
@@ -172,27 +157,12 @@ async function approveCreatorRequest(requestId, adminId) {
             client
         );
 
-        const updatedRequest =
-            await creatorRequestRepository.approve(
-                requestId,
-                adminId,
-                client
-            );
-
-        await client.query("COMMIT");
-
-        return updatedRequest;
-
-    } catch (err) {
-
-        await client.query("ROLLBACK");
-        throw err;
-
-    } finally {
-
-        client.release();
-
-    }
+        return await creatorRequestRepository.approve(
+            requestId,
+            adminId,
+            client
+        );
+    });
 }
 async function rejectCreatorRequest(requestId, adminId) {
 
