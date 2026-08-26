@@ -100,7 +100,35 @@ async function findAll() {
 async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
-        SELECT *
+        -- Named columns, NOT SELECT *, and the omissions are the point.
+        --
+        -- This is the single most-requested query in the app: every visit to Discover,
+        -- and every keystroke in its search box, runs it. SELECT * made each row carry
+        -- the project's whole story AND its gallery - a jsonb array of base64 data
+        -- URIs, one per uploaded photo. Images live inside the project row (schema known
+        -- issue: they belong in Supabase Storage), so a handful of real photo projects
+        -- turn this response from kilobytes into megabytes, on the one endpoint nobody
+        -- can avoid.
+        --
+        -- It has already cost the team once. The uptime cron used to ping this route,
+        -- and cron-job.org aborts a response past its size cap - so the endpoint most
+        -- likely to grow without warning was also the one holding the live demo awake.
+        --
+        -- The list below is exactly what mappers.toCard reads. Adding a field to the
+        -- Discover card means adding it here too, which is the intended friction: it
+        -- makes the cost of carrying it visible at the point of choosing to.
+        SELECT id,
+               creator_id,
+               title,
+               description,
+               category,
+               status,
+               image_url,
+               goal_amount,
+               current_amount,
+               start_date,
+               end_date,
+               created_at
         FROM projects
         WHERE status = 'APPROVED'
           AND archived_at IS NULL
