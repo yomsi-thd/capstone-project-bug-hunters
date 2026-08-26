@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Modal from "../ui/Modal";
 import * as projectApi from "../../api/projectApi";
+import { errorMessage } from "../../api/apiError";
 
 /**
  * "Post Project Update", opened from the UPDATE button on a project card.
@@ -31,7 +32,7 @@ export default function PostUpdateModal({ project, onClose, onPosted }) {
       onPosted?.();
       onClose?.();
     } catch (err) {
-      setError(err.response?.data?.message || err.message || "Could not post this update");
+      setError(errorMessage(err, "Could not post this update"));
     } finally {
       setPosting(false);
     }

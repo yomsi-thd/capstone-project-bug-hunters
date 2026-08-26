@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { draftStorageKey } from "./draftStorageKey";
 import { isLinkable } from "../components/project/videoUrl";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
+import { errorMessage } from "../api/apiError";
 
 const MAX_GALLERY_IMAGES = 6;
 
@@ -1068,7 +1069,7 @@ export default function CreateProject() {
         if (!cancelled) {
           setCreators([]);
           setCreatorsError(
-            err.response?.data?.message || err.message || "Could not load creator accounts"
+            errorMessage(err, "Could not load creator accounts")
           );
         }
       } finally {
@@ -1270,7 +1271,7 @@ export default function CreateProject() {
       // retryable, so release the latch and put the SUBMIT button back rather than
       // stranding the work. This is the ONLY place the latch is released.
       submitLockRef.current = false;
-      setMessage(err.response?.data?.message || err.message || "Could not submit the project");
+      setMessage(errorMessage(err, "Could not submit the project"));
     } finally {
       setSubmitting(false);
     }

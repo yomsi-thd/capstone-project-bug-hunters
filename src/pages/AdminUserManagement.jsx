@@ -11,6 +11,7 @@ import {
   ADMIN_USER_NAV_ITEMS as NAV_ITEMS,
   ADMIN_USER_ROLES as ROLES,
 } from "../mock";
+import { errorMessage } from "../api/apiError";
 
 // What each role actually unlocks, so an admin granting one can see the consequence
 // before ticking the box. Kept next to the modal rather than in mock/ because it is
@@ -234,7 +235,7 @@ export default function AdminUserManagement() {
         if (!cancelled) setUsers((rows || []).map(toAdminUser));
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load users");
+          setLoadError(errorMessage(err, "Could not load users"));
         }
       }
     })();
@@ -252,7 +253,7 @@ export default function AdminUserManagement() {
           : x
       ));
     } catch (err) {
-      setActionError(err.response?.data?.message || err.message || "Could not change this user's status");
+      setActionError(errorMessage(err, "Could not change this user's status"));
     }
   };
 
@@ -299,7 +300,7 @@ export default function AdminUserManagement() {
       ));
       setEditTarget(null);
     } catch (err) {
-      setSaveError(err.response?.data?.message || err.message || "Could not update this user's roles");
+      setSaveError(errorMessage(err, "Could not update this user's roles"));
     } finally {
       setSavingRoles(false);
     }

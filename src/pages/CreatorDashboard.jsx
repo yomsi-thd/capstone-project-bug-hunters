@@ -5,6 +5,7 @@ import CreatorSidebar from "../components/creator/CreatorSidebar";
 import Avatar from "../components/ui/Avatar";
 import * as projectApi from "../api/projectApi";
 import { toNumber, fundedPercent, toBacker } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 export default function CreatorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -41,7 +42,7 @@ export default function CreatorDashboard() {
         );
       } catch (err) {
         if (!cancelled) {
-          setStatsError(err.response?.data?.message || err.message || "Could not load your project stats");
+          setStatsError(errorMessage(err, "Could not load your project stats"));
         }
       }
     })();
@@ -62,7 +63,7 @@ export default function CreatorDashboard() {
         if (!cancelled) setBackers((rows || []).map(toBacker));
       } catch (err) {
         if (!cancelled) {
-          setBackersError(err.response?.data?.message || err.message || "Could not load your backers");
+          setBackersError(errorMessage(err, "Could not load your backers"));
         }
       }
     })();

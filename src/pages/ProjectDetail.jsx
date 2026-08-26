@@ -15,6 +15,7 @@ import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
 import { toDetail, toProjectUpdate, toCommentThread, toTier } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 // Plain progress track for the detail-page sidebar (no % label — the sidebar
 // renders its own big % + "FUNDED" below). Distinct from the labelled card
@@ -129,7 +130,7 @@ export default function ProjectDetail() {
       setCommentsVersion(v => v + 1);
       return true;
     } catch (err) {
-      setCommentError(err.response?.data?.message || err.message || "Could not post your comment");
+      setCommentError(errorMessage(err, "Could not post your comment"));
       return false;
     }
   };
@@ -143,7 +144,7 @@ export default function ProjectDetail() {
       setCommentsVersion(v => v + 1);
       return true;
     } catch (err) {
-      return err.response?.data?.message || err.message || "Could not delete that comment";
+      return errorMessage(err, "Could not delete that comment");
     }
   };
 
@@ -164,7 +165,7 @@ export default function ProjectDetail() {
         if (cancelled) return;
         // 404 -> the project does not exist, fall through to "Project not found" below.
         if (err.response?.status === 404) setP(null);
-        else setLoadError(err.response?.data?.message || err.message || "Could not load this project");
+        else setLoadError(errorMessage(err, "Could not load this project"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -220,7 +221,7 @@ export default function ProjectDetail() {
       setTiersVersion(v => v + 1);
     } catch (err) {
       setInvestStep(null);
-      setInvestError(err.response?.data?.message || err.message || "Investment failed");
+      setInvestError(errorMessage(err, "Investment failed"));
     }
   };
 

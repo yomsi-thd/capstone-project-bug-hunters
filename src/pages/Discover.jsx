@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { FILTERS, FILTER_TAGS } from "../mock";
 import * as projectApi from "../api/projectApi";
 import { toCard } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner, onEdit }) {
   return (
@@ -189,7 +190,7 @@ export default function Discover() {
       } catch (err) {
         if (!cancelled) {
           setLoadError(
-            err.response?.data?.message || err.message || "Could not load projects"
+            errorMessage(err, "Could not load projects")
           );
         }
       } finally {

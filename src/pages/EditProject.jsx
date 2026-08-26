@@ -13,6 +13,7 @@ import SupportLevels from "../components/project/SupportLevels";
 import Avatar from "../components/ui/Avatar";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
 import { toTier, parseAmount } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 // The three optional story sections ProjectDetail renders under the blurb. Kept in the
 // Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
@@ -204,7 +205,7 @@ function TabTiers({ projectId }) {
         const rows = await projectApi.getProjectTiers(projectId);
         if (!cancelled) setLevels((rows || []).map(toTier));
       } catch (err) {
-        if (!cancelled) setLoadError(err.response?.data?.message || err.message || "Could not load the support levels");
+        if (!cancelled) setLoadError(errorMessage(err, "Could not load the support levels"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -264,7 +265,7 @@ function TabTiers({ projectId }) {
       closeForm();
       reload();
     } catch (err) {
-      setFormError(err.response?.data?.message || err.message || "Could not save the level");
+      setFormError(errorMessage(err, "Could not save the level"));
     } finally {
       setBusy(false);
     }
@@ -285,7 +286,7 @@ function TabTiers({ projectId }) {
       if (editingId === level.id) closeForm();
       reload();
     } catch (err) {
-      setNotice(err.response?.data?.message || err.message || "Could not remove the level");
+      setNotice(errorMessage(err, "Could not remove the level"));
     } finally {
       setBusy(false);
     }
@@ -493,7 +494,7 @@ export default function EditProject({ project, onClose }) {
       });
       onClose?.();
     } catch (err) {
-      setSaveError(err.response?.data?.message || err.message || "Could not save changes");
+      setSaveError(errorMessage(err, "Could not save changes"));
     } finally {
       setSaving(false);
     }

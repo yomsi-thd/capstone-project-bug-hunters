@@ -4,6 +4,7 @@ import * as authApi from "../api/authApi";
 import * as classCoinApi from "../api/classCoinApi";
 import { toNumber } from "../api/mappers";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, SESSION_EXPIRED_EVENT } from "../api/axios";
+import { serverMessage } from "../api/apiError";
 
 // Fallback accounts, used ONLY when the backend cannot be reached at all.
 // They exist so the UI is still browsable when the API is down — see login().
@@ -122,7 +123,11 @@ export function AuthProvider({ children }) {
       if (err?.response) {
         return {
           ok: false,
-          error: err.response.data?.message || "Invalid email or password",
+          // serverMessage, NOT errorMessage: this one must fall through to the sentence
+          // below rather than to axios's own `err.message`, which for a 401 reads
+          // "Request failed with status code 401" — worse than the line it would
+          // replace, and shown on the screen a person meets first.
+          error: serverMessage(err) || "Invalid email or password",
         };
       }
       // No response => backend down / wrong port / CORS.

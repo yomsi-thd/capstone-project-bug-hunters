@@ -10,6 +10,7 @@ import {
   ADMIN_CAT_STYLE as CAT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
 } from "../mock";
+import { errorMessage } from "../api/apiError";
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
       setProjects((rows || []).map(toAdminProject));
       setLoadError(null);
     } catch (err) {
-      setLoadError(err.response?.data?.message || err.message || "Could not load projects");
+      setLoadError(errorMessage(err, "Could not load projects"));
     } finally {
       setLoading(false);
     }
@@ -96,7 +97,7 @@ export default function AdminDashboard() {
       closeModals();
     } catch (err) {
       setActionError(
-        err.response?.data?.message || err.message || "Could not archive this project"
+        errorMessage(err, "Could not archive this project")
       );
     } finally {
       setBusy(false);
@@ -111,7 +112,7 @@ export default function AdminDashboard() {
       await loadProjects();
     } catch (err) {
       setLoadError(
-        err.response?.data?.message || err.message || "Could not restore this project"
+        errorMessage(err, "Could not restore this project")
       );
     } finally {
       setRestoringId(null);
@@ -129,7 +130,7 @@ export default function AdminDashboard() {
       closeModals();
     } catch (err) {
       setActionError(
-        err.response?.data?.message || err.message || "Could not delete this project"
+        errorMessage(err, "Could not delete this project")
       );
     } finally {
       setBusy(false);

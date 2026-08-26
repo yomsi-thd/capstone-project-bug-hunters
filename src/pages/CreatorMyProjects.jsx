@@ -9,6 +9,7 @@ import CreatorSidebar from "../components/creator/CreatorSidebar";
 import * as projectApi from "../api/projectApi";
 import { toCreatorProject, parseAmount } from "../api/mappers";
 import Header from "../components/layout/Header";
+import { errorMessage } from "../api/apiError";
 
 const DEPT_STYLE = {
   Engineering: "bg-blue-900 text-white",
@@ -323,7 +324,7 @@ export default function CreatorMyProjects() {
       setProjects((rows || []).map(toCreatorProject));
       setLoadError(null);
     } catch (err) {
-      setLoadError(err.response?.data?.message || err.message || "Could not load your projects");
+      setLoadError(errorMessage(err, "Could not load your projects"));
     } finally {
       setLoading(false);
     }
@@ -379,7 +380,7 @@ export default function CreatorMyProjects() {
       setArchiveReason("");
     } catch (err) {
       setActionError(
-        err.response?.data?.message || err.message || "Could not archive this project"
+        errorMessage(err, "Could not archive this project")
       );
     } finally {
       setArchiving(false);
@@ -397,7 +398,7 @@ export default function CreatorMyProjects() {
       await loadProjects();
     } catch (err) {
       setLoadError(
-        err.response?.data?.message || err.message || "Could not resubmit this project"
+        errorMessage(err, "Could not resubmit this project")
       );
     } finally {
       setResubmittingId(null);
@@ -412,7 +413,7 @@ export default function CreatorMyProjects() {
       await loadProjects();
     } catch (err) {
       setLoadError(
-        err.response?.data?.message || err.message || "Could not restore this project"
+        errorMessage(err, "Could not restore this project")
       );
     } finally {
       setRestoringId(null);

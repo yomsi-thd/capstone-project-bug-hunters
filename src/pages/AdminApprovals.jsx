@@ -11,6 +11,7 @@ import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
 } from "../mock";
+import { errorMessage } from "../api/apiError";
 
 /**
  * Was this project filed by the admin who is currently looking at it?
@@ -288,7 +289,7 @@ export default function AdminApprovals() {
         }
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load the approval queue");
+          setLoadError(errorMessage(err, "Could not load the approval queue"));
         }
       }
     })();
@@ -304,7 +305,7 @@ export default function AdminApprovals() {
         if (!cancelled) setCreatorRequests((rows || []).map(toCreatorRequest));
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load creator requests");
+          setLoadError(errorMessage(err, "Could not load creator requests"));
         }
       }
     })();
@@ -333,7 +334,7 @@ export default function AdminApprovals() {
         prev.map(r => r.id === id ? { ...r, status: decision === "approve" ? "APPROVED" : "REJECTED" } : r)
       );
     } catch (err) {
-      setActionError(err.response?.data?.message || err.message || "Could not update this request");
+      setActionError(errorMessage(err, "Could not update this request"));
     }
   };
 
@@ -344,7 +345,7 @@ export default function AdminApprovals() {
       setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Approved" } : p));
       setReviewTarget(null);
     } catch (err) {
-      setActionError(err.response?.data?.message || err.message || "Could not approve this project");
+      setActionError(errorMessage(err, "Could not approve this project"));
     }
   };
 
@@ -358,7 +359,7 @@ export default function AdminApprovals() {
       setProjects(prev => prev.map(p => p.id === id ? { ...p, status: "Changes Requested", feedback } : p));
       setReviewTarget(null);
     } catch (err) {
-      setActionError(err.response?.data?.message || err.message || "Could not reject this project");
+      setActionError(errorMessage(err, "Could not reject this project"));
     }
   };
 

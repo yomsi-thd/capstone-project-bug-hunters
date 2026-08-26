@@ -8,6 +8,7 @@ import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as classCoinApi from "../api/classCoinApi";
 import { toInvestment } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 function InvestmentCard({ investment, isMobile }) {
   return (
@@ -172,7 +173,7 @@ export default function BackerInvestments() {
       } catch (err) {
         if (!cancelled) {
           setLoadError(
-            err.response?.data?.message || err.message || "Could not load your investments"
+            errorMessage(err, "Could not load your investments")
           );
         }
       } finally {

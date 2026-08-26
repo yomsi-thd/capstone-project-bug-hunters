@@ -8,6 +8,7 @@ import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as userApi from "../api/userApi";
 import { toProfile } from "../api/mappers";
+import { errorMessage } from "../api/apiError";
 
 /* ── Small shared pieces ──────────────────────────────────────────────────────
    Top-level functions, never nested inside the page: a component defined during
@@ -121,7 +122,7 @@ export default function Account() {
         setForm({ name: p.name, email: p.email, title: p.title });
       } catch (err) {
         if (!cancelled) {
-          setLoadError(err.response?.data?.message || err.message || "Could not load your profile");
+          setLoadError(errorMessage(err, "Could not load your profile"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -171,7 +172,7 @@ export default function Account() {
       setSaved(true);
       setErrors({});
     } catch (err) {
-      setErrors({ form: err.response?.data?.message || err.message || "Could not save your profile" });
+      setErrors({ form: errorMessage(err, "Could not save your profile") });
     } finally {
       setSaving(false);
     }
@@ -197,7 +198,7 @@ export default function Account() {
       setPwErrors({});
       setPwSaved(true);
     } catch (err) {
-      setPwErrors({ form: err.response?.data?.message || err.message || "Could not change your password" });
+      setPwErrors({ form: errorMessage(err, "Could not change your password") });
     } finally {
       setPwSaving(false);
     }

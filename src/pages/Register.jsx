@@ -6,6 +6,7 @@ import SsoButton from "../components/auth/SsoButton";
 import RegisterSuccessModal from "../components/auth/RegisterSuccessModal";
 import useBreakpoint from "../hooks/useBreakpoint";
 import * as authApi from "../api/authApi";
+import { errorMessage } from "../api/apiError";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -67,7 +68,7 @@ export default function Register() {
       setShowSuccess(true);
     } catch (err) {
       setErrors({
-        identifier: err.response?.data?.message || err.message || "Registration failed",
+        identifier: errorMessage(err, "Registration failed"),
       });
     } finally {
       setIsSubmitting(false);
