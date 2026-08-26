@@ -1,7 +1,12 @@
 const projectService = require("../services/projectService");
+const moderationService = require("../services/moderationService");
 const asyncHandler = require("../http/asyncHandler");
 
 /**
+ * The project's own lifecycle. Comments, updates, support levels and investments moved
+ * to controllers of their own alongside their services; the ROUTES are unchanged, so
+ * /api/projects/:id/comments still answers exactly as before.
+ *
  * Not one try/catch in this file, where there used to be twenty-four.
  *
  * Fourteen of them mapped every possible failure to 400, which is the defect the whole
@@ -91,141 +96,29 @@ const deleteProject = asyncHandler(async (req, res) => {
 const approveProject = asyncHandler(async (req, res) => {
     // req.user.id is who is reviewing. The service refuses when it is the same admin who
     // filed the project on the creator's behalf.
-    const project = await projectService.approveProject(req.params.id, req.user.id);
+    const project = await moderationService.approveProject(req.params.id, req.user.id);
 
     res.json(project);
 });
 
 const rejectProject = asyncHandler(async (req, res) => {
     // `note` is the reviewer's explanation, shown to the creator on their project card.
-    const project = await projectService.rejectProject(req.params.id, req.body?.note, req.user.id);
+    const project = await moderationService.rejectProject(req.params.id, req.body?.note, req.user.id);
 
     res.json(project);
 });
 
 // The creator's route back into the queue after revising a rejected project.
 const resubmitProject = asyncHandler(async (req, res) => {
-    const project = await projectService.resubmitProject(req.params.id, req.user.id, req.user.roles);
+    const project = await moderationService.resubmitProject(req.params.id, req.user.id, req.user.roles);
 
     res.status(200).json({ message: "Project resubmitted for review", project });
 });
 
 const endorseProject = asyncHandler(async (req, res) => {
-    const project = await projectService.setProjectEndorsed(req.params.id, req.body.endorsed);
+    const project = await moderationService.setProjectEndorsed(req.params.id, req.body.endorsed);
 
     res.status(200).json(project);
-});
-
-// ─── Comments ───────────────────────────────────────────────────────────────────
-
-const getProjectComments = asyncHandler(async (req, res) => {
-    const comments = await projectService.getProjectComments(req.params.id, req.user);
-
-    res.status(200).json(comments);
-});
-
-const createComment = asyncHandler(async (req, res) => {
-    const comment = await projectService.createComment(req.user.id, req.params.id, req.body);
-
-    res.status(201).json({ message: "Comment posted successfully", comment });
-});
-
-const deleteComment = asyncHandler(async (req, res) => {
-    await projectService.deleteComment(req.user.id, req.user.roles, req.params.commentId);
-
-    res.status(200).json({ message: "Comment deleted successfully" });
-});
-
-// ─── Project updates ────────────────────────────────────────────────────────────
-
-const getProjectUpdates = asyncHandler(async (req, res) => {
-    const updates = await projectService.getProjectUpdates(req.params.id, req.user);
-
-    res.status(200).json(updates);
-});
-
-const createProjectUpdate = asyncHandler(async (req, res) => {
-    const update = await projectService.createProjectUpdate(
-        req.user.id,
-        req.user.roles,
-        req.params.id,
-        req.body
-    );
-
-    res.status(201).json({ message: "Update posted successfully", update });
-});
-
-const deleteProjectUpdate = asyncHandler(async (req, res) => {
-    await projectService.deleteProjectUpdate(req.user.id, req.user.roles, req.params.updateId);
-
-    res.status(200).json({ message: "Update deleted successfully" });
-});
-
-// ─── Support levels (project_tiers) ─────────────────────────────────────────────
-
-const getProjectTiers = asyncHandler(async (req, res) => {
-    const tiers = await projectService.getProjectTiers(req.params.id, req.user);
-
-    res.status(200).json(tiers);
-});
-
-const createTier = asyncHandler(async (req, res) => {
-    const tier = await projectService.createTier(
-        req.params.id,
-        req.user.id,
-        req.user.roles,
-        req.body
-    );
-
-    res.status(201).json({ message: "Support level added", tier });
-});
-
-const updateTier = asyncHandler(async (req, res) => {
-    const tier = await projectService.updateTier(
-        req.params.id,
-        req.params.tierId,
-        req.user.id,
-        req.user.roles,
-        req.body
-    );
-
-    res.status(200).json({ message: "Support level updated", tier });
-});
-
-const deleteTier = asyncHandler(async (req, res) => {
-    // `hidden` tells the UI which of the two things happened: a level nobody chose is
-    // really gone, one somebody chose is only hidden so their history still points at a
-    // row that exists.
-    const result = await projectService.deleteTier(
-        req.params.id,
-        req.params.tierId,
-        req.user.id,
-        req.user.roles
-    );
-
-    res.status(200).json({
-        message: result.hidden
-            ? "Hidden. Backers who chose it keep their history."
-            : "Support level deleted",
-        hidden: result.hidden,
-    });
-});
-
-// ─── Investing ──────────────────────────────────────────────────────────────────
-
-const investProject = asyncHandler(async (req, res) => {
-    // tierId is optional - "No level, just support" sends none, and that is a
-    // first-class choice rather than a fallback.
-    const { amount, tierId } = req.body;
-
-    const result = await projectService.investProject(
-        req.user.id,
-        req.params.id,
-        amount,
-        tierId ?? null
-    );
-
-    res.status(200).json(result);
 });
 
 module.exports = {
@@ -242,15 +135,4 @@ module.exports = {
     rejectProject,
     resubmitProject,
     endorseProject,
-    getProjectComments,
-    createComment,
-    deleteComment,
-    getProjectUpdates,
-    createProjectUpdate,
-    deleteProjectUpdate,
-    investProject,
-    getProjectTiers,
-    createTier,
-    updateTier,
-    deleteTier,
 };

@@ -2,6 +2,12 @@ const express = require("express");
 const router = express.Router();
 
 const projectController = require("../controllers/projectController");
+// Comments, updates, support levels and investments have controllers of their own now.
+// The PATHS below are deliberately unchanged - the split is internal.
+const commentController = require("../controllers/commentController");
+const projectUpdateController = require("../controllers/projectUpdateController");
+const tierController = require("../controllers/tierController");
+const investmentController = require("../controllers/investmentController");
 const authenticate = require("../middlewares/authMiddleware");
 const authenticateOptional = require("../middlewares/authOptional");
 const authorize = require("../middlewares/authorize");
@@ -105,36 +111,36 @@ router.patch(
 // Public like the project itself, and optional-auth for the same reason: these are the
 // project's content, so hiding an unapproved project while leaving its discussion
 // readable one URL over would not hide anything.
-router.get("/:id/comments", authenticateOptional, projectController.getProjectComments);
+router.get("/:id/comments", authenticateOptional, commentController.getProjectComments);
 
 router.post(
     "/:id/comments",
     authenticate,
     validateBody(commentSchema),
-    projectController.createComment
+    commentController.createComment
 );
 
 router.delete(
     "/:id/comments/:commentId",
     authenticate,
-    projectController.deleteComment
+    commentController.deleteComment
 );
 
 // Project updates. Reading is public (they show on the project page); posting and
 // deleting are checked against the project's creator inside the service.
-router.get("/:id/updates", authenticateOptional, projectController.getProjectUpdates);
+router.get("/:id/updates", authenticateOptional, projectUpdateController.getProjectUpdates);
 
 router.post(
     "/:id/updates",
     authenticate,
     validateBody(projectUpdateSchema),
-    projectController.createProjectUpdate
+    projectUpdateController.createProjectUpdate
 );
 
 router.delete(
     "/:id/updates/:updateId",
     authenticate,
-    projectController.deleteProjectUpdate
+    projectUpdateController.deleteProjectUpdate
 );
 
 // Support levels ("project_tiers" in the database — the UI wording can still change,
@@ -148,24 +154,24 @@ router.delete(
 // authOptional, not authenticate: the project page is public, but a token that is
 // present and broken still 401s so axios gets its chance to refresh. Downgrading an
 // expired token to "anonymous" would 404 a creator on their own pending project.
-router.get("/:id/tiers", authenticateOptional, projectController.getProjectTiers);
+router.get("/:id/tiers", authenticateOptional, tierController.getProjectTiers);
 
 router.post(
     "/:id/tiers",
     authenticate,
-    projectController.createTier
+    tierController.createTier
 );
 
 router.put(
     "/:id/tiers/:tierId",
     authenticate,
-    projectController.updateTier
+    tierController.updateTier
 );
 
 router.delete(
     "/:id/tiers/:tierId",
     authenticate,
-    projectController.deleteTier
+    tierController.deleteTier
 );
 
 // authorize("BACKER") added 2026-08-24 with the admin role separation. This route had
@@ -177,7 +183,7 @@ router.post(
     authenticate,
     authorize("BACKER"),
     validateBody(investSchema),
-    projectController.investProject
+    investmentController.investProject
 );
 
 module.exports = router;
