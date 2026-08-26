@@ -6,6 +6,7 @@ const classCoinRoutes = require("./routes/classCoinRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const cors = require("cors");
 const pool = require("./config/db");
+const errorHandler = require("./errors/errorHandler");
 
 const app = express();
 
@@ -105,5 +106,16 @@ app.get("/api/health", async (req, res) => {
         res.status(503).json({ status: "error", db: "down" });
     }
 });
+
+// LAST, after every route: the one place that turns an error into a status code and a
+// JSON body. Anything that reaches here either called next(err) or threw out of an async
+// handler; controllers that still catch their own errors are simply not using it yet.
+//
+// It earns its place immediately even so. express.json() rejects an oversized or
+// malformed body BEFORE the router runs, so no controller's try/catch has ever seen
+// those — until now they came back as Express's default HTML error page, which is what
+// made the 413 of 2026-08-11 so hard to find: nothing appeared in the service logs at
+// all, because no service code ran.
+app.use(errorHandler);
 
 module.exports = app;
