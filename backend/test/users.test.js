@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 
-import { app, pool, makeUser, makeProject, balanceOf, as, PASSWORD } from "./helpers/factories.js";
+import { app, pool, makeUser, makeProject, makeTier, balanceOf, as, PASSWORD } from "./helpers/factories.js";
 
 let backer;
 let creator;
@@ -177,6 +177,35 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         const res = await as(investor.token).get("/api/classcoins/investments");
 
         expect(res.body.items.map((r) => Number(r.project_id))).toContain(project.id);
+    });
+
+    // One card covers several investments, so it can only show ONE support level, and
+    // the rule is the HIGHEST the backer ever chose — not the most recent. Someone who
+    // signalled Champion once and then topped up at Supporter has not withdrawn the
+    // stronger signal, and a card that quietly demoted them would misreport it to the
+    // creator, which is the only thing a level is for.
+    //
+    // Ordering matters in this test: the LOWER level is chosen LAST, so "latest" and
+    // "highest" give different answers and only the right one passes.
+    it("shows the HIGHEST level the backer ever chose, not the latest", async () => {
+        const investor = await makeUser({ roles: ["BACKER"], balance: 2000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const supporter = await makeTier({ projectId: project.id, name: "Supporter", minAmount: 100 });
+        const champion = await makeTier({ projectId: project.id, name: "Champion", minAmount: 500 });
+
+        await as(investor.token)
+            .post(`/api/projects/${project.id}/invest`)
+            .send({ amount: 500, tierId: champion.id });
+        await as(investor.token)
+            .post(`/api/projects/${project.id}/invest`)
+            .send({ amount: 100, tierId: supporter.id });
+
+        const res = await as(investor.token).get("/api/classcoins/investments");
+        const row = res.body.items.find((r) => Number(r.project_id) === project.id);
+
+        expect(row.top_tier_name).toBe("Champion");
+        expect(row.top_tier_min).toBe(500);
+        expect(row.invested_amount).toBe(600);
     });
 });
 

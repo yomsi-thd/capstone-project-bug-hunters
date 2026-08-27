@@ -67,6 +67,35 @@ describe("GET /api/admin/projects", () => {
         expect(res.status).toBe(200);
         expect(res.body.items.map((p) => p.id)).toContain(pending.id);
     });
+
+    // Once creator_id points at the creator, created_by_admin_id is the ONLY remaining
+    // trace of who actually filed an on-behalf project — and this listing is the only
+    // place it is joined to a name. Two screens depend on it: AdminApprovals reads the
+    // id to HIDE approve/reject from the admin who filed the project, and the review
+    // panel prints the name. Losing the join costs the id as well, and the
+    // conflict-of-interest rule then holds only in the service, with the buttons back
+    // on screen for the one admin who must not press them.
+    it("joins the name of the admin who filed an on-behalf project", async () => {
+        const filingAdmin = await makeUser({ roles: ["ADMIN"], name: "Filing Admin" });
+        const onBehalf = await makeProject({
+            creatorId: creator.id,
+            status: "PENDING",
+            createdByAdminId: filingAdmin.id,
+        });
+        const ownProject = await makeProject({ creatorId: creator.id, status: "PENDING" });
+
+        const res = await as(admin.token).get("/api/admin/projects");
+        const filed = res.body.items.find((p) => p.id === onBehalf.id);
+        const unfiled = res.body.items.find((p) => p.id === ownProject.id);
+
+        expect(Number(filed.created_by_admin_id)).toBe(filingAdmin.id);
+        expect(filed.created_by_admin_name).toBe("Filing Admin");
+
+        // NULL means "the creator filed it themselves", which is every project made
+        // before 2026-08-24 — so the join must not invent a name for those.
+        expect(unfiled.created_by_admin_id).toBeNull();
+        expect(unfiled.created_by_admin_name).toBeNull();
+    });
 });
 
 describe("PATCH /api/admin/users/:id/deactivate and /activate", () => {

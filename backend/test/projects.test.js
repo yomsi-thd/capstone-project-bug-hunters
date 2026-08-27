@@ -12,7 +12,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 
-import { app, pool, makeUser, makeProject, as } from "./helpers/factories.js";
+import { app, pool, makeUser, makeProject, makeTier, as } from "./helpers/factories.js";
 
 const validBody = (overrides = {}) => ({
     title: "A test project",
@@ -248,6 +248,38 @@ describe("GET /api/projects/my and /my/backers", () => {
     it("401 signed out", async () => {
         expect((await request(app).get("/api/projects/my")).status).toBe(401);
         expect((await request(app).get("/api/projects/my/backers")).status).toBe(401);
+    });
+
+    // A row here is one PERSON grouped across every investment they made in this
+    // creator's projects, so it has to pick ONE level to show — and it picks the
+    // HIGHEST they ever chose, matching classCoinRepository.getInvestmentsByUser
+    // exactly. The two queries must never disagree: the same person would then be a
+    // Champion on their own My Investments card and a Supporter on the creator's
+    // dashboard, and neither screen would say which one the creator should believe.
+    //
+    // The higher level is chosen FIRST and on a DIFFERENT project, so neither "latest"
+    // nor "same project as the last one" would produce the expected answer.
+    it("names the HIGHEST level a backer ever chose, across all of the creator's projects", async () => {
+        const owner = await makeUser({ roles: ["CREATOR"] });
+        const investor = await makeUser({ roles: ["BACKER"], balance: 2000 });
+
+        const first = await makeProject({ creatorId: owner.id, status: "APPROVED" });
+        const second = await makeProject({ creatorId: owner.id, status: "APPROVED" });
+        const champion = await makeTier({ projectId: first.id, name: "Champion", minAmount: 500 });
+        const supporter = await makeTier({ projectId: second.id, name: "Supporter", minAmount: 100 });
+
+        await as(investor.token).post(`/api/projects/${first.id}/invest`).send({ amount: 500, tierId: champion.id });
+        await as(investor.token).post(`/api/projects/${second.id}/invest`).send({ amount: 100, tierId: supporter.id });
+
+        const res = await as(owner.token).get("/api/projects/my/backers");
+        const row = res.body.items.find((r) => Number(r.user_id) === investor.id);
+
+        expect(row.top_tier_name).toBe("Champion");
+        expect(row.top_tier_min).toBe(500);
+        // The "N projects" line under the chip has to stay: the level is across all of
+        // them, not from the project the row happens to be sorted by.
+        expect(row.project_count).toBe(2);
+        expect(row.total_amount).toBe(600);
     });
 });
 
