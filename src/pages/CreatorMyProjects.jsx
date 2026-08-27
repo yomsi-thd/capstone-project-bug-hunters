@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Modal from "../components/ui/Modal";
 import Badge from "../components/ui/Badge";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import EditProject from "./EditProject";
 import PostUpdateModal from "../components/creator/PostUpdateModal";
@@ -311,6 +311,10 @@ export default function CreatorMyProjects() {
   const [actionError, setActionError] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
+  // Set only on /creator-my-projects/:id/edit — the deep link used by "EDIT THIS PROJECT"
+  // on ProjectDetail and on the Discover hero. Undefined on the plain list route.
+  const { id: editIdParam } = useParams();
+
 
   // GET /api/projects/my — the signed-in creator's own projects, archived included.
   // Refetched after archive/restore rather than patched locally: archived_by_name comes
@@ -335,12 +339,30 @@ export default function CreatorMyProjects() {
   // the call graph and sees the setStates inside it.
   useEffect(() => { (async () => { await loadProjects(); })(); }, [loadProjects]);
 
+
   const liveProjects = projects.filter(p => !p.archived);
   const archivedProjects = projects.filter(p => p.archived);
   // Derived, not stored: restoring the LAST archived project hides the Archived chip, and
   // a stored tab would leave you stranded on an empty list with no way back. Falling back
   // here fixes that without an effect that fights the user's own clicks.
   const activeTab = activeTabFor(tab, archivedProjects.length);
+
+  // The project whose edit form is open. DERIVED rather than synced with an effect: the
+  // deep link /creator-my-projects/:id/edit is already a piece of state living in the URL,
+  // and copying it into React state with a useEffect both trips
+  // react-hooks/set-state-in-effect and reopens the dialog the moment it is closed, since
+  // the id is still in the URL for one render.
+  //
+  // ⚠️ An id matching nothing deliberately opens NOTHING and leaves the creator on the
+  // list. GET /projects/my returns only their own projects, so "no match" covers a stale
+  // link, a typo and somebody else's project alike — and the list is the honest answer to
+  // all three. Do not make it an error state; this page cannot tell those cases apart.
+  const urlEditProject = editIdParam
+    ? projects.find(p => String(p.id) === editIdParam) ?? null
+    : null;
+  // The row button wins if both are somehow set — but the open dialog covers the list, so
+  // in practice only one of them can be chosen at a time.
+  const openEditProject = editTarget ?? urlEditProject;
 
   const shown =
     activeTab === "archived"
@@ -536,7 +558,17 @@ export default function CreatorMyProjects() {
 
   const modals = (
     <>
-      {editTarget && <EditProject project={editTarget} onClose={() => setEditTarget(null)} />}
+      {openEditProject && (
+        <EditProject
+          project={openEditProject}
+          onClose={() => {
+            setEditTarget(null);
+            // Drop the deep link so a refresh does not reopen the form, and so the back
+            // button goes where the creator came from rather than back into the dialog.
+            if (editIdParam) navigate("/creator-my-projects", { replace: true });
+          }}
+        />
+      )}
       {updateTarget && (
         <PostUpdateModal
           project={updateTarget}

@@ -78,6 +78,15 @@ function App() {
         <Route path="/creator-my-projects" element={
           <RequireAccess permission="canCreate"><CreatorMyProjects /></RequireAccess>
         } />
+        {/* Deep link to one project's edit form. It renders the SAME page rather than a
+            page of its own, because EditProject is a modal that needs a fully mapped
+            creator-shaped project: a standalone route would have to refetch it, remap it
+            and re-implement the loading, error and not-yours handling this page already
+            has. Closing the modal drops back to /creator-my-projects, which is where the
+            creator expects to land. */}
+        <Route path="/creator-my-projects/:id/edit" element={
+          <RequireAccess permission="canCreate"><CreatorMyProjects /></RequireAccess>
+        } />
         {/* The one creator route an admin KEEPS, because filing a project on behalf of
             a creator uses the same wizard. canOpenProjectWizard = creator OR admin. */}
         <Route path="/create-project" element={

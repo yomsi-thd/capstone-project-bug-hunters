@@ -264,9 +264,11 @@ export default function ProjectDetail() {
   // The signed-in user owns this project -> they edit it instead of investing.
   // Compares the real id (projects.creator_id), not the username as the old mock did.
   const isOwner = isLoggedIn && p.ownerId != null && user?.id === p.ownerId;
-  // TODO: deep-link to edit this exact project once a backed edit route exists;
-  // for now send the creator to their project management page.
-  const goToEdit = () => navigate("/creator-my-projects");
+  // Deep-links to THIS project's edit form (route added 2026-08-27). It still lands on
+  // the My Projects page — /creator-my-projects/:id/edit renders that page and opens the
+  // dialog — so closing the form leaves the creator somewhere useful rather than on a
+  // dead-end screen.
+  const goToEdit = () => navigate(`/creator-my-projects/${p.id}/edit`);
 
   const tabs = [
     { id: "about", label: "About" },
