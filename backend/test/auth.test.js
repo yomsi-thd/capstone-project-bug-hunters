@@ -94,47 +94,38 @@ describe("POST /api/auth/login", () => {
     });
 
     /**
-     * A REAL BUG, recorded rather than fixed here.
+     * The regression test for a real bug, FIXED 2026-08-27.
      *
-     * generateRefreshToken signs { id, roles } only, so `iat` is the sole thing that
-     * changes between two sign-ins by the same account — and it has one-second
-     * resolution. Two logins inside the same second therefore produce a byte-identical
-     * JWT, which collides with the UNIQUE index on refresh_tokens.token.
+     * generateRefreshToken used to sign { id, roles } only, so `iat` — one-second
+     * resolution — was the sole thing that changed between two sign-ins by the same
+     * account. Two logins inside the same second produced a byte-identical JWT, which
+     * collided with the UNIQUE index on refresh_tokens.token and failed a password that
+     * was correct. Reachable by double-clicking SIGN IN, or by two devices at once.
      *
-     * What the user sees is a failure on a password that is correct. Reachable by
-     * double-clicking SIGN IN, or by two devices signing in together.
-     *
-     * ⚠️ The STATUS changed with the error contract, and the change is an improvement
-     * rather than a fix. It used to be 401 carrying the constraint name
-     * "refresh_tokens_token_key" straight to the browser; now the controller no longer
-     * catches it, so it reaches errorHandler as an unexpected error and answers 500 with
-     * a generic sentence. The leak is gone. The bug is not.
-     *
-     * It is left alone because this pass is explicitly not a behaviour change. This test
-     * is what stops it being buried, and what will fail loudly on the day it is fixed
-     * properly — a jti in the payload, or an upsert on the token.
+     * The fix is a `jti` (via jwt.sign's `jwtid`), so a token is unique whatever the
+     * clock says. This test used to assert the FAILURE, to stop the bug being buried;
+     * it now asserts the fix, and it is the thing that catches a future "tidy-up" that
+     * drops the jti and silently brings the collision back.
      */
-    it("fails on a correct password when the same account signs in twice in one second", async () => {
+    it("lets the same account sign in six times inside one second", async () => {
         const email = uniqueEmail("login-twice");
 
         await request(app).post("/api/auth/register").send({ fullName: "T", email, password: PASSWORD });
 
-        // Six sign-ins back to back take well under two seconds, so at least two of them
-        // must share a second and collide. Asserting on a single pair instead would make
-        // this test depend on which side of a second boundary it happened to start.
+        // Six back to back take well under two seconds, so several must share a second.
         const attempts = [];
 
         for (let i = 0; i < 6; i += 1) {
             attempts.push(await request(app).post("/api/auth/login").send({ email, password: PASSWORD }));
         }
 
-        const rejected = attempts.filter((res) => res.status !== 200);
+        expect(attempts.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200]);
 
-        expect(attempts.some((res) => res.status === 200)).toBe(true);
-        expect(rejected.length).toBeGreaterThan(0);
-        expect(rejected[0].status).toBe(500);
-        // The constraint name used to reach the browser. It must not any more.
-        expect(JSON.stringify(rejected[0].body)).not.toContain("refresh_tokens_token_key");
+        // Every sign-in must be a SEPARATE session. Identical strings would mean the
+        // second login silently overwrote the first device's token rather than colliding.
+        const tokens = attempts.map((res) => res.body.refreshToken);
+
+        expect(new Set(tokens).size).toBe(6);
     });
 
     it("401 on a wrong password", async () => {
