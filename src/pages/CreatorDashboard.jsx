@@ -88,18 +88,13 @@ export default function CreatorDashboard() {
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-            <div>
-              <h1 className="text-xl md:text-[22px] font-extrabold text-gray-900 m-0">Dashboard Overview</h1>
-              <p className="text-[13px] text-gray-400 mt-1">Track your campaign's performance and manage your active projects.</p>
-            </div>
-            {/* Same placement as My Projects: next to the title, not in the sidebar. */}
-            <button
-              onClick={() => navigate("/create-project")}
-              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2.5 text-[12px] font-bold tracking-wide cursor-pointer transition-colors shrink-0"
-            >
-              ⊕ NEW PROJECT
-            </button>
+          {/* NEW PROJECT used to sit beside this title. It went on 2026-08-28 when the
+              admins' CREATE FOR A CREATOR moved onto the nav bar: START A PROJECT is
+              already there for creators, on every page, so a second copy here was the
+              odd one out. The nav bar is now the one way into the wizard. */}
+          <div className="mb-6">
+            <h1 className="text-xl md:text-[22px] font-extrabold text-gray-900 m-0">Dashboard Overview</h1>
+            <p className="text-[13px] text-gray-400 mt-1">Track your campaign's performance and manage your active projects.</p>
           </div>
 
           {/* Top stats */}

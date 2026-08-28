@@ -458,22 +458,14 @@ export default function CreatorMyProjects() {
 
   const projectContent = (
     <div className="max-w-5xl mx-auto p-4 sm:p-8">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-6">
-        <div>
-          {/* Getting back to the dashboard is the sidebar's job now. */}
-          <h1 className="text-[22px] sm:text-[26px] font-extrabold text-gray-900 m-0">My Projects</h1>
-          <p className="text-[13px] text-gray-400 mt-1">Manage your ongoing research and creative initiatives.</p>
-        </div>
-
-        {/* NEW PROJECT sits with the page title rather than in the sidebar, which is now
-            purely navigation. NEW UPDATE did not survive at all: an update belongs to one
-            project, and every card carries its own UPDATE button. */}
-        <button
-          onClick={() => navigate("/create-project")}
-          className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2.5 text-[12px] font-bold tracking-wide cursor-pointer transition-colors shrink-0"
-        >
-          ⊕ NEW PROJECT
-        </button>
+      {/* Getting back to the dashboard is the sidebar's job now. NEW PROJECT used to sit
+          beside this title; it went on 2026-08-28, when CREATE FOR A CREATOR moved onto
+          the nav bar and START A PROJECT was already there for creators on every page.
+          NEW UPDATE never survived at all: an update belongs to one project, and every
+          card carries its own UPDATE button. */}
+      <div className="mb-6">
+        <h1 className="text-[22px] sm:text-[26px] font-extrabold text-gray-900 m-0">My Projects</h1>
+        <p className="text-[13px] text-gray-400 mt-1">Manage your ongoing research and creative initiatives.</p>
       </div>
 
       {postedFor && (

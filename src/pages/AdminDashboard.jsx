@@ -197,19 +197,11 @@ export default function AdminDashboard() {
       <div className="flex-1 flex flex-col min-w-0">
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
-          {/* The button sits beside the page title, where CreatorSidebar already puts
-              NEW PROJECT — not in the sidebar, which lists destinations rather than
-              actions. An admin owns no projects, so the wizard it opens always files
-              the project under a creator they pick in step 1. */}
-          <div className="flex flex-wrap items-start justify-between gap-3 mb-1">
-            <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900">Project Management</h1>
-            <button
-              onClick={() => navigate("/create-project")}
-              className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2.5 text-[12px] font-bold tracking-wide cursor-pointer transition-colors shrink-0"
-            >
-              + CREATE FOR A CREATOR
-            </button>
-          </div>
+          {/* CREATE FOR A CREATOR used to sit here beside the title. It moved to the
+              nav bar on 2026-08-28 so it is reachable from every page rather than only
+              this one — see Header, where it is gated on canCreateForOthers next to the
+              creators' START A PROJECT. Don't add a second copy back here. */}
+          <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900 mb-1">Project Management</h1>
           <p className="text-[14px] text-gray-400 mb-7">Oversee and manage all academic crowdfunding initiatives.</p>
 
           {loading && (
