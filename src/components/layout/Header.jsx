@@ -47,6 +47,11 @@ export default function Header(props = {}) {
   // Role-derived visibility: only Creators start projects; only Backers/Admins
   // hold a Class Coin balance.
   const canCreate = pick(props.canCreate, auth.canCreate);
+  // An admin owns nothing, so their way into the wizard is worded differently: the
+  // project is filed under a creator they pick in step 1. The two gates are mutually
+  // exclusive (an ADMIN account may hold no other role since 2026-08-24), so nobody
+  // ever sees both buttons — don't add an `&& !canCreate` to "make sure".
+  const canCreateForOthers = pick(props.canCreateForOthers, auth.canCreateForOthers);
   const showBalance = pick(props.showBalance, auth.canInvest);
   // Search only belongs on pages with a project catalogue to search (Discover).
   // Defaults to true for backward compatibility; pages without a searchable
@@ -159,6 +164,12 @@ export default function Header(props = {}) {
                 className="shrink-0 rounded-[5px] bg-brand px-4 py-2 text-[13px] font-bold tracking-[0.03em] text-white no-underline transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_3px_8px_rgba(204,0,0,0.3)]"
               >START A PROJECT</Link>
             )}
+            {canCreateForOthers && (
+              <Link
+                to="/create-project"
+                className="shrink-0 rounded-[5px] bg-brand px-4 py-2 text-[13px] font-bold tracking-[0.03em] text-white no-underline transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_3px_8px_rgba(204,0,0,0.3)]"
+              >CREATE FOR A CREATOR</Link>
+            )}
             <div className="flex shrink-0 items-center gap-1.5">
               <Avatar name={userName} size={30} max={1} fallback="U" />
               <Link
@@ -197,6 +208,12 @@ export default function Header(props = {}) {
                 to="/create-project"
                 className="rounded-[5px] bg-brand px-3 py-[7px] text-[12px] font-bold whitespace-nowrap text-white no-underline transition-colors duration-150 hover:bg-brand-dark"
               >START A PROJECT</Link>
+            )}
+            {canCreateForOthers && (
+              <Link
+                to="/create-project"
+                className="rounded-[5px] bg-brand px-3 py-[7px] text-[12px] font-bold whitespace-nowrap text-white no-underline transition-colors duration-150 hover:bg-brand-dark"
+              >CREATE FOR A CREATOR</Link>
             )}
             <Avatar name={userName} size={30} max={1} fallback="U" />
           </>
@@ -268,6 +285,12 @@ export default function Header(props = {}) {
                   to="/create-project" onClick={() => setMenuOpen(false)}
                   className="block rounded-[5px] bg-brand p-2.5 text-center text-[13px] font-bold text-white no-underline transition-colors duration-150 hover:bg-brand-dark my-2.5"
                 >START A PROJECT</Link>
+              )}
+              {isMobile && canCreateForOthers && (
+                <Link
+                  to="/create-project" onClick={() => setMenuOpen(false)}
+                  className="block rounded-[5px] bg-brand p-2.5 text-center text-[13px] font-bold text-white no-underline transition-colors duration-150 hover:bg-brand-dark my-2.5"
+                >CREATE FOR A CREATOR</Link>
               )}
               <Link
                 to="/account" onClick={() => setMenuOpen(false)}
