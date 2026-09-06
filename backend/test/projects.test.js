@@ -36,6 +36,10 @@ beforeAll(async () => {
     secondAdmin = await makeUser({ roles: ["ADMIN"] });
 });
 
+// ⚠️ Since 2026-09-06 every POST here also has to pass the SEMESTER gate. It passes
+// silently because globalSetup guarantees one semester contains today; the gate's own
+// tests (409 in the gap, which semester a project is filed under) live in
+// semesters.test.js, which is the file set up to rewrite that table safely.
 describe("POST /api/projects", () => {
     it("201 for a creator, and the project starts PENDING", async () => {
         const res = await as(creator.token).post("/api/projects").send(validBody());
@@ -121,14 +125,19 @@ describe("POST /api/projects", () => {
         expect(Number(res.body.project.created_by_admin_id)).toBe(admin.id);
     });
 
-    it("422 when end_date is not after start_date", async () => {
+    // Replaced the "422 when end_date is not after start_date" test on 2026-09-06.
+    // That rule is gone with resolveCampaignDates: there is no per-project campaign
+    // window to validate any more, and the schema is loose, so the two fields are now
+    // ignored rather than refused. A browser tab left open across the deploy still
+    // submits successfully, which is the reason they are ignored rather than rejected.
+    it("ignores start_date / end_date instead of refusing them", async () => {
         const res = await as(creator.token)
             .post("/api/projects")
             .send(validBody({ start_date: "2026-09-01", end_date: "2026-08-01" }));
 
-        expect(res.status).toBe(422);
-        expect(res.body.code).toBe("VALIDATION_FAILED");
-        expect(res.body.message).toBe("end_date must be after start_date.");
+        expect(res.status).toBe(201);
+        expect(res.body.project.start_date).toBeNull();
+        expect(res.body.project.end_date).toBeNull();
     });
 
     // Support levels are validated before the transaction opens, so a bad level costs

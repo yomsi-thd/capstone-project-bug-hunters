@@ -59,8 +59,12 @@ const createProjectSchema = z.looseObject({
     // forbidden depends on the caller's role, which is resolveOwnership's decision -
     // it has to look the target account up, so it cannot live here.
     creator_id: z.union([z.number(), z.string()]).nullish(),
-    start_date: z.string().optional(),
-    end_date: z.string().optional(),
+    // ⚠️ NO start_date / end_date, and no semester_id either. Removed 2026-09-06: a
+    // project's closing date is its semester's, and the semester is decided by
+    // semesterService from the day it is filed. Nothing the caller sends can change
+    // it. The schema is `looseObject`, so an old client still sending those three
+    // fields is not refused - they are simply ignored, which is what keeps this from
+    // breaking a browser tab left open across the deploy.
 });
 
 /**

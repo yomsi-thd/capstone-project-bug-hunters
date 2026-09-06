@@ -1,5 +1,6 @@
 const projectRepository = require("../repositories/projectRepository");
 const userRepository = require("../repositories/userRepository");
+const semesterService = require("./semesterService");
 const tierRepository = require("../repositories/tierRepository");
 const withTransaction = require("../db/withTransaction");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
@@ -18,31 +19,6 @@ const { normaliseTierBatch } = require("./tierService");
  * ⚠️ The ROUTES did not move. A comment is still POST /projects/:id/comments. This
  * split is entirely internal and the frontend cannot tell that it happened.
  */
-
-const DEFAULT_CAMPAIGN_DAYS = 30;
-
-function resolveCampaignDates(data) {
-
-    const start = data.start_date ? new Date(data.start_date) : new Date();
-
-    if (Number.isNaN(start.getTime())) {
-        throw validationFailed("start_date is not a valid date.");
-    }
-
-    const end = data.end_date
-        ? new Date(data.end_date)
-        : new Date(start.getTime() + DEFAULT_CAMPAIGN_DAYS * 24 * 60 * 60 * 1000);
-
-    if (Number.isNaN(end.getTime())) {
-        throw validationFailed("end_date is not a valid date.");
-    }
-
-    if (end <= start) {
-        throw validationFailed("end_date must be after start_date.");
-    }
-
-    return { start, end };
-}
 
 /**
  * Who ends up OWNING the project, and who gets recorded as having filed it.
@@ -108,7 +84,16 @@ async function resolveOwnership(userId, roles, data) {
 // Create project
 async function createProject(userId, roles, data) {
 
-    const { start, end } = resolveCampaignDates(data);
+    // The semester gate, checked before anything is written. A project belongs to a
+    // teaching period, so there has to be one open to file it into — and in the gap
+    // between two the refusal names the date the next one starts.
+    //
+    // ⚠️ This REPLACED resolveCampaignDates + DEFAULT_CAMPAIGN_DAYS (deleted 2026-09-06),
+    // which gave every project its own 30-day window. That per-project deadline was the
+    // funding framing the client asked us to remove, one layer below where it showed on
+    // screen. A project's closing date is its SEMESTER's end_date now, and nothing
+    // writes projects.start_date / end_date any more.
+    const semester = await semesterService.requireOpenSemester();
     const ownership = await resolveOwnership(userId, roles, data);
 
     const project = {
@@ -124,8 +109,10 @@ async function createProject(userId, roles, data) {
         image_url: data.image_url,
         status: "PENDING",
         team_members: data.team_members || [],
-        start_date: start,
-        end_date: end,
+        // Taken from the open semester, never from the request. A creator does not get
+        // to choose which teaching period their project counts towards, and neither
+        // does an admin filing on their behalf - same reasoning as creator_id.
+        semester_id: semester.id,
         // The project story, split the way ProjectDetail renders it. `description`
         // stays the short blurb used on the Discover cards; these three are the long
         // form. All optional — a project with none of them just shows the blurb.

@@ -19,8 +19,12 @@ async function createProject(project, client = pool) {
             image_url,
             status,
             team_members,
-            start_date,
-            end_date,
+            -- The teaching period this project counts towards, decided by
+            -- semesterService from whichever semester is open on the day. It replaced
+            -- start_date / end_date here on 2026-09-06: those columns are still on the
+            -- table, holding the old per-project 30-day window for rows created between
+            -- 2026-08-06 and then, but nothing writes them any more.
+            semester_id,
             challenge,
             solution,
             funding_usage,
@@ -29,7 +33,7 @@ async function createProject(project, client = pool) {
             video_url,
             created_by_admin_id
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
         RETURNING *
         `,
         [
@@ -42,8 +46,7 @@ async function createProject(project, client = pool) {
             project.image_url,
             project.status,
             JSON.stringify(project.team_members),
-            project.start_date,
-            project.end_date,
+            project.semester_id,
             project.challenge,
             project.solution,
             project.funding_usage,

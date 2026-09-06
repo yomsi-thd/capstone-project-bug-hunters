@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 
-import { app, pool } from "./helpers/factories.js";
+import { app, pool, makeUser, as } from "./helpers/factories.js";
 import semesterRepository from "../src/repositories/semesterRepository.js";
 
 // What schema.sql seeded, read once so it can be restored exactly.
@@ -23,6 +23,12 @@ let seeded = [];
 
 /** Replace the table with these rows. Offsets are whole days from today. */
 async function setSemesters(rows) {
+    // projects.semester_id has no ON DELETE action, so the default RESTRICT stands and
+    // a semester holding projects cannot be removed. That is the right behaviour for
+    // the real database and simply has to be unhooked here — the tests below file real
+    // projects against these fixtures. It only ever touches rows created earlier in the
+    // run, and nothing reads semester_id back out of them.
+    await pool.query("UPDATE projects SET semester_id = NULL");
     await pool.query("DELETE FROM semesters");
 
     for (const { name, from, to } of rows) {
@@ -34,7 +40,11 @@ async function setSemesters(rows) {
     }
 }
 
+let creator;
+
 beforeAll(async () => {
+    creator = await makeUser({ roles: ["CREATOR"] });
+
     const { rows } = await pool.query(
         `SELECT name,
                 TO_CHAR(start_date, 'YYYY-MM-DD') AS start_date,
@@ -112,6 +122,114 @@ describe("findOpenSemester / findBrowsableSemester", () => {
 
         expect((await semesterRepository.findOpenSemester()).name).toBe("Later start");
         expect((await semesterRepository.findBrowsableSemester()).name).toBe("Later start");
+    });
+});
+
+describe("findNextSemester", () => {
+    // The forward-looking one. It exists so a creator refused in the gap is told WHEN
+    // they can submit, rather than meeting a door with no sign on it.
+    it("in the gap: the semester that has not started yet", async () => {
+        await setSemesters([
+            { name: "Just ended", from: -100, to: -1 },
+            { name: "Next", from: 10, to: 100 },
+            { name: "The one after", from: 110, to: 200 },
+        ]);
+
+        const next = await semesterRepository.findNextSemester();
+
+        expect(next.name).toBe("Next");
+    });
+
+    // Null is a real answer, not a failure: after the last row on record there is no
+    // next semester until somebody inserts one. The caller has to word its refusal
+    // without a date rather than print `undefined`.
+    it("null when nothing is scheduled after today", async () => {
+        await setSemesters([{ name: "Just ended", from: -100, to: -1 }]);
+
+        await expect(semesterRepository.findNextSemester()).resolves.toBeNull();
+    });
+});
+
+describe("POST /api/projects - the semester gate", () => {
+    // These live here rather than in projects.test.js because they REWRITE the
+    // semesters table, and this file is the one set up to put it back.
+    const body = {
+        title: "A project filed against a semester",
+        description: "Short blurb.",
+        category: "ENGINEERING",
+        goal_amount: 5000,
+    };
+
+    it("201 inside a semester, filed under the open one", async () => {
+        await setSemesters([
+            { name: "Past", from: -200, to: -100 },
+            { name: "Now", from: -10, to: 10 },
+        ]);
+
+        const open = await semesterRepository.findOpenSemester();
+        const res = await as(creator.token).post("/api/projects").send(body);
+
+        expect(res.status).toBe(201);
+        expect(res.body.project.semester_id).toBe(open.id);
+    });
+
+    // 409, not 422: nothing about the request is malformed, the world is simply not
+    // in a state that accepts it — the same class as "this project is archived".
+    it("409 in the gap, and the message names the day it reopens", async () => {
+        await setSemesters([
+            { name: "Just ended", from: -100, to: -1 },
+            { name: "Next", from: 10, to: 100 },
+        ]);
+
+        const { rows } = await pool.query(
+            "SELECT TO_CHAR(start_date, 'YYYY-MM-DD') AS d FROM semesters WHERE name = 'Next'"
+        );
+
+        const res = await as(creator.token).post("/api/projects").send(body);
+
+        expect(res.status).toBe(409);
+        expect(res.body.code).toBe("CONFLICT");
+        expect(res.body.message).toContain(rows[0].d);
+    });
+
+    it("409 with no date, and no 'undefined', when no semester is scheduled", async () => {
+        await setSemesters([{ name: "Just ended", from: -100, to: -1 }]);
+
+        const res = await as(creator.token).post("/api/projects").send(body);
+
+        expect(res.status).toBe(409);
+        expect(res.body.message).not.toContain("undefined");
+        expect(res.body.message).toContain("not been scheduled");
+    });
+
+    it("creates nothing when it refuses", async () => {
+        await setSemesters([{ name: "Just ended", from: -100, to: -1 }]);
+
+        const before = await pool.query("select count(*)::int as n from projects");
+        await as(creator.token).post("/api/projects").send(body);
+        const after = await pool.query("select count(*)::int as n from projects");
+
+        expect(after.rows[0].n).toBe(before.rows[0].n);
+    });
+
+    // The semester is decided by the server from the day, exactly like creator_id is
+    // decided by the caller's role. A creator picking their own teaching period would
+    // let a project be filed into a semester whose results are already settled.
+    it("ignores a semester_id sent in the body", async () => {
+        await setSemesters([
+            { name: "Past", from: -200, to: -100 },
+            { name: "Now", from: -10, to: 10 },
+        ]);
+
+        const { rows } = await pool.query("SELECT id FROM semesters WHERE name = 'Past'");
+        const open = await semesterRepository.findOpenSemester();
+
+        const res = await as(creator.token)
+            .post("/api/projects")
+            .send({ ...body, semester_id: rows[0].id });
+
+        expect(res.status).toBe(201);
+        expect(res.body.project.semester_id).toBe(open.id);
     });
 });
 

@@ -75,6 +75,34 @@ async function findBrowsableSemester(client = pool) {
 }
 
 /**
+ * The next semester due to START, or null when none has been scheduled yet.
+ *
+ * ⚠️ This is NOT findBrowsableSemester's opposite and the two are easy to confuse.
+ * In the gap, `browsable` looks BACKWARDS (the one that just ended, so Discover still
+ * has something to show) while this one looks FORWARDS. It exists for one reason: a
+ * creator refused because no semester is open has to be told WHEN they can submit.
+ * A greyed-out control that explains nothing is the exact failure the team deleted
+ * across the app on 2026-08-18 and again with InvestBlockedNote on 2026-08-24.
+ *
+ * Null is a real answer — after the last semester on record (23 Jan 2027 today) there
+ * is no next one until somebody INSERTs it. The caller must word its message without
+ * a date rather than print `undefined`.
+ */
+async function findNextSemester(client = pool) {
+    const result = await client.query(
+        `
+        SELECT ${COLUMNS}
+        FROM semesters
+        WHERE start_date > CURRENT_DATE
+        ORDER BY start_date ASC
+        LIMIT 1;
+        `
+    );
+
+    return result.rows[0] || null;
+}
+
+/**
  * Every semester, newest first, for the picker on Discover.
  *
  * `is_browsable` marks exactly one row — the same row findBrowsableSemester returns,
@@ -104,4 +132,4 @@ async function findAll(client = pool) {
     return result.rows;
 }
 
-module.exports = { findOpenSemester, findBrowsableSemester, findAll };
+module.exports = { findOpenSemester, findBrowsableSemester, findNextSemester, findAll };

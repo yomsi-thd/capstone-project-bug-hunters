@@ -52,6 +52,22 @@ export async function setup() {
 
     try {
         await scoped.query(fs.readFileSync(SCHEMA_SQL, "utf8"));
+
+        // ⚠️ Guarantee that ONE semester contains today, whenever "today" happens to be.
+        //
+        // Since 2026-09-06 `POST /api/projects` refuses with 409 unless a semester is
+        // open, so every creation test in the suite silently depends on the wall clock
+        // falling inside one of the three rows schema.sql seeds. Those run out on
+        // 23 Jan 2027, and the failure would arrive as a dozen red tests across four
+        // files with nothing in the diff to explain them.
+        //
+        // Widening the latest already-started semester keeps that from ever happening,
+        // and deliberately does NOT insert a row: an extra overlapping semester would
+        // change what findOpenSemester answers and quietly weaken semesters.test.js.
+        await scoped.query(`
+            UPDATE semesters SET end_date = GREATEST(end_date, CURRENT_DATE + 30)
+            WHERE start_date = (SELECT MAX(start_date) FROM semesters WHERE start_date <= CURRENT_DATE);
+        `);
     } finally {
         await scoped.end();
     }
