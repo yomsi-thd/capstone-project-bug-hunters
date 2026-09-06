@@ -1,7 +1,7 @@
 const commentRepository = require("../repositories/commentRepository");
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, validationFailed } = require("../errors/AppError");
-const { isAdminRole, assertNotArchived, loadVisibleProject } = require("./projectAccess");
+const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
 const M = require("../validation/messages");
 
 // Comments are public to read and open to any signed-in user to write.
@@ -33,6 +33,9 @@ async function createComment(userId, projectId, data) {
     }
 
     assertNotArchived(project);
+    // The semester's own freeze. Posting is what closes; DELETING a comment stays open
+    // on both axes - abusive text does not become acceptable because a term ended.
+    assertSemesterOpen(project);
 
     let parentId = null;
 

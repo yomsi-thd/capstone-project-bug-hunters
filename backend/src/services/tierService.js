@@ -1,7 +1,7 @@
 const tierRepository = require("../repositories/tierRepository");
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
-const { isAdminRole, assertNotArchived, loadVisibleProject } = require("./projectAccess");
+const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
 
 const MAX_TIERS = 5;
 
@@ -118,6 +118,10 @@ async function loadProjectForTierWrite(projectId, userId, roles) {
     }
 
     assertNotArchived(project);
+    // Covers create, update AND delete, because all three come through here. Hiding a
+    // level is an EDIT of the project, not the removal of somebody's abusive text -
+    // which is why this one is gated where deleteComment is not.
+    assertSemesterOpen(project);
 
     return project;
 }

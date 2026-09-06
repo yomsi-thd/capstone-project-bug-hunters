@@ -3,10 +3,10 @@
  *
  * Design: docs/superpowers/specs/2026-09-06-semester-readonly-design.md
  *
- * This file grows in two steps. Step 1 (here) pins only that the reads REPORT whether
- * the semester has closed — no rule is enforced yet and no behaviour changed. Step 2
- * adds assertSemesterOpen and the tests for what it blocks and, just as importantly,
- * what it must NOT block.
+ * Two halves. The first pins that the reads REPORT whether the semester has closed; the
+ * second pins what assertSemesterOpen blocks and — just as importantly — what it must
+ * NOT block. The second half is the one that matters: nearly every way of getting this
+ * feature wrong is the rule applied one place too far.
  *
  * ⚠️ LIKE semesters.test.js, THIS FILE REWRITES THE `semesters` TABLE, and it is safe
  * for the same reasons: vitest runs one file at a time in one process, and what
@@ -17,7 +17,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import request from "supertest";
 
-import { app, pool, makeUser, makeProject, as } from "./helpers/factories.js";
+import { app, pool, makeUser, makeProject, makeTier, makeComment, balanceOf, as } from "./helpers/factories.js";
 
 let creator;
 let closedSemester;
@@ -185,5 +185,226 @@ describe("GET /api/projects/my reports the same three fields", () => {
         const res = await as(owner.token).get("/api/projects/my");
 
         expect(res.body.items.map(p => p.id)).toContain(old.id);
+    });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The rule itself.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("a project whose semester has ended", () => {
+    let owner;
+    let backer;
+    let admin;
+    let secondAdmin;
+
+    beforeAll(async () => {
+        owner = await makeUser({ roles: ["CREATOR"] });
+        backer = await makeUser({ roles: ["BACKER"], balance: 5000 });
+        admin = await makeUser({ roles: ["ADMIN"] });
+        secondAdmin = await makeUser({ roles: ["ADMIN"] });
+    });
+
+    // Fresh per test: several of these change the project, and one has to be able to
+    // prove that nothing changed.
+    const closedProject = (overrides = {}) =>
+        makeProject({ creatorId: owner.id, status: "APPROVED", semesterId: closedSemester.id, ...overrides });
+
+    describe("is frozen for writing", () => {
+        it("409 on invest, and neither the wallet nor the funding moves", async () => {
+            const project = await closedProject();
+
+            const before = await balanceOf(backer.id);
+            const res = await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+            const after = await balanceOf(backer.id);
+
+            expect(res.status).toBe(409);
+            expect(res.body.code).toBe("CONFLICT");
+            expect(res.body.message).toContain("read-only");
+            expect(after).toBe(before);
+
+            const { rows } = await pool.query("select current_amount from projects where id = $1", [project.id]);
+            expect(Number(rows[0].current_amount)).toBe(0);
+        });
+
+        it("409 on editing the project", async () => {
+            const project = await closedProject();
+
+            const res = await as(owner.token).put(`/api/projects/${project.id}`).send({ title: "Renamed" });
+
+            expect(res.status).toBe(409);
+        });
+
+        it("409 on posting a comment", async () => {
+            const project = await closedProject();
+
+            const res = await as(backer.token)
+                .post(`/api/projects/${project.id}/comments`)
+                .send({ body: "Still here?" });
+
+            expect(res.status).toBe(409);
+        });
+
+        it("409 on posting a project update", async () => {
+            const project = await closedProject();
+
+            const res = await as(owner.token)
+                .post(`/api/projects/${project.id}/updates`)
+                .send({ title: "News", body: "Something happened." });
+
+            expect(res.status).toBe(409);
+        });
+
+        // One check in loadProjectForTierWrite covers all three, so all three are pinned.
+        it("409 on creating, editing and deleting a support level", async () => {
+            const project = await closedProject();
+            const tier = await makeTier({ projectId: project.id });
+
+            const created = await as(owner.token)
+                .post(`/api/projects/${project.id}/tiers`)
+                .send({ name: "New level", min_amount: 200, bullets: ["Signals support"] });
+
+            const updated = await as(owner.token)
+                .put(`/api/projects/${project.id}/tiers/${tier.id}`)
+                .send({ name: "Renamed", min_amount: 150, bullets: ["Signals support"] });
+
+            const deleted = await as(owner.token).delete(`/api/projects/${project.id}/tiers/${tier.id}`);
+
+            expect([created.status, updated.status, deleted.status]).toEqual([409, 409, 409]);
+        });
+
+        // Locked because updateProject is locked: a creator who cannot fix what was
+        // rejected has nothing to resubmit. See the note in moderationService.
+        it("409 on resubmitting a rejected project", async () => {
+            const project = await closedProject({ status: "REJECTED" });
+
+            const res = await as(owner.token).patch(`/api/projects/${project.id}/resubmit`);
+
+            expect(res.status).toBe(409);
+        });
+    });
+
+    describe("is still fully readable", () => {
+        it("200 on the project, its comments, its updates and its levels - signed out", async () => {
+            const project = await closedProject();
+            await makeTier({ projectId: project.id });
+            await makeComment({ projectId: project.id, userId: backer.id });
+
+            const [detail, comments, updates, tiers] = await Promise.all([
+                request(app).get(`/api/projects/${project.id}`),
+                request(app).get(`/api/projects/${project.id}/comments`),
+                request(app).get(`/api/projects/${project.id}/updates`),
+                request(app).get(`/api/projects/${project.id}/tiers`),
+            ]);
+
+            expect([detail.status, comments.status, updates.status, tiers.status]).toEqual([200, 200, 200, 200]);
+            expect(comments.body.items.length).toBeGreaterThan(0);
+        });
+    });
+
+    // ⚠️ THE HALF THAT PROTECTS THE FEATURE FROM A TIDY-UP.
+    //
+    // Every test below goes red the moment somebody adds assertSemesterOpen "for
+    // consistency" to a place that must not have it. Read the reason before changing any
+    // of them to expect a 409.
+    describe("still allows the things that must never be blocked", () => {
+        it("an admin can APPROVE a project whose term already ended", async () => {
+            const project = await closedProject({ status: "PENDING" });
+
+            const res = await as(admin.token).patch(`/api/projects/${project.id}/approve`);
+
+            // A project left PENDING when the term closed would otherwise be stuck in the
+            // queue for ever. Approved, it simply belongs to that term's record.
+            expect(res.status).toBe(200);
+        });
+
+        it("an admin can REJECT a project whose term already ended", async () => {
+            const project = await closedProject({ status: "PENDING" });
+
+            const res = await as(secondAdmin.token)
+                .patch(`/api/projects/${project.id}/reject`)
+                .send({ note: "Out of scope." });
+
+            expect(res.status).toBe(200);
+        });
+
+        it("a comment can still be DELETED", async () => {
+            const project = await closedProject();
+            const comment = await makeComment({ projectId: project.id, userId: backer.id });
+
+            const res = await as(backer.token)
+                .delete(`/api/projects/${project.id}/comments/${comment.id}`);
+
+            // Abusive text does not become acceptable because a term ended - the same
+            // reasoning that keeps deletion open on an archived project.
+            expect(res.status).toBe(200);
+        });
+
+        it("a project update can still be DELETED", async () => {
+            // Posted while the term was open, and then the term ended.
+            const live = await makeProject({ creatorId: owner.id, status: "APPROVED", semesterId: openSemester.id });
+            const posted = await as(owner.token)
+                .post(`/api/projects/${live.id}/updates`)
+                .send({ title: "News", body: "Something happened." });
+
+            await pool.query("UPDATE projects SET semester_id = $1 WHERE id = $2", [closedSemester.id, live.id]);
+
+            const res = await as(owner.token)
+                .delete(`/api/projects/${live.id}/updates/${posted.body.update.id}`);
+
+            expect(res.status).toBe(200);
+        });
+
+        it("an admin can still ENDORSE it", async () => {
+            const project = await closedProject();
+
+            const res = await as(admin.token)
+                .patch(`/api/projects/${project.id}/endorse`)
+                .send({ endorsed: true });
+
+            // Curation, the same family as approving. Nothing about it belongs to the
+            // creator's editing rights.
+            expect(res.status).toBe(200);
+        });
+
+        it("it can still be ARCHIVED and RESTORED", async () => {
+            const project = await closedProject();
+
+            const archived = await as(admin.token)
+                .patch(`/api/projects/${project.id}/archive`)
+                .send({ reason: "Housekeeping." });
+
+            const restored = await as(admin.token).patch(`/api/projects/${project.id}/restore`);
+
+            // Two independent axes: the calendar closing a term must not take away the
+            // admin's ability to hide or unhide a project.
+            expect([archived.status, restored.status]).toEqual([200, 200]);
+        });
+    });
+
+    describe("while the semester is still open", () => {
+        it("everything the closed one refuses still works", async () => {
+            const live = await makeProject({
+                creatorId: owner.id,
+                status: "APPROVED",
+                semesterId: openSemester.id,
+            });
+
+            const edited = await as(owner.token).put(`/api/projects/${live.id}`).send({ title: "Renamed while open" });
+            const commented = await as(backer.token).post(`/api/projects/${live.id}/comments`).send({ body: "Nice." });
+            const posted = await as(owner.token).post(`/api/projects/${live.id}/updates`).send({ title: "News", body: "Body." });
+
+            expect([edited.status, commented.status, posted.status]).toEqual([200, 201, 201]);
+        });
+
+        // The COALESCE again, this time on the rule rather than on the read: an orphaned
+        // project must stay editable rather than be frozen by accident.
+        it("a project with no semester is not frozen either", async () => {
+            const orphan = await makeProject({ creatorId: owner.id, status: "APPROVED", semesterId: null });
+
+            const res = await as(owner.token).put(`/api/projects/${orphan.id}`).send({ title: "Still editable" });
+
+            expect(res.status).toBe(200);
+        });
     });
 });

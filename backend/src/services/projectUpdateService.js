@@ -1,7 +1,7 @@
 const projectUpdateRepository = require("../repositories/projectUpdateRepository");
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
-const { isAdminRole, assertNotArchived, loadVisibleProject } = require("./projectAccess");
+const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
 const M = require("../validation/messages");
 
 // Anyone can read a project's updates — they are published on the public project page.
@@ -45,6 +45,9 @@ async function createProjectUpdate(userId, roles, projectId, data) {
     }
 
     assertNotArchived(project);
+    // An update is a public post. Once the term is over there is no longer an audience
+    // to announce anything to. deleteProjectUpdate below stays open, like deleteComment.
+    assertSemesterOpen(project);
 
     // A project update is a public announcement on the project page. A rejected project
     // is not on Discover and has no backers, so the post would go nowhere — and worse,

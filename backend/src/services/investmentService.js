@@ -3,6 +3,7 @@ const classCoinRepository = require("../repositories/classCoinRepository");
 const tierRepository = require("../repositories/tierRepository");
 const withTransaction = require("../db/withTransaction");
 const { AppError, notFound, conflict, validationFailed } = require("../errors/AppError");
+const { assertSemesterOpen } = require("./projectAccess");
 
 // `tierId` is the support level the backer picked, and it is OPTIONAL — the modal
 // offers "No level — just support" and that is a first-class choice, not a fallback.
@@ -31,6 +32,18 @@ async function investProject(userId, projectId, amount, tierId = null) {
         if (project.archived_at) {
             throw conflict("This project has been archived and is no longer accepting investments.");
         }
+
+        // The second freeze axis, checked in the same place and for the same reason: the
+        // clock can pass the semester's end_date while an investment is in flight, and
+        // the right answer then is a rollback, not a transaction recorded against a term
+        // that has closed.
+        //
+        // ⚠️ The archived check above is a hand-written copy of projectAccess's
+        // assertNotArchived, kept because its wording speaks to a backer's wallet
+        // ("no longer accepting investments") where the shared one speaks to a creator
+        // ("Restore it first"). Losing that sentence would be a worse trade than the
+        // duplication. assertSemesterOpen has no such conflict, so it is imported.
+        assertSemesterOpen(project);
 
         // Resolved INSIDE the transaction, for the same reason archived_at is: the
         // creator can hide a level or raise its minimum while this investment is in

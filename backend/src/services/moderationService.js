@@ -1,6 +1,6 @@
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, conflict } = require("../errors/AppError");
-const { isAdminRole, assertNotArchived } = require("./projectAccess");
+const { isAdminRole, assertNotArchived, assertSemesterOpen } = require("./projectAccess");
 
 /**
  * The verdicts: approve, reject, resubmit, endorse.
@@ -86,6 +86,14 @@ async function resubmitProject(projectId, userId, roles) {
     }
 
     assertNotArchived(project);
+    // ⚠️ Resubmit is gated on the semester but approve and reject above deliberately are
+    // NOT, and the asymmetry is the point. A verdict still has to be reachable on a
+    // finished term or a PENDING project is stuck for ever. Resubmitting, on the other
+    // hand, is only useful if the creator can first FIX what was rejected - and
+    // updateProject is closed once the term ends, so this would be a button that changes
+    // state and achieves nothing. If editing on a closed semester is ever reopened, this
+    // line has to be reconsidered at the same time.
+    assertSemesterOpen(project);
 
     const isAdmin = isAdminRole(roles);
 

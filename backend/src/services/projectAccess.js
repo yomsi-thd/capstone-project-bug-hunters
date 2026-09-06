@@ -30,6 +30,39 @@ function assertNotArchived(project) {
 }
 
 /**
+ * A project whose SEMESTER has ended is read-only (the client's rule, 2026-09-06).
+ *
+ * The second freeze axis, and deliberately independent of the first. Archiving is
+ * something a PERSON does and it hides the project from Discover; a semester ending is
+ * something the CALENDAR does and the project stays perfectly visible under its own
+ * term. A project can be in both states at once, and each has to be checked on its own.
+ *
+ * ⚠️ Pure and synchronous, because `semester_closed` is computed by Postgres in
+ * projectRepository (findById / findByCreatorId) rather than derived here. NEVER add a
+ * lookup and a `new Date(...) < new Date()` to this function: `semesters.end_date` is a
+ * DATE column with no time of day, so building a Date from it reads a day early west of
+ * Greenwich, and `new Date()` is the SERVER's clock - UTC on Render, UTC+7 on a dev
+ * machine - so the two would lock a project at two different moments.
+ *
+ * ⚠️ A project with no semester is NOT locked (the COALESCE in that query). Failing open
+ * is the safer default: an orphaned project stays editable, where failing closed would
+ * silently freeze a live one.
+ *
+ * ⚠️ THIS MUST NOT BE ADDED TO approveProject OR rejectProject. A project still PENDING
+ * when its term ended has to remain reviewable, or it is stuck in the queue for ever -
+ * and once approved it simply belongs to that term's read-only record. Blocking those
+ * two looks like consistency and is the one change that breaks the feature.
+ */
+function assertSemesterOpen(project) {
+
+    if (project.semester_closed) {
+        throw conflict(
+            `${project.semester_name || "That semester"} has ended, so this project is now read-only.`
+        );
+    }
+}
+
+/**
  * Who may READ a project and everything hanging off it (its comments, its updates).
  *
  * Only APPROVED projects are public. A PENDING one has been vetted by nobody and a
@@ -85,6 +118,7 @@ async function loadVisibleProject(projectId, viewer) {
 module.exports = {
     isAdminRole,
     assertNotArchived,
+    assertSemesterOpen,
     assertVisibleTo,
     loadVisibleProject,
 };

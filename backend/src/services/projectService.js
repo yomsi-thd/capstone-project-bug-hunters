@@ -4,7 +4,7 @@ const semesterService = require("./semesterService");
 const tierRepository = require("../repositories/tierRepository");
 const withTransaction = require("../db/withTransaction");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
-const { isAdminRole, assertNotArchived, loadVisibleProject } = require("./projectAccess");
+const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
 const { normaliseTierBatch } = require("./tierService");
 
 /**
@@ -239,6 +239,9 @@ async function updateProject(projectId, userId, data) {
     }
 
     assertNotArchived(project);
+    // "Không sửa" - the client's words. Note this is what makes locking resubmit the
+    // right call: a creator who cannot edit has nothing to resubmit.
+    assertSemesterOpen(project);
 
     const updatedProject = {
         title: data.title ?? project.title,
