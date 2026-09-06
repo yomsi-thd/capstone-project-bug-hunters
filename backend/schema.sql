@@ -85,6 +85,50 @@ CREATE TABLE creator_requests (
 );
 
 
+-- ─── semesters ──────────────────────────────────────────────────────────────
+-- Added 2026-09-06. The teaching period a project belongs to, and the ONLY
+-- source of a project's closing date — projects.start_date/end_date used to hold
+-- a per-project 30-day campaign, which is exactly the funding framing the client
+-- asked us to remove (see the design spec for the quotes).
+--
+-- MUST be declared before `projects`, which references it: this file has to run
+-- top-to-bottom on an empty database, and backend/test/ builds its throwaway
+-- schema from here.
+--
+-- There is deliberately NO `is_current` column. "Open" and "browsable" are both
+-- derived from the dates by semesterService, for the same reason `archived_at`
+-- has no companion status column: a second copy of one fact drifts out of step.
+--
+-- There is also no constraint against overlapping ranges. An EXCLUDE USING gist
+-- would be heavy for three hand-entered rows; instead every resolver orders by
+-- start_date DESC LIMIT 1, so the answer stays deterministic even if two rows
+-- ever overlap.
+CREATE TABLE semesters (
+    id          SERIAL PRIMARY KEY,
+    -- Shown on the project card and in Discover's semester picker, e.g.
+    -- "Semester 2 2026". Free text: the university's naming is not ours to model.
+    name        VARCHAR(100) NOT NULL,
+    start_date  DATE         NOT NULL,
+    end_date    DATE         NOT NULL,
+    created_at  TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP,
+    CHECK (end_date > start_date)
+);
+
+-- The three 2026 teaching periods, supplied by the client on 2026-09-06.
+--
+-- ⚠️ SEMESTER 2 ENDS 19 SEP 2026 IN REALITY. It is seeded as 25 Oct here on
+-- purpose: the project demo is 20-22 Sep, and with the real date the whole
+-- platform would sit in the gap between semesters on the day — nothing
+-- investable, nothing creatable, Discover read-only. To an assessor that reads
+-- as a broken build, with no way to tell it apart from one.
+-- 25 Oct is the day before Semester 3 starts, so it closes the gap without
+-- overlapping. Put the real date back after the demo; it is one UPDATE.
+INSERT INTO semesters (name, start_date, end_date) VALUES
+    ('Semester 1 2026', DATE '2026-03-02', DATE '2026-05-23'),
+    ('Semester 2 2026', DATE '2026-06-29', DATE '2026-10-25'),  -- real end: 2026-09-19
+    ('Semester 3 2026', DATE '2026-10-26', DATE '2027-01-23');
+
+
 -- ─── projects ───────────────────────────────────────────────────────────────
 -- Renamed from `campaigns`; the sequence and primary key still carry the old
 -- name, which is why projects.id draws from campaigns_id_seq.
@@ -109,6 +153,12 @@ CREATE TABLE projects (
     -- only ever describes the CURRENT verdict — a stale note on an approved project
     -- would be worse than none.
     review_note       TEXT,
+    -- ⚠️ SUPERSEDED 2026-09-06 by semester_id below. These held a per-project
+    -- 30-day campaign window (projectService.resolveCampaignDates, now deleted);
+    -- a project's closing date is its SEMESTER's end_date now. The columns are
+    -- kept rather than dropped because rows created between 2026-08-06 and
+    -- 2026-09-06 hold real values and DROP COLUMN is not reversible. Nothing
+    -- writes them any more and nothing reads them. See known issue 9.
     start_date        DATE,
     end_date          DATE,
     -- NULLABLE, unlike its two jsonb siblings below. That asymmetry is what the live
@@ -160,11 +210,24 @@ CREATE TABLE projects (
     -- Required when an admin archives someone else's project — they cannot undo
     -- it themselves, so they are at least told why.
     archive_reason    TEXT,
+    -- Added 2026-09-06. The teaching period this project belongs to, assigned by
+    -- createProject from whichever semester is open on the day — a creator never
+    -- picks it, and neither does an admin filing on their behalf.
+    -- NULLABLE so the column could be added to the live database ahead of any
+    -- code that reads it, and dropped again in one statement. Every existing row
+    -- was backfilled to Semester 2 2026; see known issue 10 for the SET NOT NULL
+    -- that is recorded but deliberately not applied.
+    -- No ON DELETE action, so the default RESTRICT stands: a semester holding
+    -- projects must not be deletable. It is reference data, not a record.
+    semester_id       INTEGER       REFERENCES semesters(id),
     created_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_projects_archived ON projects (archived_at);
+-- GET /projects filters by semester on every Discover visit (the app's busiest
+-- query), so this one carries its weight.
+CREATE INDEX idx_projects_semester ON projects (semester_id);
 
 
 -- ─── project_tiers ──────────────────────────────────────────────────────────
@@ -397,3 +460,22 @@ CREATE INDEX idx_comments_project
 --    2026-08-26 explicitly touches no schema. Recorded here because this file
 --    said NOT NULL until that date, which quietly made the test database stricter
 --    than the real one.
+--
+-- 9. projects.start_date / end_date are dead as of 2026-09-06 — superseded by
+--    semester_id, and nothing reads or writes them any more. They are kept
+--    because rows created between 2026-08-06 and 2026-09-06 hold real values and
+--    DROP COLUMN cannot be undone. Drop them only once the team agrees the old
+--    campaign windows are of no further interest:
+--
+--      ALTER TABLE projects DROP COLUMN start_date, DROP COLUMN end_date;
+--
+-- 10. projects.semester_id is NULLABLE, and after the 2026-09-06 backfill no row
+--     holds NULL. It stayed nullable so the column could be added to the live
+--     database before any code read it, and removed again in one statement while
+--     the change was still in flight. Once the semester work has settled:
+--
+--       ALTER TABLE projects ALTER COLUMN semester_id SET NOT NULL;
+--
+--     Deliberately NOT applied yet — same reasoning as issue 8, and doing it now
+--     would make the test database stricter than production in the direction that
+--     hides bugs rather than catching them.
