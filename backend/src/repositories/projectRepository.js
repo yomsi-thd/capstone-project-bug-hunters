@@ -92,6 +92,40 @@ async function findAll() {
     return result.rows;
 }
 
+/**
+ * The teaching period a project belongs to, joined into the two reads that need it:
+ * findById (the detail page and every write that loads the project first) and
+ * findByCreatorId (My Projects).
+ *
+ * ⚠️ `semester_closed` IS COMPUTED BY POSTGRES, and that is the whole point.
+ *
+ * The obvious alternative - hand the service `end_date` and let it compare with
+ * `new Date()` - puts back the bug this table went to some trouble to avoid. `end_date`
+ * is a DATE column, so node-postgres reads it into a Date at LOCAL midnight: on the dev
+ * machine (UTC+7) `2026-10-25` becomes `2026-10-24T17:00:00Z`. And `new Date()` in Node
+ * is the SERVER's clock, which is UTC on Render and UTC+7 here - so the two would lock a
+ * project at two different moments. CURRENT_DATE settles it in one place, with the
+ * database's own calendar.
+ *
+ * ⚠️ COALESCE(..., false) is load-bearing. projects.semester_id is still nullable
+ * (schema known issue 10) and `NULL < CURRENT_DATE` is NULL, which is falsy by accident
+ * rather than by decision. Stated outright: a project belonging to no semester is NOT
+ * locked. Failing open is the safer default - locking a live project by accident is far
+ * worse than leaving an orphaned one editable.
+ *
+ * ⚠️ LEFT JOIN, never JOIN. A plain join would drop those same rows from the detail page
+ * entirely - the trap that would have emptied My Investments when tier_id was mostly
+ * NULL.
+ *
+ * `semester_end_date` goes out as a 'YYYY-MM-DD' string for the same reason
+ * semesterRepository does it: a string with no time of day has no timezone to be shifted
+ * by.
+ */
+const SEMESTER_COLUMNS = `
+               COALESCE(s.end_date < CURRENT_DATE, false) AS semester_closed,
+               s.name                                     AS semester_name,
+               TO_CHAR(s.end_date, 'YYYY-MM-DD')          AS semester_end_date`;
+
 // The PUBLIC catalogue behind Discover. `archived_at IS NULL` is the whole reason
 // archiving hides a project: this is the only list a backer browses from.
 // findAll (admin), findByCreatorId (My Projects) and findById (detail page) all keep
@@ -195,10 +229,12 @@ async function findById(id, client = pool) {
                    SELECT COUNT(*)::int
                    FROM comments c
                    WHERE c.project_id = p.id
-               ) AS comments_count
+               ) AS comments_count,
+               ${SEMESTER_COLUMNS}
         FROM projects p
         LEFT JOIN users u ON u.id = p.creator_id
         LEFT JOIN users a ON a.id = p.archived_by
+        LEFT JOIN semesters s ON s.id = p.semester_id
         WHERE p.id = $1
         `,
         [id]
@@ -229,9 +265,11 @@ async function findByCreatorId(userId) {
                    SELECT COUNT(*)::int
                    FROM comments c
                    WHERE c.project_id = p.id
-               ) AS comments_count
+               ) AS comments_count,
+               ${SEMESTER_COLUMNS}
         FROM projects p
         LEFT JOIN users a ON a.id = p.archived_by
+        LEFT JOIN semesters s ON s.id = p.semester_id
         WHERE p.creator_id = $1
         ORDER BY p.created_at DESC
         `,
