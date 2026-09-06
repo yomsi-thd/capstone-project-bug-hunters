@@ -102,6 +102,16 @@ async function findNextSemester(client = pool) {
     return result.rows[0] || null;
 }
 
+/** One semester by id, or null. Behind `?semester=` on Discover. */
+async function findById(id, client = pool) {
+    const result = await client.query(
+        `SELECT ${COLUMNS} FROM semesters WHERE id = $1;`,
+        [id]
+    );
+
+    return result.rows[0] || null;
+}
+
 /**
  * Every semester, newest first, for the picker on Discover.
  *
@@ -132,4 +142,4 @@ async function findAll(client = pool) {
     return result.rows;
 }
 
-module.exports = { findOpenSemester, findBrowsableSemester, findNextSemester, findAll };
+module.exports = { findOpenSemester, findBrowsableSemester, findNextSemester, findById, findAll };

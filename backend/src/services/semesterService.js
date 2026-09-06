@@ -1,5 +1,5 @@
 const semesterRepository = require("../repositories/semesterRepository");
-const { conflict } = require("../errors/AppError");
+const { conflict, notFound } = require("../errors/AppError");
 
 /**
  * Semester resolution — deliberately the ONLY place in the app that answers
@@ -39,6 +39,33 @@ function getBrowsableSemester(client) {
 
 function getNextSemester(client) {
     return semesterRepository.findNextSemester(client);
+}
+
+/**
+ * The semester named by `?semester=`, or a 404.
+ *
+ * ⚠️ 404 for BOTH a non-integer and an id that names nothing, which is the same answer
+ * numericParam gives every id in the path. An id that cannot exist names nothing, and
+ * keeping the two cases identical is the reasoning that already makes an unapproved
+ * project 404 rather than 403.
+ *
+ * The alternative - filtering by an unknown id and returning an empty catalogue - would
+ * report "this semester has no projects" for a semester that does not exist. That is the
+ * class of quiet lie the team spent 2026-08-18 deleting.
+ */
+async function requireSemester(id) {
+    // Not Number(): that accepts "12.5", " 7 " and "1e3", none of which is an id.
+    if (!/^\d+$/.test(String(id))) {
+        throw notFound("Semester not found");
+    }
+
+    const semester = await semesterRepository.findById(id);
+
+    if (!semester) {
+        throw notFound("Semester not found");
+    }
+
+    return semester;
 }
 
 function listSemesters() {
@@ -82,6 +109,7 @@ module.exports = {
     getOpenSemester,
     getBrowsableSemester,
     getNextSemester,
+    requireSemester,
     listSemesters,
     requireOpenSemester,
 };

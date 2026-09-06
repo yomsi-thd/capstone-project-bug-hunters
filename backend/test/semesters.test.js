@@ -2,10 +2,9 @@
  * Semester resolution (N1) and GET /api/semesters.
  *
  * ⚠️ THIS FILE REWRITES THE `semesters` TABLE. That is safe here and only here:
- * vitest.config.mjs runs one file at a time in one process, no other suite reads the
- * table yet, and every project the factories build leaves `semester_id` NULL, so the
- * RESTRICT foreign key never stands in the way. The seed from schema.sql is put back in
- * afterAll so a later file finds the schema as it was built.
+ * vitest.config.mjs runs one file at a time in one process, and the seed from
+ * schema.sql is put back in afterAll so a later file finds the schema as it was built.
+ * Every other suite only ever reads the semester the factories pick for it.
  *
  * Fixtures are written as OFFSETS FROM CURRENT_DATE rather than as fixed dates. Fixed
  * dates would make "today is inside a semester" a fact about the calendar, so the suite
@@ -15,7 +14,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import request from "supertest";
 
-import { app, pool, makeUser, as } from "./helpers/factories.js";
+import { app, pool, makeUser, makeProject, as } from "./helpers/factories.js";
 import semesterRepository from "../src/repositories/semesterRepository.js";
 
 // What schema.sql seeded, read once so it can be restored exactly.
@@ -230,6 +229,103 @@ describe("POST /api/projects - the semester gate", () => {
 
         expect(res.status).toBe(201);
         expect(res.body.project.semester_id).toBe(open.id);
+    });
+});
+
+describe("GET /api/projects - the semester filter", () => {
+    // Two approved projects, one in each of two semesters, so "the filter did nothing"
+    // and "the filter worked" cannot look the same.
+    let past;
+    let now;
+    let inPast;
+    let inNow;
+
+    beforeEach(async () => {
+        await setSemesters([
+            { name: "Past", from: -200, to: -100 },
+            { name: "Now", from: -10, to: 10 },
+        ]);
+
+        const { rows } = await pool.query("SELECT id, name FROM semesters ORDER BY start_date");
+        past = rows[0].id;
+        now = rows[1].id;
+
+        inPast = await makeProject({ creatorId: creator.id, status: "APPROVED", semesterId: past });
+        inNow = await makeProject({ creatorId: creator.id, status: "APPROVED", semesterId: now });
+    });
+
+    it("defaults to the browsable semester, and leaves the older term out", async () => {
+        const res = await request(app).get("/api/projects");
+
+        const ids = res.body.items.map((p) => p.id);
+
+        expect(ids).toContain(inNow.id);
+        expect(ids).not.toContain(inPast.id);
+    });
+
+    it("?semester=<old id> shows that term instead", async () => {
+        const res = await request(app).get(`/api/projects?semester=${past}`);
+
+        const ids = res.body.items.map((p) => p.id);
+
+        expect(ids).toContain(inPast.id);
+        expect(ids).not.toContain(inNow.id);
+    });
+
+    // 404, matching every other id in this API. Returning an empty catalogue would
+    // report "this term has no projects" about a term that does not exist.
+    it("404 for a semester id that is not a number", async () => {
+        const res = await request(app).get("/api/projects?semester=abc");
+
+        expect(res.status).toBe(404);
+        expect(res.body.code).toBe("NOT_FOUND");
+    });
+
+    it("404 for a numeric semester id that names nothing", async () => {
+        const res = await request(app).get("/api/projects?semester=99999999");
+
+        expect(res.status).toBe(404);
+    });
+
+    // The filter goes into the WHERE clause, so limit/offset shifted from $1/$2 to
+    // $2/$3. Getting that wrong throws rather than misbehaving quietly - but only on
+    // the paged path, which nothing on Discover uses today.
+    it("still pages, with the filter applied", async () => {
+        const res = await request(app).get(`/api/projects?semester=${now}&limit=1&offset=0`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.items).toHaveLength(1);
+        expect(res.body).toMatchObject({ limit: 1, offset: 0 });
+        // total is the COUNT for that semester alone, not the whole catalogue.
+        expect(res.body.items[0].semester_id).toBe(now);
+    });
+
+    it("in the gap: still serves the term that just ended", async () => {
+        await setSemesters([
+            { name: "Just ended", from: -100, to: -1 },
+            { name: "Next", from: 10, to: 100 },
+        ]);
+
+        const { rows } = await pool.query("SELECT id FROM semesters WHERE name = 'Just ended'");
+        const project = await makeProject({
+            creatorId: creator.id,
+            status: "APPROVED",
+            semesterId: rows[0].id,
+        });
+
+        const res = await request(app).get("/api/projects");
+
+        expect(res.status).toBe(200);
+        expect(res.body.items.map((p) => p.id)).toContain(project.id);
+    });
+
+    it("with no semesters at all: an empty catalogue, not an error", async () => {
+        await setSemesters([]);
+
+        const res = await request(app).get("/api/projects");
+
+        expect(res.status).toBe(200);
+        expect(res.body).toEqual({ items: [], total: 0, limit: null, offset: 0 });
     });
 });
 

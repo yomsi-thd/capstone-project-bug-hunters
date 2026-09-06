@@ -158,12 +158,42 @@ async function getAllProjects() {
     return await projectRepository.findAll();
 }
 
-async function getAllApprovedProjects({ limit = null, offset = 0 } = {}) {
+/**
+ * Discover's catalogue, ALWAYS scoped to one semester.
+ *
+ * `semester` is the raw `?semester=` value or null. Null means "the one Discover opens
+ * on", which is the most recently STARTED semester — not the open one. In the gap
+ * between two teaching periods there is no open semester, and Discover must still show
+ * the term that just finished rather than an empty page: no open semester blocks
+ * writing, never reading.
+ *
+ * ⚠️ An explicit id is looked up rather than trusted, so `?semester=abc` and
+ * `?semester=99999` both answer 404 instead of quietly reporting an empty term.
+ */
+async function getAllApprovedProjects({ semester = null, limit = null, offset = 0 } = {}) {
 
-    const items = await projectRepository.findAllApprovedProjects({ limit, offset });
+    const target =
+        semester == null
+            ? await semesterService.getBrowsableSemester()
+            : await semesterService.requireSemester(semester);
+
+    // No semester has started yet. Impossible with the real data, and it must still be
+    // an empty catalogue rather than a 500 on the landing page.
+    if (!target) {
+        return { items: [], total: 0 };
+    }
+
+    const items = await projectRepository.findAllApprovedProjects({
+        semesterId: target.id,
+        limit,
+        offset,
+    });
 
     // Only pay for the COUNT when a page was actually asked for.
-    const total = limit == null ? items.length : await projectRepository.countApprovedProjects();
+    const total =
+        limit == null
+            ? items.length
+            : await projectRepository.countApprovedProjects({ semesterId: target.id });
 
     return { items, total };
 }

@@ -100,7 +100,7 @@ async function findAll() {
 // `limit` is optional and there is deliberately no default. Discover loads the whole
 // catalogue and filters it client-side, so a default page size would silently reduce its
 // search box to the first page and report nothing wrong. See http/envelope.js.
-async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
+async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
         -- Named columns, NOT SELECT *, and the omissions are the point.
@@ -117,9 +117,16 @@ async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
         -- and cron-job.org aborts a response past its size cap - so the endpoint most
         -- likely to grow without warning was also the one holding the live demo awake.
         --
-        -- The list below is exactly what mappers.toCard reads. Adding a field to the
-        -- Discover card means adding it here too, which is the intended friction: it
-        -- makes the cost of carrying it visible at the point of choosing to.
+        -- The thirteen columns below are exactly what mappers.toCard reads. Adding a
+        -- field to the Discover card means adding it here too, which is the intended
+        -- friction: it makes the cost of carrying it visible at the point of choosing to.
+        --
+        -- semester_id joined that list on 2026-09-06 and is the one exception to "only
+        -- what the card renders" - the card shows the semester's NAME, not its id, and
+        -- there is deliberately NO JOIN to semesters here. The frontend has already
+        -- loaded GET /semesters for its picker, so it can name the id itself. This is
+        -- the app's hottest query; a join for one short string is a cost paid on every
+        -- keystroke in the search box.
         SELECT id,
                creator_id,
                title,
@@ -129,16 +136,18 @@ async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
                image_url,
                goal_amount,
                current_amount,
+               semester_id,
                start_date,
                end_date,
                created_at
         FROM projects
         WHERE status = 'APPROVED'
           AND archived_at IS NULL
+          AND semester_id = $1
         ORDER BY created_at DESC
-        ${limit == null ? "" : "LIMIT $1 OFFSET $2"};
+        ${limit == null ? "" : "LIMIT $2 OFFSET $3"};
         `,
-        limit == null ? [] : [limit, offset]
+        limit == null ? [semesterId] : [semesterId, limit, offset]
     );
 
     return result.rows;
@@ -146,14 +155,16 @@ async function findAllApprovedProjects({ limit = null, offset = 0 } = {}) {
 
 // Only ever called when a caller asked for a page - an unpaginated read already knows
 // its own total, and a second round trip for a number in hand would be waste.
-async function countApprovedProjects() {
+async function countApprovedProjects({ semesterId } = {}) {
     const result = await pool.query(
         `
         SELECT COUNT(*)::int AS total
         FROM projects
         WHERE status = 'APPROVED'
-          AND archived_at IS NULL;
-        `
+          AND archived_at IS NULL
+          AND semester_id = $1;
+        `,
+        [semesterId]
     );
 
     return result.rows[0].total;

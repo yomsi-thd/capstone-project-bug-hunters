@@ -32,6 +32,10 @@ const CARD_COLUMNS = [
     "image_url",
     "goal_amount",
     "current_amount",
+    // Added 2026-09-06. The one column here that the card does not render directly: it
+    // shows the semester's NAME, which the frontend resolves from GET /semesters rather
+    // than making this query JOIN for a short string on every keystroke.
+    "semester_id",
     "start_date",
     "end_date",
     "created_at",

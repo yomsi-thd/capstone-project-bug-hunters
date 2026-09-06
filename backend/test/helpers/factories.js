@@ -79,9 +79,31 @@ async function makeUser({ roles = ["BACKER"], balance = 5000, active = true, nam
     };
 }
 
+// The semester a project goes into by default.
+//
+// ⚠️ Deliberately NOT cached. semesters.test.js rewrites the table and restores it,
+// and because the ids are SERIAL the restored rows come back with NEW ones - a
+// remembered id would point at a deleted semester and every later makeProject would
+// fail on the foreign key. It is a three-row table; the lookup is free.
+async function openSemesterId() {
+    const { rows } = await pool.query(
+        `SELECT id FROM semesters
+         WHERE CURRENT_DATE BETWEEN start_date AND end_date
+         ORDER BY start_date DESC LIMIT 1`
+    );
+
+    return rows[0] ? rows[0].id : null;
+}
+
 /**
  * A project row, inserted directly so a test can start from any status without walking
  * the whole create → approve path first. Tests that are ABOUT that path use the API.
+ *
+ * ⚠️ It is filed under the OPEN semester unless a test says otherwise, because that
+ * is what createProject does. Leaving semester_id NULL would take the row out of
+ * GET /projects entirely (it filters by semester since 2026-09-06), so a test that had
+ * nothing to do with semesters would fail with an empty catalogue and no clue why.
+ * globalSetup guarantees one semester contains today, so this lookup always finds one.
  */
 async function makeProject({
     creatorId,
@@ -93,12 +115,15 @@ async function makeProject({
     archivedAt = null,
     archivedBy = null,
     category = "ENGINEERING",
+    semesterId,
 } = {}) {
+    const semester = semesterId === undefined ? await openSemesterId() : semesterId;
+
     const { rows } = await pool.query(
         `INSERT INTO projects
              (creator_id, title, description, goal_amount, current_amount, category,
-              status, created_by_admin_id, archived_at, archived_by, start_date, end_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_DATE, CURRENT_DATE + 30)
+              status, created_by_admin_id, archived_at, archived_by, semester_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
             creatorId,
@@ -111,6 +136,7 @@ async function makeProject({
             createdByAdminId,
             archivedAt,
             archivedBy,
+            semester,
         ]
     );
 

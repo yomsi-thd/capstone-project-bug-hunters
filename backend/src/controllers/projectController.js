@@ -35,7 +35,14 @@ const createProject = asyncHandler(async (req, res) => {
 const getAllApprovedProjects = asyncHandler(async (req, res) => {
     const { limit, offset } = pagination(req);
 
-    const { items, total } = await projectService.getAllApprovedProjects({ limit, offset });
+    // ?semester=<id> comes from Discover's picker. Read straight off req.query rather
+    // than through the pagination schema: it is not a paging parameter, and zod would
+    // answer 422 for a bad value where every other id in this API answers 404.
+    const { items, total } = await projectService.getAllApprovedProjects({
+        semester: req.query.semester ?? null,
+        limit,
+        offset,
+    });
 
     res.status(200).json(page(items, { total, limit, offset }));
 });
