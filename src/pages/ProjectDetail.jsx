@@ -14,7 +14,8 @@ import SupportLevels from "../components/project/SupportLevels";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
-import { toDetail, toProjectUpdate, toCommentThread, toTier } from "../api/mappers";
+import * as semesterApi from "../api/semesterApi";
+import { toDetail, toProjectUpdate, toCommentThread, toTier, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
 // Plain progress track for the detail-page sidebar (no % label — the sidebar
@@ -186,6 +187,30 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
+  // The semester this project was filed under, for the closing date in the sidebar.
+  // GET /projects/:id sends `semester_id` only, so the name and dates are looked up
+  // from the list - the same list Discover loads for its picker. Its own effect, for
+  // the same reason as the updates: the page reads fine without it.
+  const [semesters, setSemesters] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await semesterApi.getSemesters();
+        if (!cancelled) setSemesters(rows);
+      } catch {
+        if (!cancelled) setSemesters([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const semester =
+    p?.semesterId == null
+      ? null
+      : semesters.find(s => String(s.id) === String(p.semesterId)) ?? null;
+
   // Support levels, on their own endpoint for the same reason the updates are: a
   // failure here must not blank a page that reads perfectly well without them.
   // `tiersVersion` is bumped after a successful investment — backersCount on each level
@@ -347,7 +372,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} semester={semester} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -509,7 +534,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} semester={semester} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -607,7 +632,7 @@ function InvestBlockedNote({ isLoggedIn, from }) {
   );
 }
 
-function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
+function FundingSidebar({ p, semester, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
   const location = useLocation();
   return (
     // ⚠️ `sticky` is a PROP, not a breakpoint utility. On mobile and tablet this card is
@@ -636,9 +661,19 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
 
       <div className="mb-[22px] flex gap-6">
         <div>
-          {/* end_date exists in the DB but createProject never writes it -> usually null. */}
-          <div className="text-[20px] font-extrabold text-neutral-900">{p.stats.daysLeft ?? "—"}</div>
-          <div className="text-[12px] text-neutral-500">days to go</div>
+          {/* A DATE, not a countdown (client decision, 2026-09-06). A project closes
+              when its SEMESTER closes — there is no per-project deadline any more —
+              and "12 days to go" was part of the funding-drive framing the client
+              asked us to drop.
+              ⚠️ Rendered through formatSemesterDate, which reads the "YYYY-MM-DD"
+              string. Never build a Date from it: that prints the previous day for any
+              viewer west of Greenwich. */}
+          <div className="text-[20px] font-extrabold text-neutral-900">
+            {semester ? formatSemesterDate(semester.end_date) : "—"}
+          </div>
+          <div className="text-[12px] text-neutral-500">
+            {semester ? `closes · ${semester.name}` : "closing date"}
+          </div>
         </div>
         <div>
           {/* backers_count on GET /projects/:id — DISTINCT wallets, not transactions.

@@ -1,7 +1,12 @@
 import api from "./axios";
 
-export const getAllProjects = async () => {
-  const response = await api.get("/projects");
+// `semesterId` is optional. Omitted, the API answers with the semester Discover opens
+// on (the most recently started one), so a first visit needs no id at all and there is
+// no waterfall waiting for GET /semesters before the catalogue can load.
+export const getAllProjects = async (semesterId = null) => {
+  const response = await api.get("/projects", {
+    params: semesterId == null ? {} : { semester: semesterId },
+  });
 
   // The API answers list endpoints with { items, total, limit, offset }. The envelope
   // is unwrapped HERE so pages and mappers keep the plain array they were built

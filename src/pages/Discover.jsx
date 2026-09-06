@@ -5,12 +5,14 @@ import Footer from "../components/layout/Footer";
 import Tag from "../components/project/Tag";
 import ProjectCard from "../components/project/ProjectCard";
 import EmptyState from "../components/ui/EmptyState";
+import Badge from "../components/ui/Badge";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 // FILTERS / FILTER_TAGS are UI config, not data — they still come from the mock.
 import { FILTERS, FILTER_TAGS } from "../mock";
 import * as projectApi from "../api/projectApi";
-import { toCard } from "../api/mappers";
+import * as semesterApi from "../api/semesterApi";
+import { toCard, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
 function HeroCard({ project, style, showDesc, showFundingBar, canInvest, isOwner, onEdit }) {
@@ -110,21 +112,14 @@ const SORTS = [
     label: "Most funded",
     compare: (a, b) => b.funded - a.funded,
   },
-  {
-    id: "ending",
-    label: "Ending soon",
-    // daysLeft is null for every project created before 2026-08-06 (no end_date).
-    // Those go to the BACK: an unknown deadline is not the same as an imminent one,
-    // and sorting null as 0 would put the oldest projects at the front of a list
-    // that claims to show what closes first.
-    compare: (a, b) => {
-      if (a.daysLeft == null && b.daysLeft == null) return 0;
-      if (a.daysLeft == null) return 1;
-      if (b.daysLeft == null) return -1;
-      return a.daysLeft - b.daysLeft;
-    },
-  },
 ];
+
+// ⚠️ "Ending soon" was REMOVED on 2026-09-06, one step ahead of N3, and deliberately.
+// A project's closing date is its semester's now, and this grid shows one semester at a
+// time — so every card on screen closes on the same day and that sort could never
+// reorder anything. A control that responds and changes nothing is the exact thing the
+// 2026-08-18 pass went through the app deleting. "Most funded" goes with the rest of
+// the funding framing in N3.
 
 // Shared notice block for the loading / error / empty states.
 function StatusBlock({ title, detail, actionLabel, onAction }) {
@@ -167,6 +162,15 @@ export default function Discover() {
   const [loadError, setLoadError] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
+  // Every semester, for the picker. Loaded in parallel with the catalogue: the API
+  // defaults to the browsable semester when no id is sent, so the first page of results
+  // never waits on this request.
+  const [semesters, setSemesters] = useState([]);
+  // null = "whichever the API opens on". Only a user's choice ever sets it, which is
+  // what keeps the initial load to ONE projects request instead of a second one the
+  // moment the semester list lands.
+  const [semesterId, setSemesterId] = useState(null);
+
   const [activeFilter, setActiveFilter] = useState("ALL");
   const [sortId, setSortId] = useState("newest");
   const [showAll, setShowAll] = useState(false);
@@ -182,7 +186,7 @@ export default function Discover() {
       setLoading(true);
       setLoadError(null);
       try {
-        const rows = await projectApi.getAllProjects();
+        const rows = await projectApi.getAllProjects(semesterId);
         if (cancelled) return;
         // GET /projects now returns APPROVED rows only (findAllApprovedProjects), so
         // there is no client-side status filter here any more. Filtering in the browser
@@ -199,7 +203,32 @@ export default function Discover() {
       }
     })();
     return () => { cancelled = true; };
-  }, [reloadKey]);
+  }, [reloadKey, semesterId]);
+
+  // The semester list is its own effect so a failure here cannot blank the catalogue —
+  // the same reason ProjectDetail loads its updates separately. Without it the page
+  // simply has no picker, which is a page that still works.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await semesterApi.getSemesters();
+        if (!cancelled) setSemesters(rows);
+      } catch {
+        if (!cancelled) setSemesters([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Which semester the page is showing. `semesterId` is null until the visitor picks
+  // one, and the API's own default is the browsable semester — so the label comes from
+  // whichever row carries is_browsable, not from a guess.
+  const browsableSemester = semesters.find(s => s.is_browsable) ?? null;
+  const selectedSemester =
+    semesterId == null
+      ? browsableSemester
+      : semesters.find(s => String(s.id) === String(semesterId)) ?? null;
 
   // The backend has no notion of hero/trending, so derive both from the data:
   // Hero = the 3 newest projects, Trending = the 4 with the highest funded percentage.
@@ -291,6 +320,45 @@ export default function Discover() {
           `pad` is a runtime value from the breakpoint hook. */}
       <div className="mx-auto max-w-[1100px] [overflow-anchor:none]" style={{ padding: pad }}>
 
+        {/* The semester picker scopes the WHOLE page - hero, trending and the grid - so
+            it sits above all three rather than beside the tag chips.
+            ⚠️ It is also outside every loading / error / empty branch on purpose: a
+            semester with no projects would otherwise hide the only control that gets
+            the visitor back to the current one, which is a dead end reached in one
+            click. */}
+        {semesters.length > 0 && (
+          <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <label className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold tracking-[0.06em] text-neutral-500">
+                SEMESTER
+              </span>
+              <select
+                value={selectedSemester?.id ?? ""}
+                onChange={e => setSemesterId(e.target.value)}
+                className="cursor-pointer rounded-[5px] border border-neutral-200 bg-white px-2.5 py-[5px] text-[12px] font-semibold tracking-[0.04em] text-neutral-700 transition-all duration-150 hover:border-brand"
+              >
+                {semesters.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </label>
+
+            {selectedSemester && (
+              <span className="text-[12px] text-neutral-500">
+                {/* Both dates are rendered from their "YYYY-MM-DD" strings. A range,
+                    not "closes in N days": the countdown was part of the funding
+                    framing the client asked us to drop, and a range needs no tense -
+                    so a future semester is not described as though it had ended. */}
+                {formatSemesterDate(selectedSemester.start_date)} – {formatSemesterDate(selectedSemester.end_date)}
+              </span>
+            )}
+
+            {selectedSemester?.is_open && (
+              <Badge tone="success" size="sm">CURRENT</Badge>
+            )}
+          </div>
+        )}
+
         {loading && <StatusBlock title="Loading projects…" />}
 
         {!loading && loadError && (
@@ -304,8 +372,12 @@ export default function Discover() {
 
         {!loading && !loadError && projects.length === 0 && (
           <StatusBlock
-            title="No projects yet"
-            detail="No approved projects have been published yet. Once a creator submits a project and an admin approves it, it will show up here."
+            title="No projects this semester"
+            detail={
+              selectedSemester
+                ? `No approved projects have been published for ${selectedSemester.name}. Pick another semester above, or check back once a creator submits one and an admin approves it.`
+                : "No approved projects have been published yet. Once a creator submits a project and an admin approves it, it will show up here."
+            }
           />
         )}
 
@@ -371,7 +443,9 @@ export default function Discover() {
             className="lp-stagger grid gap-3.5"
             style={{ gridTemplateColumns: isDesktop ? "repeat(4, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr" }}
           >
-            {trending.map(p => <ProjectCard key={p.id} project={p} />)}
+            {trending.map(p => (
+              <ProjectCard key={p.id} project={p} semesterName={selectedSemester?.name ?? null} />
+            ))}
           </div>
         </div>
         </>
@@ -447,12 +521,14 @@ export default function Discover() {
               unmounts nothing, so without the remount the cards would silently
               swap places with no sign the control did anything. */}
           <div
-            key={`${activeFilter}|${sortId}|${isSearching ? "search" : "browse"}`}
+            key={`${activeFilter}|${sortId}|${semesterId ?? "default"}|${isSearching ? "search" : "browse"}`}
             className={`grid gap-3.5 ${isSearching ? "" : "lp-stagger"}`}
             style={{ gridTemplateColumns: isDesktop ? "repeat(3, 1fr)" : isTablet ? "repeat(2, 1fr)" : "1fr" }}
           >
             {visibleProjects.length > 0 ? (
-              visibleProjects.map(p => <ProjectCard key={p.id} project={p} />)
+              visibleProjects.map(p => (
+                <ProjectCard key={p.id} project={p} semesterName={selectedSemester?.name ?? null} />
+              ))
             ) : (
               <EmptyState
                 className="col-span-full py-12"

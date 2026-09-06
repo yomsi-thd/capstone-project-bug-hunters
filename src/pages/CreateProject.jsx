@@ -1224,7 +1224,13 @@ export default function CreateProject() {
     try {
       // The backend accepts: title, description, category, goal_amount, image_url,
       // team_members, challenge, solution, funding_usage, gallery, solution_bullets
-      // and video_url (plus start_date/end_date, which it defaults for us).
+      // and video_url.
+      //
+      // It also decides the SEMESTER itself, from the day of the submit - it is not
+      // sent from here and cannot be chosen. Outside a teaching period the request
+      // comes back 409 with a message naming the date the next one opens, which lands
+      // in `setMessage` below like any other server error. The draft is autosaved per
+      // account, so nothing typed is lost while waiting for that date.
       // The column is funding_usage; the form calls the field `funding`.
       await projectApi.createProject({
         title: basicData.title.trim(),

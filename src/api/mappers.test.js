@@ -3,6 +3,7 @@ import {
   toNumber,
   fundedPercent,
   daysLeftFrom,
+  formatSemesterDate,
   toCard,
   toDetail,
   toCreatorProject,
@@ -31,6 +32,7 @@ function projectRow(overrides = {}) {
     image_url: "https://example.test/drone.jpg",
     category: "ENGINEERING",
     status: "APPROVED",
+    semester_id: 2,
     start_date: null,
     end_date: null,
     created_at: "2026-08-05T02:45:00.000Z",
@@ -126,13 +128,17 @@ describe("toCard", () => {
       status: "APPROVED",
       ownerId: 14,
       createdAt: "2026-08-05T02:45:00.000Z",
-      // Null here because projectRow() has no end_date — Discover's "Ending soon"
-      // sort pushes those to the back rather than treating them as ending today.
+      semesterId: 2,
+      // Null here because projectRow() has no end_date. Nothing reads this any more:
+      // the closing date comes from the project's SEMESTER now, and Discover's
+      // "Ending soon" sort went with it (one semester per page = one closing date for
+      // every card on it). The field itself goes in N3 with the rest of the funding
+      // framing.
       daysLeft: null,
     });
   });
 
-  it("carries daysLeft so Discover can sort by which campaign closes first", () => {
+  it("still derives daysLeft from end_date, for the older rows that have one", () => {
     const future = new Date(Date.now() + 5 * 86_400_000).toISOString();
     expect(toCard(projectRow({ end_date: future })).daysLeft).toBe(5);
     // A closed campaign is 0, not a negative number.
@@ -156,6 +162,13 @@ describe("toCard", () => {
 });
 
 describe("toDetail", () => {
+  it("carries the semester id so the page can look up its closing date", () => {
+    expect(toDetail(projectRow()).semesterId).toBe(2);
+    // An older row filed before the column existed. The sidebar shows a dash rather
+    // than inventing a date.
+    expect(toDetail(projectRow({ semester_id: null })).semesterId).toBeNull();
+  });
+
   it("exposes numeric stats, not the raw strings", () => {
     const d = toDetail(projectRow());
     expect(d.stats.raised).toBe(500);
@@ -789,5 +802,32 @@ describe("parseAmount", () => {
 
   it("passes a number through untouched", () => {
     expect(parseAmount(1050)).toBe(1050);
+  });
+});
+
+describe("formatSemesterDate", () => {
+  // ⚠️ The whole point of this function. A semester's dates are `DATE` columns and
+  // arrive as plain strings; `new Date("2026-10-25").toLocaleDateString()` prints
+  // 24 Oct for any viewer west of Greenwich, which is the same family of bug as the
+  // investment dates that read a day early until the TIMESTAMPTZ migration.
+  it("reads the string and never builds a Date from it", () => {
+    expect(formatSemesterDate("2026-10-25")).toBe("25 Oct 2026");
+    expect(formatSemesterDate("2026-01-01")).toBe("1 Jan 2026");
+    expect(formatSemesterDate("2027-12-31")).toBe("31 Dec 2027");
+  });
+
+  it("returns an empty string for anything that is not a plain date", () => {
+    expect(formatSemesterDate(null)).toBe("");
+    expect(formatSemesterDate(undefined)).toBe("");
+    expect(formatSemesterDate("")).toBe("");
+    expect(formatSemesterDate("not-a-date")).toBe("");
+    // A full timestamp is deliberately refused rather than half-parsed: this function
+    // is only ever handed a DATE column, and accepting more would invite a caller to
+    // pass a created_at and get a date shifted by the viewer's zone.
+    expect(formatSemesterDate("2026-10-25T00:00:00.000Z")).toBe("");
+  });
+
+  it("returns an empty string for an impossible month", () => {
+    expect(formatSemesterDate("2026-13-01")).toBe("");
   });
 });

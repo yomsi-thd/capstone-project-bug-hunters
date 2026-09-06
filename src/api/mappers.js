@@ -35,6 +35,32 @@ function toTag(category) {
   return (category || "UNCATEGORIZED").toUpperCase();
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * "2026-10-25" -> "25 Oct 2026", by reading the string. Never through `new Date`.
+ *
+ * ⚠️ THIS IS NOT A STYLE CHOICE. A semester's dates are Postgres `DATE` columns, so
+ * they carry no time of day. `new Date("2026-10-25")` parses that as midnight UTC, and
+ * `toLocaleDateString()` then prints it in the VIEWER's zone — 24 Oct for anybody west
+ * of Greenwich. The API already goes to the trouble of sending these as plain strings
+ * (TO_CHAR in semesterRepository) precisely so no Date is ever constructed from them;
+ * building one here would put the bug back at the last possible moment.
+ *
+ * The team has paid for this family of bug once already: investment dates read a day
+ * early on 78% of rows until the TIMESTAMPTZ migration of 2026-08-21.
+ */
+export function formatSemesterDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
+  if (!match) return "";
+
+  const [, year, month, day] = match;
+  const name = MONTHS[Number(month) - 1];
+  if (!name) return "";
+
+  return `${Number(day)} ${name} ${year}`;
+}
+
 function formatDate(value) {
   if (!value) return "";
   const d = new Date(value);
@@ -96,6 +122,10 @@ export function toCard(row) {
     status: row.status,
     ownerId: row.creator_id,
     createdAt: row.created_at,
+    // The teaching period this project was filed under. The card shows the semester's
+    // NAME, which the page resolves from the list it already loaded for the picker —
+    // GET /projects deliberately does not JOIN semesters for one short string.
+    semesterId: row.semester_id ?? null,
     // Feeds Discover's "Ending soon" sort. Null for anything created before
     // 2026-08-06, when createProject started writing start_date/end_date — those sort
     // to the back rather than being mistaken for campaigns closing today.
@@ -112,6 +142,10 @@ export function toDetail(row) {
     tag: toTag(row.category),
     title: row.title,
     status: row.status,
+    // Same as toCard: the id only. ProjectDetail looks the name and closing date up
+    // from GET /semesters, so the closing date shown is the SEMESTER's, never the
+    // project's own superseded end_date.
+    semesterId: row.semester_id ?? null,
 
     // GET /projects/:id joins users for the name only — it is a public route, so the
     // creator's email is deliberately not exposed here (the admin routes return it).
