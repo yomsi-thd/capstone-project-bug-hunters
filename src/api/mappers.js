@@ -17,9 +17,12 @@ export function fundedPercent(currentAmount, goalAmount) {
   return Math.round((toNumber(currentAmount) / goal) * 100);
 }
 
-// createProject now writes start_date / end_date (defaulting to a 30-day window), so
-// this returns a real number for anything created after 2026-08-06. Projects created
-// before that still have both columns null and fall back to null here.
+// ⚠️ NOTHING READS THIS ANY MORE, and it is kept only until N3 removes it properly.
+// createProject stopped writing start_date / end_date on 2026-09-06 — a project closes
+// when its SEMESTER closes — so it returns null for every project filed since, and a
+// real number only for the rows created between 2026-08-06 and then. Discover's
+// "Ending soon" sort went at the same time: one semester per page means one closing
+// date for every card on it, so that control could not reorder anything.
 export function daysLeftFrom(endDate) {
   if (!endDate) return null;
   const end = new Date(endDate);
@@ -126,9 +129,8 @@ export function toCard(row) {
     // NAME, which the page resolves from the list it already loaded for the picker —
     // GET /projects deliberately does not JOIN semesters for one short string.
     semesterId: row.semester_id ?? null,
-    // Feeds Discover's "Ending soon" sort. Null for anything created before
-    // 2026-08-06, when createProject started writing start_date/end_date — those sort
-    // to the back rather than being mistaken for campaigns closing today.
+    // Legacy, unread: see daysLeftFrom above. The closing date shown to a reader now
+    // comes from the project's semester, not from this.
     daysLeft: daysLeftFrom(row.end_date),
   };
 }
@@ -163,6 +165,7 @@ export function toDetail(row) {
       funded: fundedPercent(row.current_amount, row.goal_amount),
       raised: toNumber(row.current_amount),
       goal: toNumber(row.goal_amount),
+      // Legacy, unread since 2026-09-06: the sidebar shows the SEMESTER's closing date.
       daysLeft: daysLeftFrom(row.end_date),
       // Distinct wallets that invested, not the number of transactions.
       backers: row.backers_count == null ? null : toNumber(row.backers_count),
