@@ -75,6 +75,30 @@ function formatDate(value) {
   });
 }
 
+/**
+ * The SECOND freeze axis, and deliberately not merged with the archive one above.
+ *
+ * Archiving is something a person DOES, and it hides the project from Discover. A
+ * semester ending is something the CALENDAR does, and the project stays visible under
+ * its own term — that is exactly the client's rule of 2026-09-06. A project can be in
+ * both states at once, so both are carried.
+ *
+ * ⚠️ `semesterClosed` is computed by Postgres (`COALESCE(end_date < CURRENT_DATE, false)`
+ * in projectRepository) and simply passed through. Never re-derive it here from
+ * `semesterEndDate`: that string is a DATE with no time of day, so `new Date(...)` reads
+ * a day early for any viewer west of Greenwich — the trap formatSemesterDate exists to
+ * avoid.
+ */
+function toSemesterFields(row) {
+  return {
+    semesterId: row.semester_id ?? null,
+    semesterName: row.semester_name || null,
+    // Kept as the raw 'YYYY-MM-DD' string. Render it with formatSemesterDate.
+    semesterEndDate: row.semester_end_date || null,
+    semesterClosed: Boolean(row.semester_closed),
+  };
+}
+
 // Archive is a SECOND axis, independent of `status`. A project can be APPROVED and
 // archived at the same time, which is why nothing here touches the status field.
 // "Archived" is `archived_at IS NOT NULL` on the row — there is no PUBLISHED/ARCHIVED
@@ -144,10 +168,10 @@ export function toDetail(row) {
     tag: toTag(row.category),
     title: row.title,
     status: row.status,
-    // Same as toCard: the id only. ProjectDetail looks the name and closing date up
-    // from GET /semesters, so the closing date shown is the SEMESTER's, never the
-    // project's own superseded end_date.
-    semesterId: row.semester_id ?? null,
+    // The closing date shown on this page is the SEMESTER's, never the project's own
+    // superseded end_date. GET /projects/:id joins the name and date in, so the page
+    // no longer loads the whole semester list just to look one up.
+    ...toSemesterFields(row),
 
     // GET /projects/:id joins users for the name only — it is a public route, so the
     // creator's email is deliberately not exposed here (the admin routes return it).
@@ -294,6 +318,9 @@ export function toCreatorProject(row) {
     // `status` above stays the moderation verdict. These describe visibility, and
     // My Projects lists archived cards in their own tab rather than hiding them.
     ...toArchiveFields(row),
+    // The other freeze axis. The card hides EDIT / UPDATE / RESUBMIT on a closed
+    // semester rather than offering buttons the API answers 409 to.
+    ...toSemesterFields(row),
   };
 }
 

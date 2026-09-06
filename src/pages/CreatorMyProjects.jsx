@@ -93,6 +93,10 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
   // An archived project keeps its verdict ("Active", "Pending Review"), so the funding
   // block below must not read as a live campaign — the archived branch takes over.
   const isArchived = Boolean(project.archived);
+  // The other freeze axis. A finished semester takes away EDIT / UPDATE / RESUBMIT
+  // exactly like archiving does — the backend refuses all three — but it does NOT hide
+  // the project from Discover, so the card must not borrow the archive wording.
+  const semesterEnded = Boolean(project.semesterClosed);
   const isActive = !isArchived && project.status === "Active";
   const isRejected = !isArchived && project.status === "Rejected";
 
@@ -211,6 +215,18 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
               archived project, and that refusal is exactly what keeps restoring safe
               (nothing can change between archive and restore, so no re-approval).
               Offering the buttons would only produce an error after the fact. */}
+          {/* Said once, above the buttons, because the buttons it explains are the ones
+              that are missing. A creator who worked on this project last term would
+              otherwise just find the card oddly bare. Suppressed while archived: that
+              banner already explains a stricter state. */}
+          {!isArchived && semesterEnded && (
+            <div className="mt-3 rounded-md border border-[#f0d9a0] bg-[#fff8e6] px-3 py-2.5 text-[12px] leading-normal text-[#7a5200]">
+              <strong>{project.semesterName || "That semester"} has ended.</strong>{" "}
+              This project is part of that semester&rsquo;s record now — it stays visible,
+              but it can no longer be edited or supported.
+            </div>
+          )}
+
           <div className="border-t border-gray-100 pt-4 mt-auto flex flex-wrap gap-2.5">
             {isArchived ? (
               <>
@@ -228,6 +244,25 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                   className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
                 >
                   PROJECT DETAILS
+                </button>
+              </>
+            ) : semesterEnded ? (
+              /* PROJECT DETAILS and ARCHIVE survive; EDIT, UPDATE and RESUBMIT do not,
+                 because the API answers 409 to all three. ARCHIVE stays on purpose: the
+                 two axes are independent, and a creator must still be able to take an old
+                 project down. */
+              <>
+                <button
+                  onClick={() => onDetails(project)}
+                  className="bg-white border border-gray-300 text-gray-600 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                >
+                  PROJECT DETAILS
+                </button>
+                <button
+                  onClick={() => onArchive(project)}
+                  className="bg-white border border-gray-300 text-gray-500 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 hover:text-gray-700 transition-colors ml-auto"
+                >
+                  🗄 ARCHIVE
                 </button>
               </>
             ) : (

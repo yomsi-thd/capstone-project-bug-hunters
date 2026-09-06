@@ -14,7 +14,6 @@ import SupportLevels from "../components/project/SupportLevels";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
-import * as semesterApi from "../api/semesterApi";
 import { toDetail, toProjectUpdate, toCommentThread, toTier, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
@@ -187,30 +186,6 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // The semester this project was filed under, for the closing date in the sidebar.
-  // GET /projects/:id sends `semester_id` only, so the name and dates are looked up
-  // from the list - the same list Discover loads for its picker. Its own effect, for
-  // the same reason as the updates: the page reads fine without it.
-  const [semesters, setSemesters] = useState([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const rows = await semesterApi.getSemesters();
-        if (!cancelled) setSemesters(rows);
-      } catch {
-        if (!cancelled) setSemesters([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const semester =
-    p?.semesterId == null
-      ? null
-      : semesters.find(s => String(s.id) === String(p.semesterId)) ?? null;
-
   // Support levels, on their own endpoint for the same reason the updates are: a
   // failure here must not blank a page that reads perfectly well without them.
   // `tiersVersion` is bumped after a successful investment — backersCount on each level
@@ -331,7 +306,15 @@ export default function ProjectDetail() {
         {/* An archived project stays readable rather than 404ing: the link may already
             be shared, and a backer who funded it still reaches this page from My
             Investments. It just goes read-only. */}
-        {p.archived && <ArchivedBanner p={p} isOwner={isOwner} />}
+        {/* ⚠️ Two freeze axes, but only ONE banner. A project can be archived AND belong
+            to a finished semester; when it is, archive is the one worth saying, because
+            it is the stricter state (hidden from Discover) and the only one with an
+            action attached. Two amber blocks stacked read as a page that has gone wrong. */}
+        {p.archived ? (
+          <ArchivedBanner p={p} isOwner={isOwner} />
+        ) : p.semesterClosed ? (
+          <SemesterEndedBanner p={p} />
+        ) : null}
 
         {investError && (
           <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-[#f5c2c2] bg-[#fdecec] px-4 py-3 text-[13px] text-[#a11]">
@@ -372,7 +355,7 @@ export default function ProjectDetail() {
             </div>
 
             {/* Sidebar injected here on mobile/tablet */}
-            {!isDesktop && <FundingSidebar p={p} semester={semester} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+            {!isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={false} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
 
             {/* Tab nav */}
             <TabNav tabs={tabs} active={activeTab} onChange={setActiveTab} />
@@ -485,8 +468,12 @@ export default function ProjectDetail() {
                     error={commentError}
                     // The backend rejects comments on an archived project, so the box is
                     // closed here rather than letting the post fail. Reading stays open.
-                    locked={p.archived}
-                    lockedMessage="This project has been archived. The discussion is closed."
+                    locked={p.archived || p.semesterClosed}
+                    lockedMessage={
+                      p.archived
+                        ? "This project has been archived. The discussion is closed."
+                        : `${p.semesterName || "This semester"} has ended. The discussion is closed.`
+                    }
                   />
                 </div>
               </div>
@@ -534,7 +521,7 @@ export default function ProjectDetail() {
           </div>
 
           {/* ── RIGHT: Sidebar (desktop only) ── */}
-          {isDesktop && <FundingSidebar p={p} semester={semester} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
+          {isDesktop && <FundingSidebar p={p} isLoggedIn={isLoggedIn} canInvest={canInvest} sticky={true} isOwner={isOwner} onEdit={goToEdit} onInvest={() => setInvestStep("invest")} />}
         </div>
       </div>
 
@@ -594,6 +581,32 @@ function ArchivedBanner({ p, isOwner }) {
   );
 }
 
+// Shown when the project's TEACHING PERIOD has ended. Same amber as the archive banner
+// and for the same reason: a state, not a failure. What it must not do is sound like an
+// apology — the project is complete, and it stays on Discover under its own semester.
+//
+// ⚠️ The date is rendered through formatSemesterDate from the 'YYYY-MM-DD' string.
+// Never `new Date(p.semesterEndDate)`: that prints the previous day west of Greenwich.
+function SemesterEndedBanner({ p }) {
+  return (
+    <div className="mb-5 flex items-start gap-3 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a06a00" strokeWidth="2" className="mt-px shrink-0">
+        <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+      </svg>
+      <div className="text-[13px] leading-normal text-[#7a5200]">
+        <strong>{p.semesterName || "This semester"} has ended.</strong>{" "}
+        This project stays on Launchpad as part of that semester&rsquo;s record, but it can
+        no longer be supported, edited or commented on.
+        {p.semesterEndDate && (
+          <div className="mt-1 text-[#96702a]">
+            Closed on {formatSemesterDate(p.semesterEndDate)}.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /**
  * The line under a disabled INVEST button, saying WHY it is disabled.
  *
@@ -632,7 +645,7 @@ function InvestBlockedNote({ isLoggedIn, from }) {
   );
 }
 
-function FundingSidebar({ p, semester, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
+function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
   const location = useLocation();
   return (
     // ⚠️ `sticky` is a PROP, not a breakpoint utility. On mobile and tablet this card is
@@ -669,10 +682,12 @@ function FundingSidebar({ p, semester, isLoggedIn, canInvest, sticky, isOwner, o
               string. Never build a Date from it: that prints the previous day for any
               viewer west of Greenwich. */}
           <div className="text-[20px] font-extrabold text-neutral-900">
-            {semester ? formatSemesterDate(semester.end_date) : "—"}
+            {p.semesterEndDate ? formatSemesterDate(p.semesterEndDate) : "—"}
           </div>
           <div className="text-[12px] text-neutral-500">
-            {semester ? `closes · ${semester.name}` : "closing date"}
+            {p.semesterName
+              ? `${p.semesterClosed ? "closed" : "closes"} · ${p.semesterName}`
+              : "closing date"}
           </div>
         </div>
         <div>
@@ -695,6 +710,21 @@ function FundingSidebar({ p, semester, isLoggedIn, canInvest, sticky, isOwner, o
           </div>
           <div className="text-[12px] leading-normal text-neutral-400">
             This project is not accepting investments.
+          </div>
+        </div>
+      ) : p.semesterClosed ? (
+        /* Ranked above the owner branch for the same reason archived is: the backend
+           refuses to update a project whose semester has ended, so an EDIT button here
+           would only produce an error after the click. It is a plain block rather than a
+           disabled button — there is no future moment at which this one becomes
+           available, so a greyed-out control would be promising something. */
+        <div className="rounded-md border border-dashed border-[#d4d4d0] bg-[#f6f6f4] p-3.5 text-center">
+          <div className="mb-1 text-[12px] font-bold tracking-[0.06em] text-[#8a8a85]">
+            SEMESTER ENDED
+          </div>
+          <div className="text-[12px] leading-normal text-neutral-400">
+            {p.semesterName || "This semester"} is over, so this project can no longer be
+            supported.
           </div>
         </div>
       ) : isOwner ? (

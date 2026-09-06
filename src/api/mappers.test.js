@@ -311,6 +311,54 @@ describe("toProjectUpdate", () => {
   });
 });
 
+describe("the semester fields", () => {
+  // Two freeze axes that must not be conflated: archiving hides a project from Discover
+  // and is something a person did; a semester ending leaves it visible and is something
+  // the calendar did. Both mappers carry both.
+  it("toDetail carries the semester, and semesterClosed is a real boolean", () => {
+    const d = toDetail(
+      projectRow({ semester_name: "Semester 1 2026", semester_end_date: "2026-05-23", semester_closed: true })
+    );
+
+    expect(d.semesterId).toBe(2);
+    expect(d.semesterName).toBe("Semester 1 2026");
+    expect(d.semesterEndDate).toBe("2026-05-23");
+    expect(d.semesterClosed).toBe(true);
+  });
+
+  it("toCreatorProject carries the same fields", () => {
+    const c = toCreatorProject(projectRow({ semester_name: "Semester 1 2026", semester_closed: true }));
+
+    expect(c.semesterName).toBe("Semester 1 2026");
+    expect(c.semesterClosed).toBe(true);
+  });
+
+  // The API sends `false` for a project with no semester (the COALESCE), but an older
+  // response or a row read some other way could omit the field entirely. Undefined must
+  // not reach a component as `undefined` — it decides whether buttons are drawn.
+  it("treats a missing semester as open, never as closed", () => {
+    const row = projectRow({ semester_id: null });
+    delete row.semester_closed;
+
+    const d = toDetail(row);
+
+    expect(d.semesterClosed).toBe(false);
+    expect(d.semesterId).toBeNull();
+    expect(d.semesterName).toBeNull();
+    expect(d.semesterEndDate).toBeNull();
+  });
+
+  // ⚠️ The date stays the raw string. Turning it into a Date here would print the
+  // previous day for any viewer west of Greenwich — the whole reason the API sends
+  // 'YYYY-MM-DD' and formatSemesterDate parses it by hand.
+  it("keeps semesterEndDate as the raw 'YYYY-MM-DD' string", () => {
+    const d = toDetail(projectRow({ semester_end_date: "2026-10-25" }));
+
+    expect(d.semesterEndDate).toBe("2026-10-25");
+    expect(formatSemesterDate(d.semesterEndDate)).toBe("25 Oct 2026");
+  });
+});
+
 describe("toCreatorProject", () => {
   it("maps backend statuses onto the creator labels", () => {
     expect(toCreatorProject(projectRow({ status: "APPROVED" })).status).toBe("Active");
