@@ -1,34 +1,15 @@
 // The backend returns snake_case rows straight from Postgres, while the components
 // were built against the old mock shape. Every difference is absorbed here, so
-// ProjectCard / FundingBar / CommentList keep the same props as before.
+// ProjectCard / CommentList keep the same props as before. (FundingBar was the
+// third one until N3 deleted it on 2026-09-07 along with the goal it drew.)
 //
-// Note: goal_amount and current_amount are Postgres `numeric`, and node-postgres
-// returns those as STRINGS ("5000.00"), not numbers. Every calculation must go
-// through toNumber() first or the result is wrong.
+// Note: current_amount is a Postgres `numeric`, and node-postgres returns those as
+// STRINGS ("5000.00"), not numbers. Every calculation must go through toNumber() first
+// or the result is wrong. goal_amount was the other one until N3 dropped it (2026-09-07).
 
 export function toNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
-}
-
-export function fundedPercent(currentAmount, goalAmount) {
-  const goal = toNumber(goalAmount);
-  if (goal <= 0) return 0;
-  return Math.round((toNumber(currentAmount) / goal) * 100);
-}
-
-// ⚠️ NOTHING READS THIS ANY MORE, and it is kept only until N3 removes it properly.
-// createProject stopped writing start_date / end_date on 2026-09-06 — a project closes
-// when its SEMESTER closes — so it returns null for every project filed since, and a
-// real number only for the rows created between 2026-08-06 and then. Discover's
-// "Ending soon" sort went at the same time: one semester per page means one closing
-// date for every card on it, so that control could not reorder anything.
-export function daysLeftFrom(endDate) {
-  if (!endDate) return null;
-  const end = new Date(endDate);
-  if (Number.isNaN(end.getTime())) return null;
-  const diff = Math.ceil((end.getTime() - Date.now()) / 86_400_000);
-  return diff > 0 ? diff : 0;
 }
 
 // TAG_COLORS is keyed by uppercase tags. Hiếu's existing rows use "Education" /
@@ -144,7 +125,13 @@ export function toCard(row) {
     title: row.title,
     desc: row.description,
     img: row.image_url || null,
-    funded: fundedPercent(row.current_amount, row.goal_amount),
+    // The two numbers a card carries since N3 (2026-09-07): the Class Coins the project
+    // has received, and how many separate people put them there. There is no goal any
+    // more, so there is no percentage and no bar.
+    raised: toNumber(row.current_amount),
+    // `== null`, not falsy: a project nobody has backed yet must read 0. Only a row from
+    // before GET /projects carried the subquery reads as unknown.
+    backers: row.backers_count == null ? null : toNumber(row.backers_count),
     large: false,
     status: row.status,
     ownerId: row.creator_id,
@@ -153,9 +140,6 @@ export function toCard(row) {
     // NAME, which the page resolves from the list it already loaded for the picker —
     // GET /projects deliberately does not JOIN semesters for one short string.
     semesterId: row.semester_id ?? null,
-    // Legacy, unread: see daysLeftFrom above. The closing date shown to a reader now
-    // comes from the project's semester, not from this.
-    daysLeft: daysLeftFrom(row.end_date),
   };
 }
 
@@ -186,11 +170,9 @@ export function toDetail(row) {
       : null,
 
     stats: {
-      funded: fundedPercent(row.current_amount, row.goal_amount),
+      // The whole funding measure since N3: a running total, with no target to reach and
+      // therefore no percentage. The closing date beside it is the SEMESTER's.
       raised: toNumber(row.current_amount),
-      goal: toNumber(row.goal_amount),
-      // Legacy, unread since 2026-09-06: the sidebar shows the SEMESTER's closing date.
-      daysLeft: daysLeftFrom(row.end_date),
       // Distinct wallets that invested, not the number of transactions.
       backers: row.backers_count == null ? null : toNumber(row.backers_count),
     },
@@ -286,9 +268,7 @@ export function toCreatorProject(row) {
     category: row.category,
     dept: toDept(row.category),
     status: CREATOR_STATUS[row.status] ?? row.status,
-    pct: fundedPercent(row.current_amount, row.goal_amount),
     raised: money(row.current_amount),
-    goal: money(row.goal_amount),
     img: row.image_url || null,
     lastEdited: formatDate(row.updated_at),
     // Carried through so the EditProject modal can prefill the story fields it saves.
@@ -333,9 +313,7 @@ export function toAdminProject(row) {
     creator: row.creator_name || `Creator #${row.creator_id}`,
     category: toDept(row.category),
     status: ADMIN_STATUS[row.status] ?? row.status,
-    pct: fundedPercent(row.current_amount, row.goal_amount),
     raised: money(row.current_amount),
-    goal: money(row.goal_amount),
     img: row.image_url || null,
     ...toArchiveFields(row),
     ...toOnBehalfFields(row),
@@ -354,13 +332,10 @@ export function toApprovalProject(row) {
     submitted: formatDate(row.created_at),
     status: "Pending Review",
     img: row.image_url || null,
-    goal: money(row.goal_amount),
-    // Projects created before 2026-08-06 have no dates — createProject did not write
-    // them back then — so "Not set" is still reachable.
-    duration:
-      row.start_date && row.end_date
-        ? `${formatDate(row.start_date)} → ${formatDate(row.end_date)}`
-        : "Not set",
+    // ⚠️ NO goal and NO duration. Both went on 2026-09-07 (N3): there is no funding
+    // goal any more, and the "campaign duration" read start_date / end_date, which
+    // createProject stopped writing on 2026-09-06 — so that field had already been
+    // showing "Not set" on every project filed since.
     description: row.description,
     team: Array.isArray(row.team_members) ? row.team_members : [],
     // AdminApprovals' review screen reads project.gallery[0] and project.tiers.map().
@@ -630,7 +605,9 @@ export function toInvestment(row) {
     // now covers several.
     investmentDate: formatDate(row.last_invested_at),
     firstInvestmentDate: formatDate(row.first_invested_at),
-    fundingProgress: fundedPercent(row.current_amount, row.goal_amount),
+    // The PROJECT's running total, not this backer's share — theirs is investedAmount
+    // above. It replaced the funding-progress bar on the card in N3.
+    projectTotal: toNumber(row.current_amount),
     // The backer keeps the card either way — archiving a project must not erase
     // somebody's spend history — so it is badged rather than dropped.
     archived: row.archived_at != null,

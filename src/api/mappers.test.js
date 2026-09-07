@@ -1,8 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   toNumber,
-  fundedPercent,
-  daysLeftFrom,
   formatSemesterDate,
   toCard,
   toDetail,
@@ -27,7 +25,6 @@ function projectRow(overrides = {}) {
     creator_id: 14,
     title: "Autonomous Swarm Drones",
     description: "Coordinated drones for disaster mapping.",
-    goal_amount: "15000.00",
     current_amount: "500.00",
     image_url: "https://example.test/drone.jpg",
     category: "ENGINEERING",
@@ -70,51 +67,6 @@ describe("toNumber", () => {
   });
 });
 
-describe("fundedPercent", () => {
-  it("computes a percentage from the string amounts", () => {
-    expect(fundedPercent("500.00", "15000.00")).toBe(3);
-    expect(fundedPercent("7500.00", "15000.00")).toBe(50);
-  });
-
-  it("returns 0 instead of Infinity when the goal is 0 or missing", () => {
-    expect(fundedPercent("500.00", "0.00")).toBe(0);
-    expect(fundedPercent("500.00", null)).toBe(0);
-  });
-
-  it("does not cap above 100 — an overfunded project stays overfunded", () => {
-    expect(fundedPercent("30000.00", "15000.00")).toBe(200);
-  });
-});
-
-describe("daysLeftFrom", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  it("returns null when there is no end date", () => {
-    // createProject never writes end_date, so this is the everyday case.
-    expect(daysLeftFrom(null)).toBeNull();
-    expect(daysLeftFrom(undefined)).toBeNull();
-    expect(daysLeftFrom("")).toBeNull();
-  });
-
-  it("returns null for an unparseable date", () => {
-    expect(daysLeftFrom("not-a-date")).toBeNull();
-  });
-
-  it("counts the days remaining", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-05T00:00:00.000Z"));
-    expect(daysLeftFrom("2026-08-15T00:00:00.000Z")).toBe(10);
-  });
-
-  it("clamps a past deadline to 0 instead of going negative", () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-08-05T00:00:00.000Z"));
-    expect(daysLeftFrom("2026-07-01T00:00:00.000Z")).toBe(0);
-  });
-});
-
 describe("toCard", () => {
   it("maps a row onto the shape ProjectCard expects", () => {
     expect(toCard(projectRow())).toEqual({
@@ -123,27 +75,28 @@ describe("toCard", () => {
       title: "Autonomous Swarm Drones",
       desc: "Coordinated drones for disaster mapping.",
       img: "https://example.test/drone.jpg",
-      funded: 3,
+      raised: 500,
+      // Null here because projectRow() carries no backers_count. GET /projects supplies
+      // it; a row from before that subquery existed simply shows no head count.
+      backers: null,
       large: false,
       status: "APPROVED",
       ownerId: 14,
       createdAt: "2026-08-05T02:45:00.000Z",
       semesterId: 2,
-      // Null here because projectRow() has no end_date. Nothing reads this any more:
-      // the closing date comes from the project's SEMESTER now, and Discover's
-      // "Ending soon" sort went with it (one semester per page = one closing date for
-      // every card on it). The field itself goes in N3 with the rest of the funding
-      // framing.
-      daysLeft: null,
     });
   });
 
-  it("still derives daysLeft from end_date, for the older rows that have one", () => {
-    const future = new Date(Date.now() + 5 * 86_400_000).toISOString();
-    expect(toCard(projectRow({ end_date: future })).daysLeft).toBe(5);
-    // A closed campaign is 0, not a negative number.
-    const past = new Date(Date.now() - 3 * 86_400_000).toISOString();
-    expect(toCard(projectRow({ end_date: past })).daysLeft).toBe(0);
+  it("carries the total and the head count, the two numbers a card shows", () => {
+    const card = toCard(projectRow({ current_amount: "1250.00", backers_count: 8 }));
+    expect(card.raised).toBe(1250);
+    expect(card.backers).toBe(8);
+  });
+
+  it("keeps a real zero backer count instead of turning it into null", () => {
+    // 0 is falsy — the check has to be against null, exactly like stats.backers. A
+    // project nobody has backed reads "0 backers", not a blank.
+    expect(toCard(projectRow({ backers_count: 0 })).backers).toBe(0);
   });
 
   it("uppercases the tag so TAG_COLORS can key on it", () => {
@@ -172,8 +125,6 @@ describe("toDetail", () => {
   it("exposes numeric stats, not the raw strings", () => {
     const d = toDetail(projectRow());
     expect(d.stats.raised).toBe(500);
-    expect(d.stats.goal).toBe(15000);
-    expect(d.stats.funded).toBe(3);
   });
 
   it("reads the creator name and backer count off the joined row", () => {
@@ -213,7 +164,6 @@ describe("toDetail", () => {
     // No join columns on this fixture — a deleted creator row looks the same.
     expect(d.creator).toBeNull();
     expect(d.stats.backers).toBeNull();
-    expect(d.stats.daysLeft).toBeNull();
     expect(d.challenge).toBeNull();
     expect(d.solution).toBeNull();
     expect(d.funding).toBeNull();
@@ -372,16 +322,14 @@ describe("toCreatorProject", () => {
 
   it("formats amounts in Class Coins, as strings the pages parse back", () => {
     // CreatorMyProjects and EditProject strip non-digits back out of these.
-    const p = toCreatorProject(projectRow({ current_amount: "10625.00", goal_amount: "12500.00" }));
+    const p = toCreatorProject(projectRow({ current_amount: "10625.00" }));
     expect(p.raised).toBe("10,625 CC");
-    expect(p.goal).toBe("12,500 CC");
     expect(typeof p.raised).toBe("string");
   });
 
   it("never labels an amount in dollars — CC has no real-world value", () => {
     const p = toCreatorProject(projectRow());
     expect(p.raised).not.toContain("$");
-    expect(p.goal).not.toContain("$");
   });
 
   it("title-cases the department so DEPT_STYLE can key on it", () => {
@@ -478,15 +426,14 @@ describe("toAdminProject", () => {
 });
 
 describe("toApprovalProject", () => {
-  it("says the duration is not set when the dates are missing", () => {
-    expect(toApprovalProject(projectRow()).duration).toBe("Not set");
-  });
-
-  it("shows the range once both dates exist", () => {
-    // createProject writes full timestamps, so the raw values would render as
-    // "2026-08-01T00:00:00.000Z → …" in the table.
+  // Neither a funding goal nor a campaign duration reaches the review screen since N3
+  // (2026-09-07). The duration went with them rather than surviving alone: it read
+  // start_date / end_date, which createProject stopped writing on 2026-09-06, so it had
+  // already been answering "Not set" for every project filed since.
+  it("carries no funding goal and no campaign duration", () => {
     const row = projectRow({ start_date: "2026-08-01T00:00:00.000Z", end_date: "2026-09-01T00:00:00.000Z" });
-    expect(toApprovalProject(row).duration).toBe("Aug 01, 2026 → Sep 01, 2026");
+    expect(toApprovalProject(row).goal).toBeUndefined();
+    expect(toApprovalProject(row).duration).toBeUndefined();
   });
 
   it("uses the joined creator name and email, falling back to the id", () => {
@@ -624,7 +571,6 @@ describe("toInvestment", () => {
     category: "ENGINEERING",
     image_url: "https://example.test/drone.jpg",
     current_amount: "500.00",
-    goal_amount: "15000.00",
     status: "APPROVED",
     archived_at: null,
     invested_amount: 500,
@@ -639,7 +585,9 @@ describe("toInvestment", () => {
     expect(inv.projectId).toBe(4);
     expect(inv.title).toBe("Autonomous Swarm Drones");
     expect(inv.investedAmount).toBe(500);
-    expect(inv.fundingProgress).toBe(3);
+    // The PROJECT's total, not this backer's share — it replaced the funding-progress
+    // bar on the card when the goal went (N3).
+    expect(inv.projectTotal).toBe(500);
     expect(inv.investmentDate).toMatch(/Aug \d{2}, 2026/);
   });
 
@@ -667,7 +615,7 @@ describe("toInvestment", () => {
   it("coerces the numeric strings node-postgres hands back", () => {
     const inv = toInvestment(investmentRow({ invested_amount: "750", current_amount: "7500.00" }));
     expect(inv.investedAmount).toBe(750);
-    expect(inv.fundingProgress).toBe(50);
+    expect(inv.projectTotal).toBe(7500);
   });
 });
 
@@ -682,7 +630,6 @@ describe("toInvestment support level", () => {
     category: "ENGINEERING",
     image_url: null,
     current_amount: "500.00",
-    goal_amount: "15000.00",
     status: "APPROVED",
     archived_at: null,
     invested_amount: 500,
