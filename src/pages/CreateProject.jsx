@@ -384,7 +384,7 @@ function Step1({ data, setData, ownerPicker }) {
 }
 
 // The three story fields behind ProjectDetail's "The Challenge" / "Our Solution" /
-// "How Your Funding Helps" sections. They live in step 2 because that step is called
+// "How Support Would Be Used" sections. They live in step 2 because that step is called
 // "Story & Media" — until 2026-08-06 it only ever collected the media half.
 // All three are optional: a project that leaves them blank just shows its blurb.
 const STORY_FIELDS = [
@@ -402,7 +402,11 @@ const STORY_FIELDS = [
   },
   {
     key: "funding",
-    label: "HOW YOUR FUNDING HELPS",
+    // Was "HOW YOUR FUNDING HELPS" until 2026-09-07. The client asked for headings that
+    // stop sounding like a fundraising appeal, and this wording is the one the team used
+    // when describing the section to her. ⚠️ The COLUMN is still funding_usage and the
+    // form field is still `funding` — a label changing is not a schema changing.
+    label: "HOW SUPPORT WOULD BE USED",
     hint: "What will the Class Coins be used for?",
     placeholder: "Break down what the support enables — equipment, lab time, materials…",
   },
@@ -1174,7 +1178,7 @@ export default function CreateProject() {
     // `story` was missing here while the autosave effect above does include it. Since
     // clicking SAVE DRAFT changes none of that effect's dependencies, the effect did not
     // re-run afterwards — so this write was the last one to land and the saved draft came
-    // back from a reload with The Challenge / Our Solution / How Your Funding Helps blank.
+    // back from a reload with The Challenge / Our Solution / How Support Would Be Used blank.
     saveDraftToStorage(draftKey, {
       step,
       ownerId,

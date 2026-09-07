@@ -415,7 +415,7 @@ export default function ProjectDetail() {
                 {p.funding && (
                   <>
                     <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
-                      How Your Funding Helps
+                      How Support Would Be Used
                     </h2>
                     <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-10">
                       {p.funding}

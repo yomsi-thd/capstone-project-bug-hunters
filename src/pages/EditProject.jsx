@@ -20,7 +20,8 @@ import { errorMessage } from "../api/apiError";
 const STORY_FIELDS = [
   { key: "challenge", label: "The Challenge" },
   { key: "solution", label: "Our Solution" },
-  { key: "funding", label: "How Your Funding Helps" },
+  // Reworded 2026-09-07 (N7); the key stays `funding` and the column stays funding_usage.
+  { key: "funding", label: "How Support Would Be Used" },
 ];
 
 // projects.category stores the bare department ("ENGINEERING") — the SCHOOLS dropdown
