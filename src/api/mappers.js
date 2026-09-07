@@ -177,6 +177,12 @@ export function toDetail(row) {
       backers: row.backers_count == null ? null : toNumber(row.backers_count),
     },
 
+    // What the person READING the page already contributed, or null for a visitor who
+    // has not (or is signed out). Deliberately NOT inside `stats`: stats describes the
+    // project, this describes the reader — and it is what turns the invest button into
+    // "you have supported this" (N4, one contribution per person).
+    myContribution: row.my_contribution == null ? null : toNumber(row.my_contribution),
+
     // projects.endorsed — only an admin can set it (PATCH /projects/:id/endorse).
     endorsed: Boolean(row.endorsed),
 
@@ -598,13 +604,10 @@ export function toInvestment(row) {
     desc: row.description ?? "",
     img: row.image_url || null,
     investedAmount: toNumber(row.invested_amount),
-    // How many separate times they invested. 1 for most cards, which is why the UI
-    // only mentions it above 1.
-    investmentCount: toNumber(row.investment_count),
-    // The most recent one — that is what "when did I back this" means on a card that
-    // now covers several.
+    // The day they backed it. One contribution per project since N4, so there is no
+    // longer a first and a latest to tell apart — the column stays MAX(created_at)
+    // because the row is still a GROUP BY, and over one row that is the same date.
     investmentDate: formatDate(row.last_invested_at),
-    firstInvestmentDate: formatDate(row.first_invested_at),
     // The PROJECT's running total, not this backer's share — theirs is investedAmount
     // above. It replaced the funding-progress bar on the card in N3.
     projectTotal: toNumber(row.current_amount),

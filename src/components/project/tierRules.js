@@ -10,6 +10,8 @@
 // "Support Level" on screen, `tier` in the code and the database (`project_tiers`,
 // `tier_id`). The wording can still change; the column names should not.
 
+import { MAX_CONTRIBUTION } from "./investmentRules";
+
 export const MAX_TIERS = 5;
 
 /**
@@ -60,6 +62,15 @@ export function validateTiers(tiers) {
     // rounded by Postgres into a number the creator never typed.
     if (!Number.isInteger(tier.minAmount) || tier.minAmount <= 0) {
       return "A level needs a minimum above 0 CC — a whole number of Class Coins.";
+    }
+
+    // A level above the contribution cap can never be chosen: one contribution per
+    // person, at most MAX_CONTRIBUTION CC. Creating one would put a control on the
+    // project page that responds and can never lead anywhere.
+    //
+    // ⚠️ Worded identically to TIER_ABOVE_CAP in backend/src/validation/messages.js.
+    if (tier.minAmount > MAX_CONTRIBUTION) {
+      return "A support level cannot ask for more than 500 CC.";
     }
 
     if (tier.bullets.length === 0) {

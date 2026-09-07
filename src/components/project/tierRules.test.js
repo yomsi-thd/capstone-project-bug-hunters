@@ -87,6 +87,20 @@ describe("validateTiers", () => {
     expect(validateTiers([level({ amount: "-50" })])).toMatch(/above 0 CC/i);
   });
 
+  // A level above the contribution cap is unreachable by construction: since 2026-09-07
+  // one person may put at most 500 CC into a project, once. The sentence is pinned
+  // because the backend refuses the same thing with the same words — a creator who slips
+  // past one check and is refused by the other must not read a different rule.
+  it("rejects a minimum above the contribution cap", () => {
+    expect(validateTiers([level({ amount: "501" })])).toBe(
+      "A support level cannot ask for more than 500 CC."
+    );
+  });
+
+  it("accepts a minimum of exactly the cap", () => {
+    expect(validateTiers([level({ amount: "500" })])).toBeNull();
+  });
+
   it("rejects a non-numeric minimum", () => {
     expect(validateTiers([level({ amount: "abc" })])).toMatch(/above 0 CC/i);
   });

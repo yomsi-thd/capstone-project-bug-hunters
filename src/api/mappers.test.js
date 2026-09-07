@@ -139,6 +139,13 @@ describe("toDetail", () => {
     expect(toDetail(projectRow({ backers_count: 0 })).stats.backers).toBe(0);
   });
 
+  // Drives the sidebar's "you have supported this" block in place of the invest button.
+  it("reports the reader's own contribution, and null when there is none", () => {
+    expect(toDetail(projectRow({ my_contribution: 250 })).myContribution).toBe(250);
+    // A signed-out visitor, or a backer who has not contributed: the column is NULL.
+    expect(toDetail(projectRow()).myContribution).toBeNull();
+  });
+
   it("maps the three story columns onto the About sections", () => {
     // The column is funding_usage; the UI prop has always been `funding`.
     const d = toDetail(projectRow({
@@ -574,8 +581,6 @@ describe("toInvestment", () => {
     status: "APPROVED",
     archived_at: null,
     invested_amount: 500,
-    investment_count: 1,
-    first_invested_at: "2026-08-05T02:46:36.210Z",
     last_invested_at: "2026-08-05T02:46:36.210Z",
     ...overrides,
   });
@@ -591,12 +596,17 @@ describe("toInvestment", () => {
     expect(inv.investmentDate).toMatch(/Aug \d{2}, 2026/);
   });
 
-  it("totals repeat investments into one card and counts them", () => {
-    // The old page rendered one card per transaction, so backing the same project
-    // three times produced three cards that looked identical.
-    const inv = toInvestment(investmentRow({ invested_amount: 900, investment_count: 3 }));
-    expect(inv.investedAmount).toBe(900);
-    expect(inv.investmentCount).toBe(3);
+  // ⚠️ This used to prove that several investments in one project were TOTALLED into a
+  // single card, with a count beside it. N4 (2026-09-07) made a second contribution
+  // illegal, so `investmentCount` and `firstInvestmentDate` were dropped rather than
+  // left reporting 1 forever. The row is still a GROUP BY — one row per project — which
+  // is what this now checks.
+  it("reads the grouped row as one card per project", () => {
+    const inv = toInvestment(investmentRow({ invested_amount: 500 }));
+    expect(inv.projectId).toBe(4);
+    expect(inv.investedAmount).toBe(500);
+    expect(inv.investmentCount).toBeUndefined();
+    expect(inv.firstInvestmentDate).toBeUndefined();
   });
 
   it("uppercases the tag and survives a missing category", () => {
@@ -633,8 +643,6 @@ describe("toInvestment support level", () => {
     status: "APPROVED",
     archived_at: null,
     invested_amount: 500,
-    investment_count: 1,
-    first_invested_at: "2026-08-05T02:46:36.210Z",
     last_invested_at: "2026-08-05T02:46:36.210Z",
     ...overrides,
   });

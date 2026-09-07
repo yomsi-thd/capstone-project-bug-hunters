@@ -2,6 +2,7 @@ import Modal from "../ui/Modal";
 import { useState } from "react";
 import { parseAmount } from "../../api/mappers";
 import { meetsMinimum } from "./tierRules";
+import { MAX_CONTRIBUTION, validateContribution } from "./investmentRules";
 
 const QUICK_AMOUNTS = [25, 50, 100];
 
@@ -14,12 +15,20 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
   const belowMinimum = selectedTier != null && !meetsMinimum(amount, selectedTier);
 
   const handleQuickAmount = (val) => setAmount(val);
-  const handleMax = () => setAmount(balance);
+
+  // ⚠️ min(balance, cap), never balance alone. This is the only control in the app that
+  // types a number into a money field for somebody, and filling in one the API will
+  // refuse is exactly the kind of lying button this codebase keeps deleting.
+  // ⚠️ The most this button may offer, and the number it must ALSO advertise. It read
+  // "MAX (4,500 CC)" off the balance alone until 2026-09-07 while filling in 500 — a
+  // button whose label and behaviour disagree is worse than no button.
+  const maxAllowed = Math.min(balance, MAX_CONTRIBUTION);
+  const handleMax = () => setAmount(maxAllowed);
 
   const handleInputChange = (e) => {
     // parseAmount returns 0 for an empty or unreadable field, which is exactly what the
-    // old `raw === "" ? 0 : parseInt(raw, 10)` produced — so the cap is all that is left.
-    setAmount(Math.min(parseAmount(e.target.value, { integer: true }), balance));
+    // old `raw === "" ? 0 : parseInt(raw, 10)` produced — so the caps are all that is left.
+    setAmount(Math.min(parseAmount(e.target.value, { integer: true }), balance, MAX_CONTRIBUTION));
   };
 
   // Picking a level fills the minimum in for you. Typing MORE afterwards is fine;
@@ -35,7 +44,9 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
     if (amount < tier.minAmount) setAmount(Math.min(tier.minAmount, balance));
   };
 
-  const isValid = amount > 0 && amount <= balance && !belowMinimum;
+  // One source for the amount rules, shared with anything else that has to judge one.
+  const amountError = validateContribution(amount, balance);
+  const isValid = amountError === null && !belowMinimum;
 
   return (
     <Modal onClose={onClose} maxWidth={550} panelClassName="border-t-[5px] border-brand">
@@ -153,6 +164,13 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
             />
           </div>
 
+          {/* The rule a backer meets here for the first time. It says "per project"
+              rather than "per person" because that is the shape of the limit: they can
+              still back everything else on Discover. */}
+          <p className="mt-[-10px] mb-[18px] text-[12px] text-neutral-500">
+            One contribution per project, up to {MAX_CONTRIBUTION.toLocaleString()} CC.
+          </p>
+
           {belowMinimum && (
             <div className="mt-[-8px] mb-[18px] text-[13px] font-semibold text-brand">
               &ldquo;{selectedTier.name}&rdquo; needs at least {selectedTier.minAmount.toLocaleString()} CC.
@@ -181,12 +199,12 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
           <button
             onClick={handleMax}
             className={`mb-6 w-full cursor-pointer rounded-md border border-neutral-200 p-3 text-[13px] font-bold transition-[background,border-color] duration-150 ${
-              amount === balance
+              amount === maxAllowed
                 ? "bg-brand text-white"
                 : "bg-white text-neutral-700 hover:border-brand hover:bg-neutral-100"
             }`}
           >
-            MAX ({balance.toLocaleString()} CC)
+            MAX ({maxAllowed.toLocaleString()} CC)
           </button>
 
           {/* Disclaimer */}

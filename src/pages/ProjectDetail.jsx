@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import * as projectApi from "../api/projectApi";
 import { toDetail, toProjectUpdate, toCommentThread, toTier, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
+import { MAX_CONTRIBUTION } from "../components/project/investmentRules";
 
 function TabNav({ tabs, active, onChange }) {
   return (
@@ -708,6 +709,19 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
             supported.
           </div>
         </div>
+      ) : p.myContribution != null ? (
+        /* One contribution per person, so unlike a wallet that is merely empty today
+           there is no future moment at which this button works again — a disabled one
+           would be promising something. Same shape as the two blocks above it. */
+        <div className="rounded-md border border-dashed border-[#d4d4d0] bg-[#f6f6f4] p-3.5 text-center">
+          <div className="mb-1 text-[12px] font-bold tracking-[0.06em] text-[#8a8a85]">
+            YOU HAVE SUPPORTED THIS
+          </div>
+          <div className="text-[12px] leading-normal text-neutral-400">
+            Your contribution of {p.myContribution.toLocaleString()} CC is counted — one
+            contribution per person.
+          </div>
+        </div>
       ) : isOwner ? (
         <>
           <button
@@ -733,12 +747,16 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
             INVEST IN THIS PROJECT
           </button>
 
-          {/* ⚠️ Nothing under the button for a backer who CAN invest. "All or nothing
-              funding model." stood here until N3 (2026-09-07) — it described a goal that
-              no longer exists. Left empty on purpose rather than filled with a stand-in:
-              N4 puts the real sentence here (one contribution per person, 500 CC cap),
-              and a placeholder now would be written twice and deleted once. */}
-          {!canInvest && <InvestBlockedNote isLoggedIn={isLoggedIn} from={location.pathname} />}
+          {/* The rule, where the person about to press the button meets it. It replaced
+              "All or nothing funding model.", which described a goal removed in N3 —
+              that slot was left deliberately empty until this sentence existed. */}
+          {canInvest ? (
+            <p className="mx-0 mt-2 mb-0 text-center text-[11px] text-neutral-400">
+              One contribution per person, up to {MAX_CONTRIBUTION.toLocaleString()} CC.
+            </p>
+          ) : (
+            <InvestBlockedNote isLoggedIn={isLoggedIn} from={location.pathname} />
+          )}
         </>
       )}
 

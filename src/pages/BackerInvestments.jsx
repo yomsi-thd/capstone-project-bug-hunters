@@ -38,10 +38,10 @@ function InvestmentCard({ investment, isMobile }) {
               </span>
             )}
             {/* The support level this backer chose. Null for anything backed before
-                2026-08-20 and for every "just support" investment, so most cards show
-                nothing here. When the card covers several investments it is the HIGHEST
-                level they picked — "across N investments" below already says the card is
-                a total, so the two do not contradict each other. */}
+                2026-08-20 and for every "just support" contribution, so most cards show
+                nothing here. Since N4 a card covers exactly one contribution, so this is
+                simply the level they picked — there is no "highest of several" left to
+                explain. */}
             {investment.topTier && (
               <span className="rounded border border-[#f3ccd4] bg-[#fff2f4] px-[7px] py-[3px] text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-[#7a1020]">
                 {investment.topTier.name.toUpperCase()}
@@ -67,28 +67,18 @@ function InvestmentCard({ investment, isMobile }) {
               </svg>
               {investment.investedAmount.toLocaleString()} CC
             </div>
-            {/* Only mentioned above 1: the card is now one PROJECT, so a total of
-                900 CC could be one investment or three, and the difference matters
-                to somebody reading their own history. */}
-            {investment.investmentCount > 1 && (
-              <div className="mt-[3px] text-[11px] text-neutral-500">
-                across {investment.investmentCount} investments
-              </div>
-            )}
           </div>
 
           <div>
+            {/* One contribution per project since N4, so there is no "latest" to
+                distinguish from a first — the label no longer switches, and the two
+                lines that reported a repeat are gone. */}
             <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
-              {investment.investmentCount > 1 ? "LATEST INVESTMENT" : "INVESTMENT DATE"}
+              CONTRIBUTION DATE
             </div>
             <div className="text-[15px] font-bold text-neutral-900">
               {investment.investmentDate}
             </div>
-            {investment.investmentCount > 1 && (
-              <div className="mt-[3px] text-[11px] text-neutral-500">
-                first on {investment.firstInvestmentDate}
-              </div>
-            )}
           </div>
 
           <div className={`min-w-[140px] ${isMobile ? "flex-[0_0_100%]" : "flex-[1_1_160px]"}`}>
