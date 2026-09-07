@@ -102,9 +102,16 @@ function assertVisibleTo(project, viewer) {
  * must not be able to disagree, because hiding a project while leaving its discussion
  * readable one URL over hides nothing at all.
  */
-async function loadVisibleProject(projectId, viewer) {
+// `withContribution` is opt-in, not the default: three of the four callers here load a
+// project only to decide whether its comments / updates / levels may be read, and would
+// pay for a subquery they then throw away. Only the detail page renders it.
+async function loadVisibleProject(projectId, viewer, { withContribution = false } = {}) {
 
-    const project = await projectRepository.findById(projectId);
+    const project = await projectRepository.findById(
+        projectId,
+        undefined,
+        withContribution ? (viewer?.id ?? null) : null
+    );
 
     if (!project) {
         throw notFound("Project not found");

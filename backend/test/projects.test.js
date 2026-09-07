@@ -198,22 +198,25 @@ describe("GET /api/projects", () => {
         expect(ids).not.toContain(hidden.id);
     });
 
-    // backers_count is DISTINCT wallets, exactly like findById's. Backing twice must not
-    // make one person look like two — after N3 removed the percentage, this number is
-    // half of what a card says, and it is meant to be a head count.
-    // ⚠️ N4 will make a second investment in the same project illegal. When it lands,
-    // rewrite this with TWO backers and expect 2 — same rule, legal shape.
+    // backers_count is DISTINCT wallets, exactly like findById's — a head count, which
+    // is half of what a card says now that N3 removed the percentage.
+    //
+    // ⚠️ Written with ONE person backing twice until 2026-09-07; N4 made that illegal,
+    // so the same guarantee is now proved with two people. The DISTINCT still earns its
+    // place: transactions on this project can also come from the ADD/DEDUCT side of the
+    // wallet, and a future rule change must not be able to double-count a person.
     it("counts distinct backers, not transactions", async () => {
-        const spender = await makeUser({ roles: ["BACKER"], balance: 5000 });
+        const one = await makeUser({ roles: ["BACKER"], balance: 5000 });
+        const two = await makeUser({ roles: ["BACKER"], balance: 5000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED", title: "Counted" });
 
-        await as(spender.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
-        await as(spender.token).post(`/api/projects/${project.id}/invest`).send({ amount: 50 });
+        await as(one.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+        await as(two.token).post(`/api/projects/${project.id}/invest`).send({ amount: 50 });
 
         const res = await request(app).get("/api/projects");
         const row = res.body.items.find((p) => p.id === project.id);
 
-        expect(row.backers_count).toBe(1);
+        expect(row.backers_count).toBe(2);
         expect(Number(row.current_amount)).toBe(150);
     });
 });

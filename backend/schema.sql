@@ -301,6 +301,22 @@ CREATE TABLE classcoin_transactions (
 
 CREATE INDEX idx_classcoin_transactions_tier
     ON classcoin_transactions (tier_id);
+
+-- One contribution per person per project (N4, 2026-09-07). investmentService refuses a
+-- second one with a sentence a person can read; this index is the line underneath, and
+-- it is what makes two requests arriving together - a double-clicked CONFIRM - impossible
+-- rather than merely unlikely. The 23505 it raises is translated back into the same 409.
+--
+-- ⚠️ The WHERE clause is load-bearing. This table also holds ADD and DEDUCT rows, which
+-- repeat legitimately; a unique index over the whole table would refuse an admin issuing
+-- Class Coins to the same wallet twice.
+--
+-- ⚠️ Rows with project_id IS NULL are not constrained, and that is correct: Postgres
+-- treats NULLs as distinct, and those rows are the history of permanently deleted
+-- projects.
+CREATE UNIQUE INDEX classcoin_transactions_one_invest_per_project
+    ON classcoin_transactions (classcoin_id, project_id)
+    WHERE type = 'INVEST';
 -- The investment flow deducts with `WHERE user_id = $1 AND balance >= $2
 -- RETURNING *` inside one transaction. Reading the balance first and checking it
 -- in JS is what allowed 8 concurrent invests to drive a wallet to -3500 CC.

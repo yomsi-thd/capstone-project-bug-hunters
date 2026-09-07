@@ -148,21 +148,26 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         expect(Array.isArray(investments.body.items)).toBe(true);
     });
 
-    // One row per PROJECT, with the amounts summed — backing the same project three
-    // times is one card on My Investments, not three identical-looking ones.
-    it("groups investments by project and sums them", async () => {
+    // One row per PROJECT.
+    //
+    // ⚠️ This test used to back ONE project twice and assert the amounts were summed.
+    // N4 (2026-09-07) made that illegal — one contribution per person per project — so
+    // the shape is now proved with two different projects instead. The grouping itself
+    // still matters: it is what the page renders one card from.
+    it("returns one row per project backed", async () => {
         const investor = await makeUser({ roles: ["BACKER"], balance: 1000 });
-        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const one = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const two = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
-        await as(investor.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
-        await as(investor.token).post(`/api/projects/${project.id}/invest`).send({ amount: 250 });
+        await as(investor.token).post(`/api/projects/${one.id}/invest`).send({ amount: 100 });
+        await as(investor.token).post(`/api/projects/${two.id}/invest`).send({ amount: 250 });
 
         const res = await as(investor.token).get("/api/classcoins/investments");
-        const row = res.body.items.filter((r) => Number(r.project_id) === project.id);
+        const mine = res.body.items.filter((r) => [one.id, two.id].includes(Number(r.project_id)));
 
-        expect(row).toHaveLength(1);
-        expect(row[0].invested_amount).toBe(350);
-        expect(row[0].investment_count).toBe(2);
+        expect(mine).toHaveLength(2);
+        expect(mine.find((r) => Number(r.project_id) === one.id).invested_amount).toBe(100);
+        expect(mine.find((r) => Number(r.project_id) === two.id).invested_amount).toBe(250);
     });
 
     // The overwhelming majority of transactions carry tier_id = NULL, so the join to
@@ -179,33 +184,31 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         expect(res.body.items.map((r) => Number(r.project_id))).toContain(project.id);
     });
 
-    // One card covers several investments, so it can only show ONE support level, and
-    // the rule is the HIGHEST the backer ever chose — not the most recent. Someone who
-    // signalled Champion once and then topped up at Supporter has not withdrawn the
-    // stronger signal, and a card that quietly demoted them would misreport it to the
-    // creator, which is the only thing a level is for.
+    // The card names the level the backer chose.
     //
-    // Ordering matters in this test: the LOWER level is chosen LAST, so "latest" and
-    // "highest" give different answers and only the right one passes.
-    it("shows the HIGHEST level the backer ever chose, not the latest", async () => {
+    // ⚠️ This used to prove something stronger: that a card covering SEVERAL investments
+    // shows the HIGHEST level ever chosen rather than the latest. N4 ended that — one
+    // contribution per project means one level per card, so the old fixture could not be
+    // built any more. The across-several rule is NOT gone from the app: it still governs
+    // GET /projects/my/backers, where a row groups one PERSON across a creator's
+    // projects, and projects.test.js pins it there. Deleting this test outright would
+    // have quietly left that rule tested in only one of the two queries that share it.
+    it("names the level the backer chose", async () => {
         const investor = await makeUser({ roles: ["BACKER"], balance: 2000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
-        const supporter = await makeTier({ projectId: project.id, name: "Supporter", minAmount: 100 });
+        await makeTier({ projectId: project.id, name: "Supporter", minAmount: 100 });
         const champion = await makeTier({ projectId: project.id, name: "Champion", minAmount: 500 });
 
         await as(investor.token)
             .post(`/api/projects/${project.id}/invest`)
             .send({ amount: 500, tierId: champion.id });
-        await as(investor.token)
-            .post(`/api/projects/${project.id}/invest`)
-            .send({ amount: 100, tierId: supporter.id });
 
         const res = await as(investor.token).get("/api/classcoins/investments");
         const row = res.body.items.find((r) => Number(r.project_id) === project.id);
 
         expect(row.top_tier_name).toBe("Champion");
         expect(row.top_tier_min).toBe(500);
-        expect(row.invested_amount).toBe(600);
+        expect(row.invested_amount).toBe(500);
     });
 });
 

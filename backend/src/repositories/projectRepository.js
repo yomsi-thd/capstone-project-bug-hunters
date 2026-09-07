@@ -224,7 +224,10 @@ async function countApprovedProjects({ semesterId } = {}) {
 // never the email, which would then be readable by anyone.
 // backers_count is DISTINCT wallets, not rows: investing three times still counts
 // as one backer.
-async function findById(id, client = pool) {
+// `viewerId` is the person READING the page, used only by the my_contribution subquery
+// below. It defaults to null because nine of the ten callers are writes that load the
+// project first (invest, archive, approve...) and have no reader to speak of.
+async function findById(id, client = pool, viewerId = null) {
     const result = await client.query(
         `
         SELECT p.*,
@@ -245,6 +248,28 @@ async function findById(id, client = pool) {
                    FROM comments c
                    WHERE c.project_id = p.id
                ) AS comments_count,
+               -- What the person reading this page already contributed, or NULL. It is
+               -- what lets the sidebar replace the invest button with a confirmation
+               -- instead of leaving a control that can never work again (N4).
+               --
+               -- ⚠️ NULL for a signed-out visitor, because $2 is NULL and nothing joins -
+               -- which is the right answer rather than a special case. And it can only
+               -- ever describe the caller: the id comes from the token, never the body.
+               (
+                   SELECT ct.amount::int
+                   FROM classcoin_transactions ct
+                   JOIN classcoins c ON c.id = ct.classcoin_id
+                   WHERE ct.project_id = p.id
+                     AND ct.type = 'INVEST'
+                     AND c.user_id = $2
+                   -- Deterministic, and it matches what the N4 seed keeps: the EARLIEST
+                   -- row. There is at most one per person per project now, so this only
+                   -- decides the answer for rows written before that rule existed - but
+                   -- an arbitrary LIMIT 1 would let the same page show different numbers
+                   -- on two refreshes, which is worse than either answer.
+                   ORDER BY ct.created_at
+                   LIMIT 1
+               ) AS my_contribution,
                ${SEMESTER_COLUMNS}
         FROM projects p
         LEFT JOIN users u ON u.id = p.creator_id
@@ -252,7 +277,7 @@ async function findById(id, client = pool) {
         LEFT JOIN semesters s ON s.id = p.semester_id
         WHERE p.id = $1
         `,
-        [id]
+        [id, viewerId]
     );
 
     return result.rows[0];

@@ -202,7 +202,9 @@ async function getAllApprovedProjects({ semester = null, limit = null, offset = 
 // req.user on GET /admin/projects/:id. See assertVisibleTo for the rule.
 async function getProjectById(id, viewer = null) {
 
-    return await loadVisibleProject(id, viewer);
+    // The one read that wants my_contribution: the detail page turns it into "you have
+    // supported this" in place of the invest button.
+    return await loadVisibleProject(id, viewer, { withContribution: true });
 }
 
 async function getMyProjects(userId) {

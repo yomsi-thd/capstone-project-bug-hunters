@@ -112,13 +112,24 @@ const projectUpdateSchema = z.looseObject({
     body: z.string({ error: M.UPDATE_BODY_REQUIRED }).trim().min(1, M.UPDATE_BODY_REQUIRED),
 });
 
+// One contribution per person per project, so this ceiling is also the most a single
+// account can ever put behind one project - which is the whole point of it: a rich
+// account must not be able to outweigh a group of genuine supporters. Client's number,
+// 2026-09-01: "500CC feels ok".
+//
+// ⚠️ It lives HERE, not in the service, because it is a complaint about the SHAPE of a
+// value - it needs no database read. The two rules that do (already contributed, own
+// project) stay in investmentService. Same line the whole API draws.
+const MAX_CONTRIBUTION = 500;
+
 const investSchema = z.looseObject({
-    amount: amount,
+    amount: amount.refine((n) => n <= MAX_CONTRIBUTION, M.CONTRIBUTION_TOO_LARGE),
     // "No level - just support" sends nothing, and that is a first-class choice.
     tierId: z.union([z.number(), z.string()]).nullish(),
 });
 
 module.exports = {
+    MAX_CONTRIBUTION,
     createProjectSchema,
     updateProjectSchema,
     archiveSchema,

@@ -2,7 +2,8 @@ const projectRepository = require("../repositories/projectRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
 const tierRepository = require("../repositories/tierRepository");
 const withTransaction = require("../db/withTransaction");
-const { AppError, notFound, conflict, validationFailed } = require("../errors/AppError");
+const { AppError, notFound, conflict, forbidden, validationFailed } = require("../errors/AppError");
+const M = require("../validation/messages");
 const { assertSemesterOpen } = require("./projectAccess");
 
 // `tierId` is the support level the backer picked, and it is OPTIONAL — the modal
@@ -12,6 +13,22 @@ async function investProject(userId, projectId, amount, tierId = null) {
     if (!amount || amount <= 0) {
         throw validationFailed("Investment amount must be greater than 0.");
     }
+
+    try {
+        return await runInvestment(userId, projectId, amount, tierId);
+    } catch (error) {
+        // The unique index caught what the service's own read could not: two requests
+        // that both saw "not backed yet" before either committed. The person double-
+        // clicked a button - they must read the same sentence either way, not Postgres's.
+        if (error && error.code === "23505") {
+            throw conflict(M.CONTRIBUTION_ALREADY_MADE);
+        }
+
+        throw error;
+    }
+}
+
+async function runInvestment(userId, projectId, amount, tierId) {
 
     return await withTransaction(async (client) => {
 
@@ -44,6 +61,34 @@ async function investProject(userId, projectId, amount, tierId = null) {
         // ("Restore it first"). Losing that sentence would be a worse trade than the
         // duplication. assertSemesterOpen has no such conflict, so it is imported.
         assertSemesterOpen(project);
+
+        // ⚠️ Until 2026-09-07 this was a UI gate ONLY. The sidebar hides the invest
+        // button from the owner (it shows EDIT THIS PROJECT instead) and nothing behind
+        // it checked, so a hand-made request walked straight through - and one did:
+        // project 6 on the shared database carried its own creator's 300 CC. Same class
+        // of hole as canInvest before authorize("BACKER") landed on 2026-08-24, and as
+        // POST /classcoins/add before it grew authorize("ADMIN") on 2026-08-21.
+        //
+        // 403 rather than 409: this is not "the current state refuses it", it is a door
+        // that is not yours - the same answer the route guard gives a non-BACKER.
+        if (project.creator_id === userId) {
+            throw forbidden(M.CONTRIBUTION_OWN_PROJECT);
+        }
+
+        // One contribution per person per project. Read on the transaction's client so
+        // two requests arriving together cannot both see "nothing here yet"; the partial
+        // unique index on (classcoin_id, project_id) is the line under this one, and it
+        // is what makes the double-clicked CONFIRM impossible rather than unlikely.
+        //
+        // ⚠️ Placed AFTER the project-level rules on purpose. Somebody who already
+        // backed a project that has since been archived should read "this project has
+        // been archived" - that is the truer answer, and it is the same answer everyone
+        // else gets.
+        const existing = await classCoinRepository.findContribution(userId, projectId, client);
+
+        if (existing) {
+            throw conflict(M.CONTRIBUTION_ALREADY_MADE);
+        }
 
         // Resolved INSIDE the transaction, for the same reason archived_at is: the
         // creator can hide a level or raise its minimum while this investment is in

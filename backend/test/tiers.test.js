@@ -90,6 +90,22 @@ describe("POST /api/projects/:id/tiers", () => {
         expect((await post(level({ bullets: [] }))).status).toBe(422);
     });
 
+    // A level above the contribution cap is a level nobody can ever reach: since
+    // 2026-09-07 one person may put at most 500 CC into a project, once. Leaving it
+    // creatable would put a dead control on the project page by construction.
+    it("422 on a level that asks for more than a person may contribute", async () => {
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const post = (body) => as(creator.token).post(`/api/projects/${project.id}/tiers`).send(body);
+
+        const tooHigh = await post(level({ name: "Impossible", min_amount: 501 }));
+
+        expect(tooHigh.status).toBe(422);
+        expect(tooHigh.body.message).toBe("A support level cannot ask for more than 500 CC.");
+
+        // The cap itself must stay reachable - it is the number backers are shown.
+        expect((await post(level({ name: "At the cap", min_amount: 500 }))).status).toBe(201);
+    });
+
     // Worded identically to the frontend copy in tierRules.js. A creator who gets past
     // one check and is refused by the other must read the same sentence, not wonder
     // whether they have hit a second, stricter rule.

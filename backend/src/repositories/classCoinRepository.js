@@ -138,9 +138,12 @@ async function getInvestmentsByUser(userId) {
                p.current_amount,
                p.status,
                p.archived_at,
+               -- Still aggregates, and the GROUP BY still earns its place: one row per
+               -- project is the shape the page renders a card from. Since N4 there is at
+               -- most one contribution per project per person, so COUNT(*) and
+               -- MIN(created_at) said nothing the row did not already say and were
+               -- dropped on 2026-09-07 along with the "across N investments" line.
                SUM(ct.amount)::int AS invested_amount,
-               COUNT(*)::int       AS investment_count,
-               MIN(ct.created_at)  AS first_invested_at,
                MAX(ct.created_at)  AS last_invested_at,
                -- One card covers several investments, so it shows ONE support level:
                -- the highest this backer ever chose for this project. Same rule as
@@ -165,6 +168,31 @@ async function getInvestmentsByUser(userId) {
     return result.rows;
 }
 
+// Has this person already backed this project? One row is all the caller needs - the
+// answer only decides whether to refuse.
+//
+// ⚠️ `client` matters here more than anywhere else in this file. investmentService
+// calls it INSIDE the transaction, and a call that forgets to pass the client would take
+// its own connection and read a state the transaction is about to change - which is the
+// exact shape of the 2026-08-06 regression, where increaseCurrentAmount ran on its own
+// connection and ROLLBACK could not undo it.
+async function findContribution(userId, projectId, client = pool) {
+    const result = await client.query(
+        `
+        SELECT ct.id, ct.amount
+        FROM classcoin_transactions ct
+        JOIN classcoins c ON c.id = ct.classcoin_id
+        WHERE c.user_id = $1
+          AND ct.project_id = $2
+          AND ct.type = 'INVEST'
+        LIMIT 1
+        `,
+        [userId, projectId]
+    );
+
+    return result.rows[0];
+}
+
 module.exports = {
     createClassCoin,
     getBalance,
@@ -172,5 +200,6 @@ module.exports = {
     addBalance,
     createTransaction,
     getTransactions,
+    findContribution,
     getInvestmentsByUser
 };

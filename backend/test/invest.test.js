@@ -68,6 +68,69 @@ describe("POST /api/projects/:id/invest", () => {
         expect((await post({ amount: -50 })).status).toBe(422);
     });
 
+    it("refuses a second contribution to the same project", async () => {
+        const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        const first = await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+        const second = await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(409);
+        // The refusal must leave the wallet alone too, not just the project.
+        expect(await balanceOf(backer.id)).toBe(900);
+        expect(await fundedAmount(project.id)).toBe(100);
+    });
+
+    it("lets the same person back a DIFFERENT project", async () => {
+        const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const one = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const two = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        expect((await as(backer.token).post(`/api/projects/${one.id}/invest`).send({ amount: 100 })).status).toBe(200);
+        expect((await as(backer.token).post(`/api/projects/${two.id}/invest`).send({ amount: 100 })).status).toBe(200);
+    });
+
+    it("lets two different people back the same project", async () => {
+        const a = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const b = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        expect((await as(a.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 })).status).toBe(200);
+        expect((await as(b.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 })).status).toBe(200);
+    });
+
+    // Both sides of the boundary. 500 is the number advertised to backers, so it has to
+    // be a number they can actually send.
+    it("caps a contribution at 500 CC", async () => {
+        const backer = await makeUser({ roles: ["BACKER"], balance: 2000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+        const other = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        const tooBig = await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 501 });
+        expect(tooBig.status).toBe(422);
+        expect(await fundedAmount(project.id)).toBe(0);
+
+        const exact = await as(backer.token).post(`/api/projects/${other.id}/invest`).send({ amount: 500 });
+        expect(exact.status).toBe(200);
+    });
+
+    // The sidebar has hidden this button from the owner since it shipped and nothing
+    // behind it ever checked, so the hole was reachable by a hand-made request - and one
+    // got through: project 6 on the shared database carried its own creator's 300 CC.
+    // Same class of gap as canInvest before authorize("BACKER") landed on 2026-08-24.
+    it("refuses the creator backing their own project", async () => {
+        const owner = await makeUser({ roles: ["CREATOR", "BACKER"], balance: 1000 });
+        const project = await makeProject({ creatorId: owner.id, status: "APPROVED" });
+
+        const res = await as(owner.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+
+        expect(res.status).toBe(403);
+        expect(res.body.message).toBe("You cannot support your own project.");
+        expect(await balanceOf(owner.id)).toBe(1000);
+        expect(await fundedAmount(project.id)).toBe(0);
+    });
+
     it("409 INSUFFICIENT_FUNDS and no state change when the wallet is short", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 100 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -174,6 +237,36 @@ describe("investing at a support level", () => {
     });
 });
 
+describe("GET /api/projects/:id my_contribution", () => {
+    /**
+     * The field that lets the sidebar replace the invest button with "you have supported
+     * this" instead of leaving a dead control. It describes the PERSON READING the page,
+     * not the project - which is why it is not inside `stats`.
+     */
+    it("reports the reader's own contribution and nobody else's", async () => {
+        const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        const before = await as(backer.token).get(`/api/projects/${project.id}`);
+        expect(before.body.my_contribution).toBeNull();
+
+        await as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 250 });
+
+        const after = await as(backer.token).get(`/api/projects/${project.id}`);
+        expect(after.body.my_contribution).toBe(250);
+
+        // Somebody else's contribution is never somebody else's business.
+        const stranger = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const asStranger = await as(stranger.token).get(`/api/projects/${project.id}`);
+        expect(asStranger.body.my_contribution).toBeNull();
+
+        // A signed-out visitor has none, and asks for none - the page stays public.
+        const anon = await request(app).get(`/api/projects/${project.id}`);
+        expect(anon.status).toBe(200);
+        expect(anon.body.my_contribution).toBeNull();
+    });
+});
+
 describe("eight investments racing for one wallet", () => {
     /**
      * The wallet holds exactly enough for four of the eight. The deduction is a single
@@ -181,17 +274,26 @@ describe("eight investments racing for one wallet", () => {
      * wins; nothing in Node reads-then-writes.
      *
      * What must hold afterwards: exactly four succeed, the balance lands on zero, it
-     * never goes negative, and the project is funded by precisely what left the wallet.
+     * never goes negative, and each project is funded by precisely what left the wallet.
+     *
+     * ⚠️ EIGHT DIFFERENT PROJECTS, not eight attempts at one. Until 2026-09-07 this test
+     * raced eight requests at a single project, which N4 made illegal - one contribution
+     * per person. Left in that shape the new rule would refuse seven of them and the test
+     * would silently stop measuring the thing it exists for: the race on the WALLET.
      */
     it("lets exactly four through, and the balance never goes negative", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
-        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
-        const attempts = Array.from({ length: 8 }, () =>
-            as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 250 })
+        const projects = [];
+        for (let i = 0; i < 8; i += 1) {
+            projects.push(await makeProject({ creatorId: creator.id, status: "APPROVED" }));
+        }
+
+        const results = await Promise.all(
+            projects.map((project) =>
+                as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 250 })
+            )
         );
-
-        const results = await Promise.all(attempts);
 
         const succeeded = results.filter((res) => res.status === 200);
         const refused = results.filter((res) => res.status === 409);
@@ -205,9 +307,13 @@ describe("eight investments racing for one wallet", () => {
         expect(balance).toBe(0);
         expect(balance).toBeGreaterThanOrEqual(0);
 
-        // The half that the 2026-08-06 regression got wrong: the project must be funded
+        // The half that the 2026-08-06 regression got wrong: the projects must be funded
         // by exactly what left the wallet, with no rolled-back investment left counted.
-        expect(await fundedAmount(project.id)).toBe(1000);
+        const funded = await Promise.all(projects.map((project) => fundedAmount(project.id)));
+
+        expect(funded.reduce((sum, n) => sum + n, 0)).toBe(1000);
+        // Four projects at 250 each, four at nothing - never a partial amount anywhere.
+        expect(funded.every((n) => n === 0 || n === 250)).toBe(true);
 
         const { rows } = await pool.query(
             `select count(*)::int as n from classcoin_transactions t
@@ -217,5 +323,34 @@ describe("eight investments racing for one wallet", () => {
         );
 
         expect(rows[0].n).toBe(4);
+    });
+
+    /**
+     * The race N4 introduces, and the reason the partial unique index exists: one person,
+     * one project, two requests arriving together - a double-clicked CONFIRM button.
+     *
+     * The service reads "have they backed this already" inside the transaction, but two
+     * transactions can both read "no" before either commits. The index is what turns that
+     * from unlikely into impossible.
+     */
+    it("lets exactly one through when the same person double-clicks", async () => {
+        const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
+
+        const results = await Promise.all([
+            as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 }),
+            as(backer.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 }),
+        ]);
+
+        expect(results.filter((res) => res.status === 200)).toHaveLength(1);
+        // Whether the service's read or the unique index caught it, the loser reads the
+        // same sentence - never a raw Postgres error.
+        const loser = results.find((res) => res.status !== 200);
+        expect(loser.status).toBe(409);
+        expect(loser.body.message).toBe("You have already supported this project — one contribution per person.");
+        // The refused one must have taken nothing with it - not half a contribution, not
+        // a debited wallet with no transaction to show for it.
+        expect(await balanceOf(backer.id)).toBe(900);
+        expect(await fundedAmount(project.id)).toBe(100);
     });
 });

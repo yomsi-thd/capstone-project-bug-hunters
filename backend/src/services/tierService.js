@@ -2,6 +2,8 @@ const tierRepository = require("../repositories/tierRepository");
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
 const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
+const { MAX_CONTRIBUTION } = require("../validation/schemas/projectSchemas");
+const M = require("../validation/messages");
 
 const MAX_TIERS = 5;
 
@@ -40,6 +42,14 @@ function assertTierFields(tier) {
         // a creator who gets past one and is refused by the other should read the same
         // sentence, not wonder whether they hit a second, stricter rule.
         throw validationFailed("A level needs a minimum above 0 CC — a whole number of Class Coins.");
+    }
+
+    // A level above the contribution cap can never be chosen: one contribution per
+    // person, at most MAX_CONTRIBUTION CC (N4). Creating one would put a control on the
+    // project page that responds and can never lead anywhere - the exact thing the
+    // 2026-08-18 pass went through the app deleting.
+    if (tier.min_amount > MAX_CONTRIBUTION) {
+        throw validationFailed(M.TIER_ABOVE_CAP);
     }
 
     if (tier.bullets.length === 0) {
