@@ -4,7 +4,7 @@ import Header from "../components/layout/Header";
 import CreatorSidebar from "../components/creator/CreatorSidebar";
 import Avatar from "../components/ui/Avatar";
 import * as projectApi from "../api/projectApi";
-import { toNumber, fundedPercent, toBacker } from "../api/mappers";
+import { toNumber, toBacker } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
 export default function CreatorDashboard() {
@@ -13,7 +13,7 @@ export default function CreatorDashboard() {
   // There is no stats endpoint — totals are summed client-side from GET /projects/my,
   // which since 2026-08-18 also carries backers_count and comments_count per project.
   // TODO: ask for an aggregate endpoint once a creator can have many projects.
-  const [totals, setTotals] = useState({ raised: 0, goal: 0, count: 0, backers: 0, comments: 0 });
+  const [totals, setTotals] = useState({ raised: 0, count: 0, backers: 0, comments: 0 });
   // Projects that have comments, busiest first — the "Community Discussions" panel.
   const [discussions, setDiscussions] = useState([]);
   const [statsError, setStatsError] = useState(null);
@@ -27,7 +27,6 @@ export default function CreatorDashboard() {
         const list = rows || [];
         setTotals({
           raised: list.reduce((s, r) => s + toNumber(r.current_amount), 0),
-          goal: list.reduce((s, r) => s + toNumber(r.goal_amount), 0),
           count: list.length,
           // Summed across projects, so one person who backed two of them counts twice.
           // The stat is labelled "backers across projects" for exactly that reason.
@@ -70,7 +69,6 @@ export default function CreatorDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const totalPct = fundedPercent(totals.raised, totals.goal);
   const navigate = useNavigate();
 
 
@@ -102,25 +100,20 @@ export default function CreatorDashboard() {
             {/* Funding card */}
             <div className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-6">
               <div className="flex justify-between items-start mb-2">
-                <div className="text-[11px] font-bold text-gray-400 tracking-widest">TOTAL FUNDS RAISED</div>
+                <div className="text-[11px] font-bold text-gray-400 tracking-widest">TOTAL CLASS COINS RECEIVED</div>
                 <span className="bg-white border border-gray-200 rounded-full px-3 py-0.5 text-[11px] font-semibold text-green-600">Active Campaign</span>
               </div>
+              {/* A "/ 12,500 CC" goal, a percentage line and a progress bar sat under
+                  this figure until N3 (2026-09-07). The running total is the measure
+                  now, so there is nothing left to be a percentage of. */}
               <div className="text-3xl md:text-[36px] font-extrabold text-brand leading-none mb-1">
-                {totals.raised.toLocaleString()} CC{" "}
-                <span className="text-lg text-gray-400 font-normal">/ {totals.goal.toLocaleString()} CC</span>
+                {totals.raised.toLocaleString()} CC
               </div>
-              <p className="text-[12px] text-gray-400 mb-4">
+              <p className="text-[12px] text-gray-400">
                 {statsError
                   ? statsError
-                  : `${totalPct}% of your funding goal reached across ${totals.count} ${totals.count === 1 ? "project" : "projects"}.`}
+                  : `across ${totals.count} ${totals.count === 1 ? "project" : "projects"}.`}
               </p>
-              <div className="flex justify-between text-[11px] text-gray-400 mb-1">
-                <span>Progress</span>
-                <span className="text-brand font-bold">{totalPct}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min(totalPct, 100)}%` }} />
-              </div>
             </div>
 
             {/* Stat cards.

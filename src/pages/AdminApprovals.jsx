@@ -132,20 +132,15 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
               ))}
             </div>
 
-            {/* Project Goal */}
+            {/* Was "Project Goal" with two figures under it: PROJECTED FUNDING GOAL and
+                CAMPAIGN DURATION. Both went in N3 (2026-09-07) — there is no funding goal
+                any more, and the duration read start_date / end_date, which createProject
+                stopped writing on 2026-09-06, so it had been showing "Not set" on every
+                project filed since. The heading changed with them: "Goal" here meant the
+                project's aim, but beside a funding figure it read as the target. */}
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
-              <h3 className="text-[15px] font-bold text-gray-900 mb-2">Project Goal</h3>
-              <p className="text-[13px] text-gray-500 leading-relaxed mb-4">{project.description}</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-1">PROJECTED FUNDING GOAL</div>
-                  <div className="text-[18px] font-extrabold text-brand">{project.goal}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-1">CAMPAIGN DURATION</div>
-                  <div className="text-[18px] font-extrabold text-gray-900">{project.duration}</div>
-                </div>
-              </div>
+              <h3 className="text-[15px] font-bold text-gray-900 mb-2">About This Project</h3>
+              <p className="text-[13px] text-gray-500 leading-relaxed">{project.description}</p>
             </div>
 
             {/* Review Decision */}

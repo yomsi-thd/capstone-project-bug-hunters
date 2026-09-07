@@ -124,7 +124,6 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                 separate axis, so an archived project shows both: what the admin decided,
                 and the fact that it is currently put away. */}
             <div className="flex items-center gap-2 shrink-0">
-              {isActive && <span className="text-[15px] font-extrabold text-brand">{project.pct}%</span>}
               <StatusBadge status={project.status} />
               {isArchived && (
                 <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-2 py-1 whitespace-nowrap">
@@ -160,17 +159,12 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
             </div>
           ) : isActive ? (
             <>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-                <div className="h-full bg-brand rounded-full" style={{ width: `${project.pct}%` }} />
-              </div>
+              {/* A progress bar and a GOAL figure stood here until N3 (2026-09-07).
+                  There is no target any more, so this is the running total on its own. */}
               <div className="flex gap-8 mb-4">
                 <div>
-                  <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">RAISED</div>
+                  <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">TOTAL SUPPORT</div>
                   <div className="text-[14px] font-bold text-gray-900">{project.raised}</div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">GOAL</div>
-                  <div className="text-[14px] font-bold text-gray-900">{project.goal}</div>
                 </div>
               </div>
             </>
@@ -480,7 +474,7 @@ export default function CreatorMyProjects() {
   // Stats describe what you are actually running, so archived projects are excluded —
   // an archived project raises nothing and is not "active funding".
   const totalProjects = liveProjects.length;
-  const activeFunding = liveProjects.filter(p => p.status === "Active").length;
+  const activeProjects = liveProjects.filter(p => p.status === "Active").length;
   const totalRaised = liveProjects.reduce((sum, p) => {
     if (p.status === "Active") {
       // toCreatorProject formats this as "10,625 CC"; parseAmount knows to strip the
@@ -518,8 +512,10 @@ export default function CreatorMyProjects() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
         <StatCard label="TOTAL PROJECTS" value={totalProjects} icon="📁" />
-        <StatCard label="ACTIVE FUNDING" value={activeFunding} icon="📈" />
-        <StatCard label="TOTAL RAISED" value={`${totalRaised.toLocaleString()} CC`} icon="💳" />
+        {/* ⚠️ Was "ACTIVE FUNDING", which had always been the wrong label: the value is
+            a COUNT of projects, not an amount. N3 (2026-09-07) only made that visible. */}
+        <StatCard label="ACTIVE PROJECTS" value={activeProjects} icon="📈" />
+        <StatCard label="TOTAL SUPPORT" value={`${totalRaised.toLocaleString()} CC`} icon="💳" />
       </div>
 
       {/* Filter by the admin's verdict, plus the archive bin. Only rendered once there is

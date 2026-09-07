@@ -20,15 +20,6 @@ import { errorMessage } from "../api/apiError";
 
 const MAX_GALLERY_IMAGES = 6;
 
-// Class Coins, not AUD. CC is an internal score with no real-world value, so it must
-// never be rendered as a currency — Intl's AUD style produced "$15,000", which read as
-// a real funding target.
-function formatCurrency(value) {
-  const numericValue = Number(String(value).replace(/[^\d.]/g, ""));
-  if (Number.isNaN(numericValue) || numericValue <= 0) return "—";
-  return `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(numericValue)} CC`;
-}
-
 // The dropdown offers "School of Engineering", but projects.category holds the bare
 // department ("ENGINEERING") — that is what TAG_COLORS and FILTER_TAGS key on and what
 // every existing row uses. Submitting the label verbatim produced a category that
@@ -200,8 +191,8 @@ function getStoredDraft(key) {
 function draftHasContent(draft) {
   if (!draft) return false;
 
-  const { title, school, goal, proposition } = draft.basicData || {};
-  if ([title, school, goal, proposition].some(hasText)) return true;
+  const { title, school, proposition } = draft.basicData || {};
+  if ([title, school, proposition].some(hasText)) return true;
   if (Object.values(draft.story || {}).some(v => typeof v === "string" && hasText(v))) return true;
 
   return Boolean(draft.media?.coverImage) || (draft.media?.galleryImages || []).length > 0;
@@ -382,14 +373,6 @@ function Step1({ data, setData, ownerPicker }) {
             <option value="">Select your primary academic affiliation...</option>
             {SCHOOLS.map(s => <option key={s}>{s}</option>)}
           </select>
-        </div>
-        <div>
-          <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">FUNDING GOAL (CC)</label>
-          <div className="relative">
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-semibold text-[12px]">CC</span>
-            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} placeholder="15,000" className="w-full border border-gray-200 rounded-md pl-10 pr-3 py-2.5 text-[14px] outline-none focus:border-brand transition-colors" />
-          </div>
-          <p className="text-[11px] text-gray-300 mt-1">Minimum target is 500 CC. Class Coins measure support from the RMIT community — they hold no real-world value.</p>
         </div>
         <div>
           <label className="text-[11px] font-bold text-gray-500 tracking-widest block mb-1.5">VALUE PROPOSITION</label>
@@ -861,9 +844,10 @@ function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
             </div>
             <button type="button" onClick={() => onEdit(1)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[13px] text-gray-600">
+          {/* One column since N3 (2026-09-07): "Funding goal" sat beside School until
+              the goal was removed from the product. */}
+          <div className="text-[13px] text-gray-600">
             <div><span className="text-gray-400">School:</span> {basicData.school || "—"}</div>
-            <div><span className="text-gray-400">Funding goal:</span> {formatCurrency(basicData.goal)}</div>
           </div>
           <div className="mt-4 text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">{basicData.proposition || "No value proposition added yet."}</div>
         </section>
@@ -988,7 +972,7 @@ export default function CreateProject() {
   const [creatorsLoading, setCreatorsLoading] = useState(false);
   const [creatorsError, setCreatorsError] = useState(null);
   const [step, setStep] = useState(storedDraft?.step ?? 1);
-  const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", goal: "", proposition: "" });
+  const [basicData, setBasicData] = useState(storedDraft?.basicData ?? { title: "", school: "", proposition: "" });
   const [media, setMedia] = useState(storedDraft?.media ? restoreMedia(storedDraft.media) : { coverImage: null, videoUrl: "", galleryImages: [] });
   const [story, setStory] = useState(
     storedDraft?.story
@@ -1114,8 +1098,6 @@ export default function CreateProject() {
       }
       if (!hasText(basicData.title)) return "Add a project title before continuing.";
       if (!hasText(basicData.school)) return "Choose a school or department before continuing.";
-      const goalValue = Number(String(basicData.goal).replace(/[^\d.]/g, ""));
-      if (!hasText(basicData.goal) || Number.isNaN(goalValue) || goalValue < 500) return "Enter a funding goal of at least 500 CC.";
       if (!hasText(basicData.proposition)) return "Add your value proposition before continuing.";
     }
 
@@ -1222,7 +1204,7 @@ export default function CreateProject() {
     setSubmitting(true);
     setMessage("");
     try {
-      // The backend accepts: title, description, category, goal_amount, image_url,
+      // The backend accepts: title, description, category, image_url,
       // team_members, challenge, solution, funding_usage, gallery, solution_bullets
       // and video_url.
       //
@@ -1236,7 +1218,6 @@ export default function CreateProject() {
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
         category: toCategory(basicData.school),
-        goal_amount: parseAmount(basicData.goal),
         // Sent ONLY by an admin. The service refuses a creator who sends it and refuses
         // an admin who does not — it is never an optional extra on either side.
         ...(canCreateForOthers ? { creator_id: Number(ownerId) } : {}),

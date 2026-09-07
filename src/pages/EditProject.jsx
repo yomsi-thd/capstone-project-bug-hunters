@@ -37,7 +37,9 @@ function TabBasicInfo({ data, setData }) {
         <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Project Title</label>
         <input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {/* One column since N3 (2026-09-07): "Funding Goal (CC)" sat beside this until
+          the goal was removed from the product. */}
+      <div>
         <div>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">School / Department</label>
           <select value={data.school} onChange={e => setData({ ...data, school: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors">
@@ -48,13 +50,6 @@ function TabBasicInfo({ data, setData }) {
             {!SCHOOLS.includes(data.school) && data.school && <option key={data.school}>{data.school}</option>}
             {SCHOOLS.map(s => <option key={s}>{s}</option>)}
           </select>
-        </div>
-        <div>
-          <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Funding Goal (CC)</label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[11px]">CC</span>
-            <input value={data.goal} onChange={e => setData({ ...data, goal: e.target.value })} className="w-full border border-gray-200 rounded-md pl-9 pr-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
-          </div>
         </div>
       </div>
       <div>
@@ -434,10 +429,6 @@ export default function EditProject({ project, onClose }) {
           // derived from it, so `School of ${dept}` produced "School of School of design"
           // for anything created through the form.
           school: project.category || EDIT_PROJECT_INITIAL_DATA.school,
-          // toCreatorProject hands this over as "12,500 CC". Kept as a STRING: it binds
-          // to a controlled <input value=...>, and a number is fine there but undefined
-          // would make the input uncontrolled.
-          goal: project.goal ? String(parseAmount(project.goal)) : EDIT_PROJECT_INITIAL_DATA.goal,
           // description comes from the API (projects.description).
           proposition: project.description || project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
           // toCreatorProject passes these through from the story columns; "" when unset.
@@ -453,7 +444,7 @@ export default function EditProject({ project, onClose }) {
   const [saveError, setSaveError] = useState(null);
 
   // PUT /api/projects/:id — the backend accepts title, description, category,
-  // goal_amount, image_url, team_members and the three story columns. Support Levels
+  // image_url, team_members and the three story columns. Support Levels
   // save themselves through their own endpoints (see TabTiers); the Media tab is still
   // the one with nowhere to save.
   const handleSave = async () => {
@@ -479,7 +470,6 @@ export default function EditProject({ project, onClose }) {
         // Was `project.category ?? basicData.school`, which always won — the School
         // dropdown looked editable but every change to it was thrown away on save.
         category: toCategory(basicData.school),
-        goal_amount: parseAmount(basicData.goal),
         image_url: project.img || "",
         team_members: team,
         // The column is funding_usage; the form field is called `funding`.

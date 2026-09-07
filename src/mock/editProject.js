@@ -14,7 +14,6 @@ export const EDIT_PROJECT_TABS = [
 export const EDIT_PROJECT_INITIAL_DATA = {
   title: "Autonomous Urban Transit",
   school: "School of Engineering",
-  goal: "250000",
   proposition: "Developing the next generation of AI-driven public transport for high-density metropolitan areas, focusing on safety, efficiency, and last-mile connectivity for RMIT's urban campus ecosystem.",
 };
 

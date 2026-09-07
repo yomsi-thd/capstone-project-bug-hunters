@@ -275,7 +275,7 @@ export default function AdminDashboard() {
               <table className="w-full border-collapse min-w-[750px]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["PROJECT DETAIL", "CREATOR", "STATUS", "FUNDING PROGRESS", "ACTIONS"].map(h => (
+                    {["PROJECT DETAIL", "CREATOR", "STATUS", "TOTAL SUPPORT", "ACTIONS"].map(h => (
                       <th key={h} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-widest text-left">{h}</th>
                     ))}
                   </tr>
@@ -332,13 +332,9 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold text-brand w-8">{p.pct}%</span>
-                            <div className="flex-1 h-1 bg-gray-100 rounded-full min-w-20">
-                              <div className="h-full bg-brand rounded-full" style={{ width: `${Math.min(p.pct, 100)}%` }} />
-                            </div>
-                            <span className="text-[11px] text-gray-400 whitespace-nowrap">{p.raised} / {p.goal}</span>
-                          </div>
+                          {/* A percentage and a progress bar stood here until N3
+                              (2026-09-07). The column is the running total now. */}
+                          <span className="text-[13px] font-bold text-gray-900 whitespace-nowrap">{p.raised}</span>
                         </td>
                         <td className="px-5 py-3.5">
                           {/* Archived rows get the two recovery-bin actions; live rows get

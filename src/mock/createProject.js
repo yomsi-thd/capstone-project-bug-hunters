@@ -2,7 +2,10 @@ export const CREATE_PROJECT_STEPS = [
   { id: 1, label: "Basic Info" },
   { id: 2, label: "Story & Media" },
   { id: 3, label: "Team Members" },
-  { id: 4, label: "Funding Goals" },
+  // The step itself has said "Support Levels" since 2026-08-20; this label was still
+  // "Funding Goals", naming a thing the step does not collect and, after N3
+  // (2026-09-07), a thing the product no longer has.
+  { id: 4, label: "Support Levels" },
   { id: 5, label: "Review & Submit" },
 ];
 
