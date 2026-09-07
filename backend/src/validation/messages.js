@@ -28,6 +28,12 @@ const MESSAGES = {
     // A level above the cap is a level nobody can reach - a dead control by construction.
     TIER_ABOVE_CAP: "A support level cannot ask for more than 500 CC.",
 
+    // An ADMIN owns nothing (role separation, 2026-08-24), so granting to one is refused
+    // on BOTH coin routes - enforcing it only where the UI hides a checkbox is how
+    // canInvest and /classcoins/add were each wrong until somebody sent a request by hand.
+    GRANT_TO_ADMIN: "An administrator account cannot hold Class Coins.",
+    GRANT_TARGET_MISSING: "One of those accounts no longer exists.",
+
     // The wallet to adjust is named in the BODY, never taken from the token - reading
     // it from the token was the whole bug of 2026-08-21, when any signed-in user could
     // mint Class Coins into their own balance.

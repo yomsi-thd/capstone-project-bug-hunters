@@ -57,6 +57,15 @@ const addCoins = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "ClassCoins added successfully", classCoin });
 });
 
+// Bulk and single are the same call - granting to one person is a list of one. The
+// grantor comes from the TOKEN, never the body: it is an audit trail, and a claim the
+// caller could type would be worth nothing.
+const grantCoins = asyncHandler(async (req, res) => {
+    const result = await classCoinService.grantToUsers(req.body.user_ids, req.body.amount, req.user.id);
+
+    res.status(200).json({ message: "Class Coins granted.", ...result });
+});
+
 const deductCoins = asyncHandler(async (req, res) => {
     const { userId, amount } = targetWallet(req);
 
@@ -65,4 +74,4 @@ const deductCoins = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "ClassCoins deducted successfully", classCoin });
 });
 
-module.exports = { getClassCoin, getTransactions, getMyInvestments, addCoins, deductCoins };
+module.exports = { getClassCoin, getTransactions, getMyInvestments, addCoins, grantCoins, deductCoins };

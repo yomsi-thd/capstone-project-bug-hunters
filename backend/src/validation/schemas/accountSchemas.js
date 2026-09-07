@@ -54,7 +54,28 @@ const updateRolesSchema = z.looseObject({
     }),
 });
 
+/**
+ * Bulk grant. Both limits guard against a slip rather than a hostile admin: 200 ids is a
+ * large class nobody reaches by accident, and 100,000 CC is 200 times the contribution
+ * cap - wide enough for any real intent, narrow enough to catch a typed extra zero.
+ *
+ * ⚠️ WHO may receive a grant is not here: it needs the roles table, so it lives in
+ * classCoinService where it cannot be routed around.
+ */
+const grantSchema = z.looseObject({
+    user_ids: z
+        .array(z.coerce.number().int().positive(), { error: "Choose at least one account to grant to." })
+        .min(1, "Choose at least one account to grant to.")
+        .max(200, "Grant to at most 200 accounts at a time."),
+    amount: z.coerce
+        .number({ error: "An amount is required." })
+        .int("An amount must be a whole number of Class Coins.")
+        .min(1, "An amount must be greater than 0.")
+        .max(100000, "That is more than 100,000 CC - check the amount."),
+});
+
 module.exports = {
+    grantSchema,
     updateProfileSchema,
     changePasswordSchema,
     walletAdjustmentSchema,

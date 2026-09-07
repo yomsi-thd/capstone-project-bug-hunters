@@ -1,8 +1,10 @@
 const pool = require("../config/db");
 
 // Create ClassCoin account
-async function createClassCoin(userId) {
-    const result = await pool.query(
+// `client` so a grant can create a missing wallet inside its own transaction: six
+// accounts on the shared database predate this call and have no wallet row at all.
+async function createClassCoin(userId, client = pool) {
+    const result = await client.query(
         `
         INSERT INTO classcoins (user_id)
         VALUES ($1)
@@ -78,9 +80,10 @@ async function createTransaction(transaction, client = pool) {
             type,
             amount,
             description,
-            tier_id
+            tier_id,
+            granted_by
         )
-        VALUES ($1,$2,$3,$4,$5,$6)
+        VALUES ($1,$2,$3,$4,$5,$6,$7)
         RETURNING *;
         `,
         [
@@ -93,11 +96,29 @@ async function createTransaction(transaction, client = pool) {
             // than derived later from the amount: min_amount is editable, so buckets
             // worked out afterwards would silently rewrite what somebody signalled.
             // NULL is the normal case — choosing a level is optional.
-            transaction.tier_id ?? null
+            transaction.tier_id ?? null,
+            // Who issued this, when it was a grant. NULL for an investment (nobody
+            // issues one), and NULL for the automatic grant at registration — there the
+            // system is the grantor and no admin should be credited with it.
+            transaction.granted_by ?? null
         ]
     );
 
     return result.rows[0];
+}
+
+// The wallets for a batch of accounts, in one round trip.
+//
+// ⚠️ Returns FEWER rows than ids when somebody has no wallet, and the service treats that
+// as "one of these accounts does not exist" rather than quietly granting to the rest -
+// a partial grant is the one outcome the bulk route exists to make impossible.
+async function findWalletsByUserIds(userIds, client = pool) {
+    const result = await client.query(
+        "SELECT id, user_id FROM classcoins WHERE user_id = ANY($1)",
+        [userIds]
+    );
+
+    return result.rows;
 }
 
 // Get transactions
@@ -201,5 +222,6 @@ module.exports = {
     createTransaction,
     getTransactions,
     findContribution,
+    findWalletsByUserIds,
     getInvestmentsByUser
 };

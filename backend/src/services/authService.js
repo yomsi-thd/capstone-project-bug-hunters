@@ -5,6 +5,7 @@ const { conflict, unauthenticated, validationFailed } = require("../errors/AppEr
 const userRepository = require("../repositories/userRepository");
 const refreshTokenRepository = require("../repositories/refreshTokenRepository");
 const classCoinRepository = require("../repositories/classCoinRepository");
+const classCoinService = require("./classCoinService");
 const creatorRequestRepository = require("../repositories/creatorRequestRepository");
 
 const {
@@ -38,6 +39,15 @@ async function register(fullName, email, password, wantCreator) {
     await userRepository.assignRole(user.id, "BACKER");
 
     await classCoinRepository.createClassCoin(user.id);
+
+    // ⚠️ Deliberately swallowed. A wallet that could not be topped up must not turn a
+    // successful registration into an error: the account exists, the wallet exists, and
+    // an admin can grant later. Failing here would trade a minor gap for a total one.
+    try {
+        await classCoinService.grantOnRegistration(user.id, email);
+    } catch (error) {
+        console.error("[warn] registration grant failed:", error.message);
+    }
 
     if (wantCreator) {
         await creatorRequestRepository.create(user.id);

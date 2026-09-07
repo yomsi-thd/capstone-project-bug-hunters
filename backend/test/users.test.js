@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 
-import { app, pool, makeUser, makeProject, makeTier, balanceOf, as, PASSWORD } from "./helpers/factories.js";
+import { app, pool, makeUser, makeProject, makeTier, balanceOf, as, uniqueEmail, PASSWORD } from "./helpers/factories.js";
 
 let backer;
 let creator;
@@ -255,5 +255,93 @@ describe("POST /api/classcoins/add and /deduct", () => {
             { field: "user_id", message: "user_id is required - name the account to adjust." },
         ]);
         expect(await balanceOf(admin.id)).toBe(before);
+    });
+});
+
+/**
+ * Where a new account's Class Coins come from, since 2026-09-07 (N5).
+ *
+ * They used to come from `classcoins.balance DEFAULT 4500` — a column default, which
+ * meant a throwaway account was worth 4,500 CC of influence over the ranking. Now a
+ * wallet starts empty and is filled either by the domain rule below or by an admin.
+ */
+describe("the grant at registration", () => {
+    const registerAs = (email) =>
+        request(app).post("/api/auth/register").send({ fullName: "Grant Test", email, password: PASSWORD });
+
+    const walletOf = async (email) => {
+        const { rows } = await pool.query(
+            `SELECT cc.id, cc.balance::int AS balance
+             FROM classcoins cc JOIN users u ON u.id = cc.user_id
+             WHERE u.email = $1`,
+            [email]
+        );
+        return rows[0];
+    };
+
+    it("grants 4000 CC to an RMIT address, and records where it came from", async () => {
+        const email = uniqueEmail("granted").replace(/@.*/, "@rmit.edu.vn");
+
+        expect((await registerAs(email)).status).toBe(201);
+
+        const wallet = await walletOf(email);
+        expect(wallet.balance).toBe(4000);
+
+        // ⚠️ Coins must never appear without a transaction to explain them. A balance
+        // that moved with nothing in the ledger is the class of unexplainable figure the
+        // 2026-08-18 pass went through the app deleting.
+        const { rows } = await pool.query(
+            `SELECT type, amount::int AS amount, granted_by
+             FROM classcoin_transactions WHERE classcoin_id = $1`,
+            [wallet.id]
+        );
+        expect(rows).toHaveLength(1);
+        expect(rows[0].type).toBe("ADMIN_ADD");
+        expect(rows[0].amount).toBe(4000);
+        // NULL means the SYSTEM granted it. An admin's grant carries their id.
+        expect(rows[0].granted_by).toBeNull();
+    });
+
+    it("leaves a non-RMIT address at zero, with no transaction", async () => {
+        const email = uniqueEmail("outsider").replace(/@.*/, "@gmail.com");
+
+        expect((await registerAs(email)).status).toBe(201);
+
+        const wallet = await walletOf(email);
+        expect(wallet.balance).toBe(0);
+
+        const { rows } = await pool.query(
+            "SELECT 1 FROM classcoin_transactions WHERE classcoin_id = $1",
+            [wallet.id]
+        );
+        expect(rows).toHaveLength(0);
+    });
+
+    // ⚠️ Regression guard, 2026-09-07. grantOnRegistration used to add the balance and
+    // THEN write the ledger row as two separate statements. When the second failed - it
+    // did, against a database that had not been migrated yet - the wallet kept 4,000 CC
+    // that nothing in the system could account for. The two are one transaction now, and
+    // this test fails the moment somebody splits them: a balance and its explanation must
+    // land together or not at all.
+    it("never leaves a balance without the row that explains it", async () => {
+        const email = uniqueEmail("atomic").replace(/@.*/, "@rmit.edu.vn");
+
+        expect((await registerAs(email)).status).toBe(201);
+
+        const wallet = await walletOf(email);
+        const { rows } = await pool.query(
+            "SELECT COALESCE(SUM(amount), 0)::int AS total FROM classcoin_transactions WHERE classcoin_id = $1",
+            [wallet.id]
+        );
+
+        // The ledger must account for the balance down to the last coin.
+        expect(rows[0].total).toBe(wallet.balance);
+    });
+
+    it("matches the domain case-insensitively", async () => {
+        const email = uniqueEmail("shouty").replace(/@.*/, "@RMIT.EDU.VN");
+
+        expect((await registerAs(email)).status).toBe(201);
+        expect((await walletOf(email)).balance).toBe(4000);
     });
 });

@@ -71,6 +71,30 @@ async function deleteUser(id) {
 // adminService.getAllUsers() calls this function, but it did not exist before
 // -> GET /api/admin/users returned "userRepository.findAllUsers is not a function".
 // Returns a roles array because the users table no longer has a role column.
+// Which of these accounts hold ADMIN? Used to refuse a grant BEFORE any of it lands.
+// An admin owns nothing since 2026-08-24, and checking it here rather than only in the
+// screen is the difference between a rule and a suggestion.
+// Which of these ids name a real account? Used by the bulk grant to tell "this person
+// has no wallet yet" (fine, one gets made) apart from "this id names nobody" (a 404).
+async function findExistingIdsAmong(userIds, client = pool) {
+    const result = await client.query("SELECT id FROM users WHERE id = ANY($1)", [userIds]);
+
+    return result.rows.map((row) => row.id);
+}
+
+async function findAdminIdsAmong(userIds, client = pool) {
+    const result = await client.query(
+        `SELECT DISTINCT u.id
+         FROM users u
+         JOIN user_roles ur ON ur.user_id = u.id
+         JOIN roles r ON r.id = ur.role_id
+         WHERE u.id = ANY($1) AND r.name = 'ADMIN'`,
+        [userIds]
+    );
+
+    return result.rows.map((row) => row.id);
+}
+
 async function findAllUsers({ limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
@@ -82,11 +106,18 @@ async function findAllUsers({ limit = null, offset = 0 } = {}) {
                COALESCE(
                    ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL),
                    '{}'
-               ) AS roles
+               ) AS roles,
+               -- The admin issues Class Coins from this same table, so the balance has to
+               -- be on the row. ⚠️ LEFT JOIN: four accounts on the shared database have no
+               -- wallet, and an INNER JOIN would drop them off the admin's screen without
+               -- an error - a silent disappearance. NULL here means "no wallet", which is
+               -- a different fact from a balance of 0.
+               cc.balance::int AS balance
         FROM users u
         LEFT JOIN user_roles ur ON ur.user_id = u.id
         LEFT JOIN roles r ON r.id = ur.role_id
-        GROUP BY u.id
+        LEFT JOIN classcoins cc ON cc.user_id = u.id
+        GROUP BY u.id, cc.balance
         ORDER BY u.id
         ${limit == null ? "" : "LIMIT $1 OFFSET $2"}
         `,
@@ -203,6 +234,8 @@ async function updateStatus(userId, isActive) {
 
 module.exports = {
     createUser,
+    findAdminIdsAmong,
+    findExistingIdsAmong,
     findById,
     findByEmail,
     updateProfile,

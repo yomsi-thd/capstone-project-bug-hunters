@@ -272,7 +272,11 @@ CREATE INDEX idx_project_tiers_project ON project_tiers (project_id);
 CREATE TABLE classcoins (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER   NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-    balance     INTEGER   NOT NULL DEFAULT 4500,
+    -- DEFAULT 0 since 2026-09-07 (N5). It was 4500, handed to every account at sign-up,
+    -- which made a throwaway account worth 4,500 CC of influence — exactly the hole that
+    -- admin-issued coins exist to close. A wallet now starts empty and is filled either by
+    -- the domain rule at registration or by an admin.
+    balance     INTEGER   NOT NULL DEFAULT 0,
     created_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -296,6 +300,14 @@ CREATE TABLE classcoin_transactions (
     type          VARCHAR(20) NOT NULL,
     amount        INTEGER     NOT NULL,
     description   TEXT,
+    -- Who issued this grant (N5, 2026-09-07). NULL means the SYSTEM granted it from the
+    -- email domain at registration.
+    -- ⚠️ Every ADMIN_ADD row written BEFORE that date is also NULL, and there it means
+    -- "nobody recorded it" — the two are told apart by created_at, which was judged not
+    -- worth a second column.
+    -- SET NULL, not CASCADE: deleting an admin must not erase the record that somebody
+    -- else received coins. Same reasoning as project_updates.author_id.
+    granted_by    INTEGER     REFERENCES users(id) ON DELETE SET NULL,
     created_at    TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

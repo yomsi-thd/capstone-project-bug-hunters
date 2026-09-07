@@ -5,7 +5,7 @@ const classCoinController = require("../controllers/classCoinController");
 const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 const { validateBody } = require("../validation/validate");
-const { walletAdjustmentSchema } = require("../validation/schemas/accountSchemas");
+const { walletAdjustmentSchema, grantSchema } = require("../validation/schemas/accountSchemas");
 
 // Get balance
 router.get(
@@ -46,6 +46,17 @@ router.post(
     authorize("ADMIN"),
     validateBody(walletAdjustmentSchema),
     classCoinController.addCoins
+);
+
+// Bulk grant. Separate from /add because it is ATOMIC across the whole list - looping
+// /add from the browser would leave an admin with half a class credited and no way to
+// tell which half.
+router.post(
+    "/grant",
+    authenticate,
+    authorize("ADMIN"),
+    validateBody(grantSchema),
+    classCoinController.grantCoins
 );
 
 router.post(

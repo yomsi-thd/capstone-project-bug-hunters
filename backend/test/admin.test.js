@@ -46,6 +46,25 @@ describe("GET /api/admin/users and /users/:id", () => {
         expect(res.body.total).toBe(res.body.items.length);
     });
 
+    // The admin's screen shows each account's balance so coins can be issued from the
+    // same table. LEFT JOIN, not INNER: four accounts on the shared database have no
+    // wallet row, and an INNER would make them vanish from the admin's screen entirely -
+    // a silent disappearance, which is worse than an error.
+    it("carries each account's balance, and keeps accounts that have no wallet", async () => {
+        const withWallet = await makeUser({ roles: ["BACKER"], balance: 250 });
+        const noWallet = await makeUser({ roles: ["BACKER"] });
+        await pool.query("DELETE FROM classcoins WHERE user_id = $1", [noWallet.id]);
+
+        const rows = (await as(admin.token).get("/api/admin/users")).body.items;
+
+        expect(rows.find((u) => u.id === withWallet.id).balance).toBe(250);
+
+        const missing = rows.find((u) => u.id === noWallet.id);
+        expect(missing).toBeDefined();
+        // null, not 0: no wallet at all is a different fact from an empty wallet.
+        expect(missing.balance).toBeNull();
+    });
+
     it("200 for one user, 404 for an id that does not exist", async () => {
         expect((await as(admin.token).get(`/api/admin/users/${backer.id}`)).status).toBe(200);
 
