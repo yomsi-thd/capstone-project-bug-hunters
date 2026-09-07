@@ -138,9 +138,11 @@ CREATE TABLE projects (
     title             VARCHAR(255)  NOT NULL,
     -- Short blurb: the Discover card text and the opening paragraph of About.
     description       TEXT          NOT NULL,
-    -- numeric, so node-postgres returns these as STRINGS ("5000.00").
+    -- The project's running total of Class Coins, and after 2026-09-07 the ONLY funding
+    -- number there is: goal_amount was dropped that day (N3) because the client asked for
+    -- the funding framing to go — no goal, no percentage, no "fully funded" state.
+    -- numeric, so node-postgres returns this as a STRING ("5000.00").
     -- src/api/mappers.js pushes every read through toNumber() for that reason.
-    goal_amount       NUMERIC       NOT NULL,
     current_amount    NUMERIC       DEFAULT 0,
     image_url         TEXT,
     -- Free text, but the UI keys TAG_COLORS / FILTER_TAGS off the bare

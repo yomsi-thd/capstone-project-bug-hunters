@@ -156,7 +156,6 @@ describe("POST /api/projects - the semester gate", () => {
         title: "A project filed against a semester",
         description: "Short blurb.",
         category: "ENGINEERING",
-        goal_amount: 5000,
     };
 
     it("201 inside a semester, filed under the open one", async () => {

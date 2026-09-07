@@ -109,7 +109,6 @@ async function makeProject({
     creatorId,
     status = "APPROVED",
     title = "Test project",
-    goal = 5000,
     current = 0,
     createdByAdminId = null,
     archivedAt = null,
@@ -121,15 +120,14 @@ async function makeProject({
 
     const { rows } = await pool.query(
         `INSERT INTO projects
-             (creator_id, title, description, goal_amount, current_amount, category,
+             (creator_id, title, description, current_amount, category,
               status, created_by_admin_id, archived_at, archived_by, semester_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          RETURNING *`,
         [
             creatorId,
             title,
             "A description used by the backend test suite.",
-            goal,
             current,
             category,
             status,

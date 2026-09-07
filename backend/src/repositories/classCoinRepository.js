@@ -136,7 +136,6 @@ async function getInvestmentsByUser(userId) {
                p.category,
                p.image_url,
                p.current_amount,
-               p.goal_amount,
                p.status,
                p.archived_at,
                SUM(ct.amount)::int AS invested_amount,

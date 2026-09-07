@@ -30,15 +30,19 @@ const CARD_COLUMNS = [
     "category",
     "status",
     "image_url",
-    "goal_amount",
+    // The card's headline number. goal_amount left this list on 2026-09-07 (N3) with the
+    // funding framing, and start_date / end_date went with it: nothing has read those two
+    // since a project started closing when its SEMESTER closes.
     "current_amount",
     // Added 2026-09-06. The one column here that the card does not render directly: it
     // shows the semester's NAME, which the frontend resolves from GET /semesters rather
     // than making this query JOIN for a short string on every keystroke.
     "semester_id",
-    "start_date",
-    "end_date",
     "created_at",
+    // Added 2026-09-07 (N3). A subquery, not a column — DISTINCT wallets, the same one
+    // findById and findByCreatorId already run. It is the second real number the card
+    // has now that there is no percentage, and it costs one integer per row.
+    "backers_count",
 ];
 
 let creator;

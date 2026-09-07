@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 
-import { app, makeUser, makeProject, makeTier, as, uniqueEmail, PASSWORD } from "./helpers/factories.js";
+import { app, makeUser, makeProject, makeTier, balanceOf, as, uniqueEmail, PASSWORD } from "./helpers/factories.js";
 
 let creator;
 let backer;
@@ -33,7 +33,6 @@ describe("what the schema catches", () => {
         expect(res.body.code).toBe("VALIDATION_FAILED");
         expect(res.body.details.map((d) => d.field).sort()).toEqual([
             "description",
-            "goal_amount",
             "title",
         ]);
         expect(res.body.details.every((d) => typeof d.message === "string" && d.message.length > 0)).toBe(true);
@@ -48,13 +47,22 @@ describe("what the schema catches", () => {
         expect(res.body.details).toEqual([{ field: "password", message: "A password is required." }]);
     });
 
+    // The coercion itself is still here — investSchema uses the same `amount` helper the
+    // create schema used to. Moved onto invest on 2026-09-07, when goal_amount went (N3).
     it("coerces a numeric string, so a hand-made request still works", async () => {
-        const res = await as(creator.token)
-            .post("/api/projects")
-            .send({ title: "Coerced", description: "x", category: "ENGINEERING", goal_amount: "5000" });
+        const spender = await makeUser({ roles: ["BACKER"], balance: 5000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
-        expect(res.status).toBe(201);
-        expect(Number(res.body.project.goal_amount)).toBe(5000);
+        const res = await as(spender.token)
+            .post(`/api/projects/${project.id}/invest`)
+            .send({ amount: "100" });
+
+        // 200, not 201 — invest answers with the updated balance, it does not create a
+        // resource the caller addresses afterwards.
+        expect(res.status).toBe(200);
+        // The assertion that actually proves the coercion: "100" reached the wallet as
+        // the number 100, not as a string concatenated or rejected.
+        expect(await balanceOf(spender.id)).toBe(4900);
     });
 });
 
@@ -71,7 +79,6 @@ describe("what the schema must NOT reject", () => {
                 title: "Full wizard payload",
                 description: "The short blurb.",
                 category: "ENGINEERING",
-                goal_amount: 5000,
                 image_url: "data:image/jpeg;base64,/9j/4AAQSkZJRg==",
                 // Skipped by the creator. The service stores "" as NULL.
                 challenge: "",
@@ -155,7 +162,7 @@ describe("the line between the schema and the service", () => {
     it("who may own a project stays with resolveOwnership", async () => {
         const res = await as(admin.token)
             .post("/api/projects")
-            .send({ title: "On behalf", description: "x", category: "ENGINEERING", goal_amount: 100 });
+            .send({ title: "On behalf", description: "x", category: "ENGINEERING" });
 
         // 422 from the service, not the schema: whether creator_id is required depends on
         // the CALLER's role, which a schema cannot see.

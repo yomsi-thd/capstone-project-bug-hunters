@@ -18,7 +18,6 @@ const validBody = (overrides = {}) => ({
     title: "A test project",
     description: "Short blurb.",
     category: "ENGINEERING",
-    goal_amount: 5000,
     ...overrides,
 });
 
@@ -197,6 +196,25 @@ describe("GET /api/projects", () => {
 
         expect(ids).toContain(project.id);
         expect(ids).not.toContain(hidden.id);
+    });
+
+    // backers_count is DISTINCT wallets, exactly like findById's. Backing twice must not
+    // make one person look like two — after N3 removed the percentage, this number is
+    // half of what a card says, and it is meant to be a head count.
+    // ⚠️ N4 will make a second investment in the same project illegal. When it lands,
+    // rewrite this with TWO backers and expect 2 — same rule, legal shape.
+    it("counts distinct backers, not transactions", async () => {
+        const spender = await makeUser({ roles: ["BACKER"], balance: 5000 });
+        const project = await makeProject({ creatorId: creator.id, status: "APPROVED", title: "Counted" });
+
+        await as(spender.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+        await as(spender.token).post(`/api/projects/${project.id}/invest`).send({ amount: 50 });
+
+        const res = await request(app).get("/api/projects");
+        const row = res.body.items.find((p) => p.id === project.id);
+
+        expect(row.backers_count).toBe(1);
+        expect(Number(row.current_amount)).toBe(150);
     });
 });
 

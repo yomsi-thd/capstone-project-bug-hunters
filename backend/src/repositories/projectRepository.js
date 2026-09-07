@@ -14,7 +14,6 @@ async function createProject(project, client = pool) {
             title,
             description,
             category,
-            goal_amount,
             current_amount,
             image_url,
             status,
@@ -33,7 +32,7 @@ async function createProject(project, client = pool) {
             video_url,
             created_by_admin_id
         )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
         RETURNING *
         `,
         [
@@ -41,7 +40,6 @@ async function createProject(project, client = pool) {
             project.title,
             project.description,
             project.category,
-            project.goal_amount,
             project.current_amount,
             project.image_url,
             project.status,
@@ -151,9 +149,10 @@ async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } 
         -- and cron-job.org aborts a response past its size cap - so the endpoint most
         -- likely to grow without warning was also the one holding the live demo awake.
         --
-        -- The thirteen columns below are exactly what mappers.toCard reads. Adding a
-        -- field to the Discover card means adding it here too, which is the intended
-        -- friction: it makes the cost of carrying it visible at the point of choosing to.
+        -- The ten columns and one subquery below are exactly what mappers.toCard reads.
+        -- Adding a field to the Discover card means adding it here too, which is the
+        -- intended friction: it makes the cost of carrying it visible at the point of
+        -- choosing to.
         --
         -- semester_id joined that list on 2026-09-06 and is the one exception to "only
         -- what the card renders" - the card shows the semester's NAME, not its id, and
@@ -161,24 +160,40 @@ async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } 
         -- loaded GET /semesters for its picker, so it can name the id itself. This is
         -- the app's hottest query; a join for one short string is a cost paid on every
         -- keystroke in the search box.
-        SELECT id,
-               creator_id,
-               title,
-               description,
-               category,
-               status,
-               image_url,
-               goal_amount,
-               current_amount,
-               semester_id,
-               start_date,
-               end_date,
-               created_at
-        FROM projects
-        WHERE status = 'APPROVED'
-          AND archived_at IS NULL
-          AND semester_id = $1
-        ORDER BY created_at DESC
+        --
+        -- 2026-09-07 (N3): goal_amount left, and start_date / end_date with it - nothing
+        -- has read those two since a project started closing when its SEMESTER closes.
+        -- backers_count arrived in their place. It is a subquery on the app's busiest
+        -- read, which is a cost worth naming: it is the same one findById and
+        -- findByCreatorId already run, it returns a single integer, and the card needs a
+        -- second real number now that there is no percentage to show.
+        SELECT p.id,
+               p.creator_id,
+               p.title,
+               p.description,
+               p.category,
+               p.status,
+               p.image_url,
+               p.current_amount,
+               p.semester_id,
+               p.created_at,
+               -- DISTINCT wallets, not transactions: backing twice still counts as one
+               -- person. That is the whole point of the number - it is a head count.
+               (
+                   SELECT COUNT(DISTINCT ct.classcoin_id)::int
+                   FROM classcoin_transactions ct
+                   WHERE ct.project_id = p.id
+                     AND ct.type = 'INVEST'
+               ) AS backers_count
+        FROM projects p
+        WHERE p.status = 'APPROVED'
+          AND p.archived_at IS NULL
+          AND p.semester_id = $1
+        -- ⚠️ Still created_at, NOT current_amount. Ranking by support lives on Discover
+        -- (the "Most Supported" row and the sort control), and this list has exactly one
+        -- caller, which re-sorts client-side - so ordering by the total here would change
+        -- nothing anybody can see. See §3.1 of the N3 design.
+        ORDER BY p.created_at DESC
         ${limit == null ? "" : "LIMIT $2 OFFSET $3"};
         `,
         limit == null ? [semesterId] : [semesterId, limit, offset]
@@ -330,24 +345,22 @@ async function updateProject(id, project) {
             title=$1,
             description=$2,
             category=$3,
-            goal_amount=$4,
-            image_url=$5,
-            team_members=$6,
-            challenge=$7,
-            solution=$8,
-            funding_usage=$9,
-            gallery=$10,
-            solution_bullets=$11,
-            video_url=$12,
+            image_url=$4,
+            team_members=$5,
+            challenge=$6,
+            solution=$7,
+            funding_usage=$8,
+            gallery=$9,
+            solution_bullets=$10,
+            video_url=$11,
             updated_at=CURRENT_TIMESTAMP
-        WHERE id=$13
+        WHERE id=$12
         RETURNING *
         `,
         [
             project.title,
             project.description,
             project.category,
-            project.goal_amount,
             project.image_url,
             // MUST be stringified, exactly like createProject does. team_members is a
             // jsonb column; handing node-postgres a raw JS array makes it send a Postgres

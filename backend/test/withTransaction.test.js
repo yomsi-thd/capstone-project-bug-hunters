@@ -79,7 +79,6 @@ describe("the call sites really are atomic", () => {
                 title: "Should not survive",
                 description: "x",
                 category: "ENGINEERING",
-                goal_amount: 1000,
                 tiers: [
                     { name: "Fine", min_amount: 50, bullets: ["ok"] },
                     { name: "", min_amount: 100, bullets: ["broken"] },

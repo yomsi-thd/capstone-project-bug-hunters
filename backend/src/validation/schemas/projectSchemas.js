@@ -44,7 +44,10 @@ const createProjectSchema = z.looseObject({
         .string({ error: "A short description is required." })
         .trim()
         .min(1, "A short description is required."),
-    goal_amount: amount,
+    // ⚠️ NO goal_amount. Dropped 2026-09-07 (N3) along with the column itself: the client
+    // asked for the funding framing to go, so a project has a running total and nothing
+    // to reach. The schema is `looseObject`, so a browser tab left open across the deploy
+    // still sends it and is NOT refused - the key is simply stripped.
     category: z.string().max(100).optional(),
     image_url: z.string().optional(),
     video_url: z.string().optional(),
