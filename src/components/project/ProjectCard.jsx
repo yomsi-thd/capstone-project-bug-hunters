@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import Tag from "./Tag";
-import FundingBar from "./FundingBar";
 import Badge from "../ui/Badge";
 
 // `semesterName` is passed in rather than read off the project: GET /projects sends the
@@ -27,7 +26,23 @@ export default function ProjectCard({ project, semesterName = null }) {
           {project.desc && (
             <p className="m-0 text-[12px] leading-normal text-neutral-600">{project.desc}</p>
           )}
-          <FundingBar percent={project.funded} />
+          {/* The card's two numbers since N3 (2026-09-07): the Class Coins this project
+              has received, and the head count behind them. There is no goal any more, so
+              there is no percentage and no bar. mt-auto does the job FundingBar's own
+              wrapper used to — it pins this line to the bottom edge, so a row of cards
+              lines its numbers up even when one description is shorter. */}
+          <div className="mt-auto flex items-baseline gap-1.5 pt-1">
+            <span className="text-[13px] font-bold text-brand">
+              {project.raised.toLocaleString()} CC
+            </span>
+            {/* Hidden only for a row the API could not count — a real 0 says "0 backers",
+                because nobody-yet is a fact and a blank reads as a failed load. */}
+            {project.backers != null && (
+              <span className="text-[11px] text-neutral-500">
+                · {project.backers} {project.backers === 1 ? "backer" : "backers"}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </Link>

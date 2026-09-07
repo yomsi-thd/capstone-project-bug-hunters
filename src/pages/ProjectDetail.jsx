@@ -17,21 +17,6 @@ import * as projectApi from "../api/projectApi";
 import { toDetail, toProjectUpdate, toCommentThread, toTier, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
-// Plain progress track for the detail-page sidebar (no % label — the sidebar
-// renders its own big % + "FUNDED" below). Distinct from the labelled card
-// FundingBar in components/project/FundingBar.jsx; kept separate on purpose.
-function ProgressTrack({ percent }) {
-  return (
-    <div className="my-2.5 h-1.5 overflow-hidden rounded-sm bg-neutral-100">
-      {/* Runtime width — the datum. */}
-      <div
-        className="h-full rounded-sm bg-brand transition-[width] duration-[400ms] ease-out"
-        style={{ width: `${Math.min(percent, 100)}%` }}
-      />
-    </div>
-  );
-}
-
 function TabNav({ tabs, active, onChange }) {
   return (
     <div className="mb-7 flex gap-0 border-b-2 border-neutral-200">
@@ -610,11 +595,12 @@ function SemesterEndedBanner({ p }) {
 /**
  * The line under a disabled INVEST button, saying WHY it is disabled.
  *
- * The button has always greyed out for anyone who cannot invest, and the note beside it
- * has always been the same "All or nothing funding model" — so a signed-out visitor,
- * who is the most common reader of this page, met a dead control with nothing pointing
- * at the way in. A pure creator got the same silence, and since 2026-08-24 so does an
- * admin.
+ * The button has always greyed out for anyone who cannot invest, and until 2026-08-24
+ * the note beside it was the same "All or nothing funding model" in every case — so a
+ * signed-out visitor, who is the most common reader of this page, met a dead control
+ * with nothing pointing at the way in. A pure creator got the same silence, and so does
+ * an admin. (That sentence itself went in N3; this note is now the only thing under the
+ * button, and only when the button is refusing.)
  *
  * The two cases are different and need different answers: signed out is a door with a
  * key (sign in), while signed in without BACKER is a door that is not theirs — telling
@@ -656,20 +642,15 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
         sticky ? "sticky top-[72px] mb-0" : "static mb-7"
       }`}
     >
-      <ProgressTrack percent={p.stats.funded} />
-
-      <div className="mb-0.5 text-[28px] font-extrabold text-brand">
-        {p.stats.funded}%
-      </div>
-      <div className="mb-3.5 text-[11px] font-bold tracking-[0.06em] text-neutral-500">
-        FUNDED
-      </div>
-
-      <div className="text-[22px] font-extrabold text-neutral-900">
+      {/* The whole funding measure since N3 (2026-09-07). There was a progress track, a
+          big "N% FUNDED" and "pledged of 15,000 CC goal" above this line; the client
+          asked for the goal, the percentage and the "fully funded" state to go, so what
+          is left is what a project actually has. */}
+      <div className="text-[28px] font-extrabold text-brand">
         {p.stats.raised.toLocaleString()} CC
       </div>
-      <div className="mb-[18px] text-[13px] text-neutral-500">
-        pledged of {p.stats.goal.toLocaleString()} CC goal
+      <div className="mb-[18px] text-[11px] font-bold tracking-[0.06em] text-neutral-500">
+        TOTAL SUPPORT
       </div>
 
       <div className="mb-[22px] flex gap-6">
@@ -752,14 +733,12 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
             INVEST IN THIS PROJECT
           </button>
 
-          {canInvest ? (
-            <p className="mx-0 mt-2 mb-0 flex items-center justify-center gap-1 text-center text-[11px] text-neutral-400">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-              All or nothing funding model.
-            </p>
-          ) : (
-            <InvestBlockedNote isLoggedIn={isLoggedIn} from={location.pathname} />
-          )}
+          {/* ⚠️ Nothing under the button for a backer who CAN invest. "All or nothing
+              funding model." stood here until N3 (2026-09-07) — it described a goal that
+              no longer exists. Left empty on purpose rather than filled with a stand-in:
+              N4 puts the real sentence here (one contribution per person, 500 CC cap),
+              and a placeholder now would be written twice and deleted once. */}
+          {!canInvest && <InvestBlockedNote isLoggedIn={isLoggedIn} from={location.pathname} />}
         </>
       )}
 

@@ -93,14 +93,14 @@ function InvestmentCard({ investment, isMobile }) {
 
           <div className={`min-w-[140px] ${isMobile ? "flex-[0_0_100%]" : "flex-[1_1_160px]"}`}>
             <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
-              FUNDING PROGRESS ({investment.fundingProgress}%)
+              TOTAL SUPPORT
             </div>
-            <div className="h-1.5 overflow-hidden rounded-sm bg-neutral-100">
-              {/* Runtime width — the datum. */}
-              <div
-                className="h-full rounded-sm bg-brand"
-                style={{ width: `${Math.min(investment.fundingProgress, 100)}%` }}
-              />
+            {/* ⚠️ The PROJECT's running total, not this backer's share — theirs is the
+                "You invested" column to the left. It replaced a funding-progress bar in
+                N3 (2026-09-07): there is no goal to be a percentage of any more, and
+                leaving the column empty would have read as a failed load. */}
+            <div className="text-[15px] font-bold text-neutral-900">
+              {investment.projectTotal.toLocaleString()} CC
             </div>
           </div>
         </div>

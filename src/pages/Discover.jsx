@@ -19,7 +19,7 @@ import { errorMessage } from "../api/apiError";
 // <span> inside the wrapping <Link>: clicking it goes to the detail page, where the real
 // button now refuses. Inviting somebody through a door that is shut is worse than not
 // inviting them.
-function HeroCard({ project, style, showDesc, showFundingBar, canInvest, semesterClosed, isOwner, onEdit }) {
+function HeroCard({ project, style, showDesc, showSupport, canInvest, semesterClosed, isOwner, onEdit }) {
   return (
     // `style` is the grid placement the caller computes, so it stays inline.
     <Link to={`/project/${project.id}`} className="text-inherit no-underline" style={style}>
@@ -81,15 +81,19 @@ function HeroCard({ project, style, showDesc, showFundingBar, canInvest, semeste
             </span>
           ) : null}
 
-          {showFundingBar && (
-            <div className="mt-1 flex items-center gap-2">
-              <div className="h-[3px] flex-1 rounded-sm bg-white/30">
-                <div
-                  className="h-full rounded-sm bg-brand"
-                  style={{ width: `${Math.min(project.funded, 100)}%` }}
-                />
-              </div>
-              <span className="text-[11px] font-semibold text-white">{project.funded}%</span>
+          {/* Was a funding bar until N3 (2026-09-07). Same slot, same prop name, but the
+              numbers are now the total and the head count — there is no goal to be a
+              percentage of. Kept white here because the hero sits on the image. */}
+          {showSupport && (
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className="text-[13px] font-bold text-white">
+                {project.raised.toLocaleString()} CC
+              </span>
+              {project.backers != null && (
+                <span className="text-[11px] text-white/70">
+                  · {project.backers} {project.backers === 1 ? "backer" : "backers"}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -112,18 +116,24 @@ const SORTS = [
     compare: (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
   },
   {
-    id: "funded",
-    label: "Most funded",
-    compare: (a, b) => b.funded - a.funded,
+    id: "supported",
+    label: "Most supported",
+    compare: (a, b) => b.raised - a.raised,
   },
 ];
 
-// ⚠️ "Ending soon" was REMOVED on 2026-09-06, one step ahead of N3, and deliberately.
-// A project's closing date is its semester's now, and this grid shows one semester at a
-// time — so every card on screen closes on the same day and that sort could never
-// reorder anything. A control that responds and changes nothing is the exact thing the
-// 2026-08-18 pass went through the app deleting. "Most funded" goes with the rest of
-// the funding framing in N3.
+// ⚠️ "Ending soon" was REMOVED on 2026-09-06 and "Most funded" on 2026-09-07 (N3),
+// both deliberately. A project's closing date is its semester's now, and this grid shows
+// one semester at a time — so every card on screen closes on the same day and that sort
+// could never reorder anything. A control that responds and changes nothing is the exact
+// thing the 2026-08-18 pass went through the app deleting. "Most funded" ranked by
+// percentage of a goal, and there is no goal any more; "Most supported" ranks by the
+// total instead.
+//
+// ⚠️ The DEFAULT stays SORTS[0] = Newest. Ranking by support is visible in the "Most
+// Supported" row above the grid and in this control; making it the default order too
+// would repeat that row as the grid's first four cards, and would bury a project filed
+// late in the semester for the rest of it. See §3.1 of the N3 design.
 
 // Shared notice block for the loading / error / empty states.
 function StatusBlock({ title, detail, actionLabel, onAction }) {
@@ -240,13 +250,13 @@ export default function Discover() {
   const browsingClosedSemester = selectedSemester ? !selectedSemester.is_open : false;
 
   // The backend has no notion of hero/trending, so derive both from the data:
-  // Hero = the 3 newest projects, Trending = the 4 with the highest funded percentage.
+  // Hero = the 3 newest projects, Most Supported = the 4 with the highest CC total.
   // The two groups may overlap — as in the old mock, hero/trending projects also
   // appear again in the "All Projects" grid below.
   const hero = [...projects]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 3);
-  const trending = [...projects].sort((a, b) => b.funded - a.funded).slice(0, 4);
+  const trending = [...projects].sort((a, b) => b.raised - a.raised).slice(0, 4);
 
   // Search and filters run over the whole catalogue, so a query reaches every
   // project (hero + trending + fresh), not just the ones shown in this grid.
@@ -407,7 +417,7 @@ export default function Discover() {
           <HeroCard
             project={hero[0]}
             showDesc={!isMobile}
-            showFundingBar
+            showSupport
             canInvest={canInvest}
             semesterClosed={browsingClosedSemester}
             isOwner={ownsProject(hero[0])}
@@ -422,25 +432,29 @@ export default function Discover() {
           {!isMobile && hero[1] && (
             <HeroCard
               project={hero[1]}
-              showFundingBar
+              showSupport
               style={{ height: isTablet ? "180px" : `${SMALL_H}px` }}
             />
           )}
           {!isMobile && hero[2] && (
             <HeroCard
               project={hero[2]}
-              showFundingBar
+              showSupport
               style={{ height: isTablet ? "180px" : `${SMALL_H}px` }}
             />
           )}
         </div>
 
-        {/* ── Trending Projects ── */}
+        {/* ── Most Supported ── */}
+        {/* Was "Trending Projects", ranked by percentage of a funding goal, until N3
+            (2026-09-07). It is the platform's only ranking, and it is what the team
+            promised the client it would become: the most supported projects of the
+            semester on screen, by total Class Coins. */}
         <div className={isMobile ? "mb-8" : "mb-12"}>
           <div className="mb-4 flex items-end justify-between">
             <div>
-              <h2 className={`m-0 font-extrabold text-neutral-900 ${isMobile ? "text-[18px]" : "text-[22px]"}`}>Trending Projects</h2>
-              <p className="mx-0 mt-0.5 mb-0 text-[13px] text-neutral-500">Projects gaining momentum across RMIT.</p>
+              <h2 className={`m-0 font-extrabold text-neutral-900 ${isMobile ? "text-[18px]" : "text-[22px]"}`}>Most Supported</h2>
+              <p className="mx-0 mt-0.5 mb-0 text-[13px] text-neutral-500">The projects RMIT has backed the most this semester.</p>
             </div>
             <a
               href="#all"
