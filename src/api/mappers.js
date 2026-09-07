@@ -468,6 +468,11 @@ export function toAdminUser(row) {
     roles,
     email: row.email,
     isActive: !!row.is_active,
+    // The wallet, so an admin can see who needs Class Coins before issuing them.
+    // ⚠️ `== null`, and null is KEPT rather than turned into 0: an account with no wallet
+    // row is a different fact from one whose wallet is empty, and the table says "—" for
+    // the first and "0 CC" for the second.
+    balance: row.balance == null ? null : toNumber(row.balance),
   };
 }
 

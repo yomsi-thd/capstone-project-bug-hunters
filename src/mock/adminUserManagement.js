@@ -17,3 +17,11 @@ export const ADMIN_USER_NAV_ITEMS = [
 // every user alive, and the statuses drove a filter for two states the schema cannot
 // express — `users.is_active` is a boolean.
 export const ADMIN_USER_ROLES = ["ADMIN", "CREATOR", "BACKER"];
+
+// The number the grant box starts on.
+//
+// ⚠️ CONFIG, not a rule. An admin types over it and the server accepts anything from 1 to
+// 100,000. Deliberately NOT shared with the backend the way MAX_CONTRIBUTION is: that one
+// is a rule both sides enforce and so must match word for word, this one is only a
+// sensible starting value in a form field.
+export const DEFAULT_GRANT = 4000;

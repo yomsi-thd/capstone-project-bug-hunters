@@ -10,7 +10,9 @@ import { useAuth } from "../context/AuthContext";
 import {
   ADMIN_USER_NAV_ITEMS as NAV_ITEMS,
   ADMIN_USER_ROLES as ROLES,
+  DEFAULT_GRANT,
 } from "../mock";
+import * as classCoinApi from "../api/classCoinApi";
 import { errorMessage } from "../api/apiError";
 
 // What each role actually unlocks, so an admin granting one can see the consequence
@@ -225,6 +227,36 @@ export default function AdminUserManagement() {
   const [savingRoles, setSavingRoles] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Issuing Class Coins. `selected` holds user ids; an ADMIN can never be in it because
+  // their row renders no checkbox at all.
+  const [selected, setSelected] = useState([]);
+  const [grantAmount, setGrantAmount] = useState(String(DEFAULT_GRANT));
+  const [granting, setGranting] = useState(false);
+  const [grantError, setGrantError] = useState(null);
+  const [grantedNote, setGrantedNote] = useState(null);
+
+  const toggleSelected = (id) =>
+    setSelected(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+
+  const handleGrant = async () => {
+    setGranting(true);
+    setGrantError(null);
+    try {
+      const result = await classCoinApi.grantCoins(selected, Number(grantAmount));
+      // Refetch rather than patching the rows: the balance on screen has to be the one
+      // the server holds, and this page is nowhere near a hot path.
+      const rows = await adminApi.getAllUsers();
+      setUsers((rows || []).map(toAdminUser));
+      setSelected([]);
+      setGrantedNote(
+        `Granted ${result.amount.toLocaleString()} CC to ${result.granted} ${result.granted === 1 ? "person" : "people"}.`
+      );
+    } catch (err) {
+      setGrantError(errorMessage(err, "Could not grant Class Coins"));
+    } finally {
+      setGranting(false);
+    }
+  };
 
   // GET /api/admin/users
   useEffect(() => {
@@ -406,20 +438,83 @@ export default function AdminUserManagement() {
             </select>
           </div>
 
+          {grantedNote && (
+            <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg px-4 py-3 text-[13px] mb-4 flex items-start justify-between gap-3">
+              <span>{grantedNote}</span>
+              <button
+                onClick={() => setGrantedNote(null)}
+                className="bg-transparent border-none text-green-700 hover:text-green-900 cursor-pointer text-[15px] leading-none shrink-0"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* Only present once somebody is selected: an empty amount box above an empty
+              selection is a control with nothing to act on. */}
+          {selected.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl px-4 md:px-5 py-3 flex flex-wrap items-center gap-3 mb-4">
+              <span className="text-[13px] font-bold text-gray-900">
+                {selected.length} selected
+              </span>
+              <input
+                value={grantAmount}
+                onChange={e => setGrantAmount(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                aria-label="Class Coins to grant"
+                className="w-28 border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors"
+              />
+              <span className="text-[13px] text-gray-500">CC each</span>
+              <button
+                onClick={handleGrant}
+                disabled={granting || !Number(grantAmount)}
+                className="bg-brand text-white border-none rounded-md px-4 py-2 text-[12px] font-bold tracking-[0.05em] cursor-pointer transition-colors hover:bg-brand-dark disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {granting ? "GRANTING…" : "GRANT"}
+              </button>
+              <button
+                onClick={() => setSelected([])}
+                className="bg-transparent border-none text-[12px] font-semibold text-gray-500 hover:text-gray-900 cursor-pointer"
+              >
+                Clear
+              </button>
+              {grantError && <span className="text-[12px] text-brand">{grantError}</span>}
+            </div>
+          )}
+
           {/* User table */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse min-w-[750px]">
                 <thead>
                   <tr className="border-b border-gray-100">
-                    {["User Identity", "Roles", "Status", "Management Actions"].map(h => (
-                      <th key={h} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-wide text-left">{h}</th>
+                    {/* The first header is blank on purpose: it sits over the checkbox
+                        column, and "Select" would be a label for a control that already
+                        explains itself. */}
+                    {["", "User Identity", "Roles", "Balance", "Status", "Management Actions"].map((h, i) => (
+                      <th key={i} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-wide text-left">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="lp-stagger">
                   {filtered.length > 0 ? filtered.map((u, i) => (
                     <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${i < filtered.length - 1 ? "border-b border-gray-100" : ""}`}>
+                      <td className="px-5 py-3.5 w-10">
+                        {/* ⚠️ An ADMIN row renders NO checkbox rather than a disabled one.
+                            An admin owns nothing, so they are never a valid target, and a
+                            greyed-out box invites somebody to try and then refuses. */}
+                        {!u.roles.includes("ADMIN") && (
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(u.id)}
+                            onChange={() => toggleSelected(u.id)}
+                            aria-label={`Select ${u.name}`}
+                            className="h-4 w-4 cursor-pointer accent-brand"
+                          />
+                        )}
+                      </td>
+
                       {/* Identity */}
                       <td className="px-5 py-3.5">
                         <div className="flex items-center gap-3">
@@ -436,6 +531,16 @@ export default function AdminUserManagement() {
                       {/* Roles */}
                       <td className="px-5 py-3.5">
                         <RoleBadgeList roles={u.roles} />
+                      </td>
+
+                      {/* Balance */}
+                      <td className="px-5 py-3.5">
+                        {/* ⚠️ "—" is for an account with NO WALLET; a real 0 renders as
+                            "0 CC". They look similar and mean different things — one has
+                            spent or never received, the other has no wallet row at all. */}
+                        <span className="text-[13px] font-bold text-gray-900 whitespace-nowrap">
+                          {u.balance == null ? "—" : `${u.balance.toLocaleString()} CC`}
+                        </span>
                       </td>
 
                       {/* Status */}

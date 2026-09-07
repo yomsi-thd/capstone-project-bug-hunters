@@ -18,6 +18,14 @@ export const getMyInvestments = async () => {
   return response.data.items;
 };
 
+// Grant Class Coins to one or many accounts. Bulk and single are the same call — granting
+// to one person is a list of one — and the server runs the whole list in ONE transaction,
+// so "half of them got it" is not a state this can produce.
+export const grantCoins = async (userIds, amount) => {
+  const response = await api.post("/classcoins/grant", { user_ids: userIds, amount });
+  return response.data;
+};
+
 export const getTransactions = async () => {
   const response = await api.get("/classcoins/transactions");
 

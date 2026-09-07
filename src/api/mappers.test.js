@@ -496,6 +496,16 @@ describe("toAdminUser", () => {
     expect(toAdminUser(userRow()).role).toBe("Admin, Backer");
   });
 
+  // The admin issues Class Coins from this table, so the balance rides along.
+  it("carries the balance, and keeps 'no wallet' distinct from 'empty wallet'", () => {
+    expect(toAdminUser(userRow({ balance: 4000 })).balance).toBe(4000);
+    // 0 is a real balance and must survive — the row says "0 CC".
+    expect(toAdminUser(userRow({ balance: 0 })).balance).toBe(0);
+    // null is not 0: this account has no wallet row at all, and the row says "—".
+    expect(toAdminUser(userRow({ balance: null })).balance).toBeNull();
+    expect(toAdminUser(userRow()).balance).toBeNull();
+  });
+
   it("shows a dash for a user with no roles", () => {
     // user id 12 in the shared database really is in this state.
     expect(toAdminUser(userRow({ roles: [] })).role).toBe("—");
