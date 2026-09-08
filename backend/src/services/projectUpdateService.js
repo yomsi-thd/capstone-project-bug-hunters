@@ -13,8 +13,10 @@ async function getProjectUpdates(projectId, viewer = null) {
     return await projectUpdateRepository.findByProjectId(projectId);
 }
 
-// Only the creator of the project may post an update about it. An ADMIN is allowed too,
-// consistent with the rest of the app treating admin as a superuser.
+// Only the creator of the project may post an update about it. An ADMIN is allowed too —
+// not because an admin is a superuser (that model was reversed on 2026-08-24: an admin
+// holds only ADMIN and owns nothing), but because an admin moderates, and may have filed
+// the project on the creator's behalf in the first place.
 async function createProjectUpdate(userId, roles, projectId, data) {
 
     const title = (data.title || "").trim();
