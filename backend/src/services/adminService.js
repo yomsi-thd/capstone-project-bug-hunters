@@ -138,6 +138,11 @@ async function updateUserRoles(userId, roles, actingAdminId) {
     };
 }
 
+// One sentence, used by both the early check and the race guard below it. Two checks are
+// fine; two wordings are not - a person refused by one would read a different reason than
+// a person refused by the other and reasonably think they were two different rules.
+const REQUEST_ALREADY_REVIEWED = "Creator request has already been reviewed.";
+
 async function approveCreatorRequest(requestId, adminId) {
 
     const request = await creatorRequestRepository.findById(requestId);
@@ -147,7 +152,7 @@ async function approveCreatorRequest(requestId, adminId) {
     }
 
     if (request.status !== "PENDING") {
-        throw conflict("Creator request has already been reviewed.");
+        throw conflict(REQUEST_ALREADY_REVIEWED);
     }
 
     // Granting the role and marking the request reviewed are one step or neither: a
@@ -161,11 +166,24 @@ async function approveCreatorRequest(requestId, adminId) {
             client
         );
 
-        return await creatorRequestRepository.approve(
+        const approved = await creatorRequestRepository.approve(
             requestId,
             adminId,
             client
         );
+
+        // ⚠️ The check above is a read-then-write and closes nothing on its own: two
+        // admins both read PENDING and both pass it. `AND status = 'PENDING'` in the
+        // UPDATE is what decides, and 0 rows means the other admin got there first.
+        //
+        // Thrown INSIDE the transaction on purpose - assignRole ran first, so the throw
+        // is what rolls the CREATOR grant back. Returning here instead would leave the
+        // role granted against a request somebody else had already rejected.
+        if (!approved) {
+            throw conflict(REQUEST_ALREADY_REVIEWED);
+        }
+
+        return approved;
     });
 }
 async function rejectCreatorRequest(requestId, adminId) {
@@ -177,13 +195,20 @@ async function rejectCreatorRequest(requestId, adminId) {
     }
 
     if (request.status !== "PENDING") {
-        throw conflict("Creator request has already been reviewed.");
+        throw conflict(REQUEST_ALREADY_REVIEWED);
     }
 
-    return await creatorRequestRepository.reject(
+    const rejected = await creatorRequestRepository.reject(
         requestId,
         adminId
     );
+
+    // Same race, same reason as approveCreatorRequest above.
+    if (!rejected) {
+        throw conflict(REQUEST_ALREADY_REVIEWED);
+    }
+
+    return rejected;
 }
 
 module.exports = {

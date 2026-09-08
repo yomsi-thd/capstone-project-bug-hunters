@@ -408,6 +408,14 @@ async function updateProject(id, project) {
 // review_note is cleared here on purpose: it explains the CURRENT verdict, so leaving a
 // rejection note on a now-approved project would show the creator a stale complaint about
 // something they have already fixed.
+// ⚠️ `AND status = 'PENDING'` is the race guard, and it has to live HERE rather than as
+// a check in the service. Two admins working the same queue both read a PENDING project,
+// both pass every service check, and both UPDATE - so a read-then-write in the service
+// closes nothing. With the condition in the statement, the second one matches no row and
+// gets back undefined, which moderationService turns into a 409.
+//
+// Only from PENDING on purpose: the queue lists nothing else, and a REJECTED project has
+// to go through resubmit (which returns it to PENDING) before a verdict applies again.
 async function approveProject(id) {
 
     const result = await pool.query(
@@ -416,6 +424,7 @@ async function approveProject(id) {
         SET status = 'APPROVED',
             review_note = NULL
         WHERE id = $1
+          AND status = 'PENDING'
         RETURNING *;
         `,
         [id]
@@ -465,6 +474,7 @@ async function setEndorsed(id, endorsed) {
 // `note` is the reviewer's explanation. AdminApprovals has always collected it in the
 // review screen's feedback box and then thrown it away, because there was nowhere to put
 // it — that is what the review_note column is for.
+// Same race guard as approveProject above, and for the same reason. See the comment there.
 async function rejectProject(id, note) {
 
     const result = await pool.query(
@@ -473,6 +483,7 @@ async function rejectProject(id, note) {
         SET status = 'REJECTED',
             review_note = $2
         WHERE id = $1
+          AND status = 'PENDING'
         RETURNING *;
         `,
         [id, note || null]

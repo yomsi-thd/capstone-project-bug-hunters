@@ -396,14 +396,70 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect(res.body.review_note).toBe("Needs a clearer budget.");
     });
 
-    it("approving clears a previous rejection note", async () => {
-        const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
-
-        await as(admin.token).patch(`/api/projects/${project.id}/reject`).send({ note: "No." });
+    // ⚠️ This test CHANGED SHAPE on 2026-09-08, it was not weakened. It used to reject
+    // and then approve the same project, which the race guard now refuses with a 409 -
+    // and left alone it would have gone on "passing" only because the assertion never
+    // ran. The note is seeded directly instead, so the thing being measured (approve
+    // NULLs review_note) is still measured, from a status the verdict is legal from.
+    it("approving clears a review note left on the project", async () => {
+        const project = await makeProject({
+            creatorId: creator.id,
+            status: "PENDING",
+            reviewNote: "An earlier reviewer's note.",
+        });
 
         const res = await as(admin.token).patch(`/api/projects/${project.id}/approve`);
 
+        expect(res.status).toBe(200);
         expect(res.body.review_note).toBeNull();
+    });
+
+    // The race of two admins on one queue. Guarded by `AND status = 'PENDING'` in the
+    // UPDATE itself, not by a read-then-write in the service: both admins read PENDING,
+    // so any check before the write passes for both of them. Postgres decides, and
+    // exactly one wins.
+    it("409 when a second verdict lands on a project already reviewed", async () => {
+        const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
+
+        const first = await as(admin.token).patch(`/api/projects/${project.id}/approve`);
+        const second = await as(secondAdmin.token).patch(`/api/projects/${project.id}/approve`);
+
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(409);
+        expect(second.body.code).toBe("CONFLICT");
+        expect(second.body.message).toContain("already been reviewed");
+    });
+
+    // The dangerous direction, and the reason this bug mattered rather than merely being
+    // untidy: a stale REJECT used to overwrite a live APPROVED project, take it off
+    // Discover, and staple a rejection note to it - answering 200 to the admin who did it.
+    it("a late REJECT cannot overwrite an approved project", async () => {
+        const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
+
+        await as(admin.token).patch(`/api/projects/${project.id}/approve`);
+
+        const late = await as(secondAdmin.token)
+            .patch(`/api/projects/${project.id}/reject`)
+            .send({ note: "Written against a stale queue." });
+
+        expect(late.status).toBe(409);
+
+        const after = await as(admin.token).get(`/api/admin/projects/${project.id}`);
+        expect(after.body.status).toBe("APPROVED");
+        expect(after.body.review_note).toBeNull();
+    });
+
+    // Recorded as a deliberate behaviour change, not a regression: before 2026-09-08 a
+    // hand-made request could approve a REJECTED project directly. No UI path is lost -
+    // AdminApprovals lists only PENDING - and PATCH /:id/resubmit is the route back.
+    it("409 approving a REJECTED project directly; resubmit is the way back", async () => {
+        const project = await makeProject({ creatorId: creator.id, status: "REJECTED" });
+
+        expect((await as(admin.token).patch(`/api/projects/${project.id}/approve`)).status).toBe(409);
+
+        await as(creator.token).patch(`/api/projects/${project.id}/resubmit`);
+
+        expect((await as(admin.token).patch(`/api/projects/${project.id}/approve`)).status).toBe(200);
     });
 
     // These two are the only handlers that already read error.status, so "not found"

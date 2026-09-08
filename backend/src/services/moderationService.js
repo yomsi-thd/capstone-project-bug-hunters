@@ -1,6 +1,7 @@
 const projectRepository = require("../repositories/projectRepository");
 const { notFound, forbidden, conflict } = require("../errors/AppError");
 const { isAdminRole, assertNotArchived, assertSemesterOpen } = require("./projectAccess");
+const MESSAGES = require("../validation/messages");
 
 /**
  * The verdicts: approve, reject, resubmit, endorse.
@@ -51,7 +52,16 @@ async function approveProject(id, adminId) {
     assertNotArchived(existing);
     assertNotOwnReview(existing, adminId);
 
-    return await projectRepository.approveProject(id);
+    const approved = await projectRepository.approveProject(id);
+
+    // No row came back, so `status` was no longer PENDING by the time the UPDATE ran -
+    // another admin reached the same project first. `existing` above says nothing about
+    // this: it was read before the write, which is exactly the window being closed.
+    if (!approved) {
+        throw conflict(MESSAGES.VERDICT_ALREADY_GIVEN);
+    }
+
+    return approved;
 }
 
 async function rejectProject(id, note, adminId) {
@@ -71,7 +81,16 @@ async function rejectProject(id, note, adminId) {
     // project was refused and nothing about why, which is the state this column exists
     // to end. Not enforced here because the queue's one-click REJECT is a legitimate
     // quick action for obvious spam.
-    return await projectRepository.rejectProject(id, trimmedNote);
+    const rejected = await projectRepository.rejectProject(id, trimmedNote);
+
+    // Same race as approveProject. Losing it here is the worse direction of the two: an
+    // already-APPROVED project would have been flipped to REJECTED and taken off Discover
+    // by an admin who was only looking at a stale queue.
+    if (!rejected) {
+        throw conflict(MESSAGES.VERDICT_ALREADY_GIVEN);
+    }
+
+    return rejected;
 }
 
 // The creator's way back after a rejection. Without this a REJECTED project is a dead

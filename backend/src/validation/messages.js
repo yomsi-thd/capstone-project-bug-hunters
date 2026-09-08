@@ -38,6 +38,12 @@ const MESSAGES = {
     // it from the token was the whole bug of 2026-08-21, when any signed-in user could
     // mint Class Coins into their own balance.
     WALLET_TARGET_REQUIRED: "user_id is required - name the account to adjust.",
+
+    // Two admins working the same approval queue. Wording fixed by the design spec
+    // (2026-08-28-notifications-design.md §3.2) - do not reword it here without changing
+    // it there too, or the frontend and the API start explaining the same refusal
+    // differently, which is the drift the support-level minimum already caused once.
+    VERDICT_ALREADY_GIVEN: "This project has already been reviewed by another admin.",
 };
 
 module.exports = MESSAGES;

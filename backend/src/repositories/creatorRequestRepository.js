@@ -67,6 +67,7 @@ async function approve(id, adminId, client = pool) {
             reviewed_by = $1,
             reviewed_at = CURRENT_TIMESTAMP
         WHERE id = $2
+          AND status = 'PENDING'
         RETURNING *;
         `,
         [adminId, id]
@@ -84,6 +85,7 @@ async function reject(id, adminId, client = pool) {
             reviewed_by = $1,
             reviewed_at = CURRENT_TIMESTAMP
         WHERE id = $2
+          AND status = 'PENDING'
         RETURNING *;
         `,
         [adminId, id]
