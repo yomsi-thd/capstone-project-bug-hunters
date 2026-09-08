@@ -170,7 +170,9 @@ CREATE TABLE projects (
     -- the ONLY difference in 11 tables, and it mattered because the backend test suite
     -- now builds its database from here. A stricter test schema would refuse rows that
     -- production accepts, which is a test that lies in the more dangerous direction.
-    team_members      JSONB         DEFAULT '[]'::jsonb,
+    -- ⚠️ RESOLVED 2026-09-08: the live column was migrated to NOT NULL (known issue 8
+    -- below), so this line matches production again — now in the safe direction.
+    team_members      JSONB         DEFAULT '[]'::jsonb NOT NULL,
     -- The long-form story rendered on the project page.
     challenge         TEXT,
     solution          TEXT,
@@ -478,18 +480,22 @@ CREATE INDEX idx_comments_project
 --     `review_note` landed 2026-08-11 and `video_url` on 2026-08-18; both are
 --     declared in the projects table above.)
 --
--- 8. projects.team_members is NULLABLE while gallery and solution_bullets, which
---    the code treats identically, are NOT NULL. Nothing writes NULL today —
---    createProject coalesces with `|| []` and updateProject with `?? []` — so no
---    row has one, and this is a tidiness migration rather than a fix:
+-- 8. ✅ RESOLVED 2026-09-08 — projects.team_members is NOT NULL.
+--    It was the ONE column where this file and the live database disagreed. Applied
+--    with scripts/migrate-team-members-not-null.cjs, both statements in a single
+--    transaction:
 --
 --      UPDATE projects SET team_members = '[]'::jsonb WHERE team_members IS NULL;
 --      ALTER TABLE projects ALTER COLUMN team_members SET NOT NULL;
 --
---    Deliberately NOT applied: it is a schema change, and the API restructure of
---    2026-08-26 explicitly touches no schema. Recorded here because this file
---    said NOT NULL until that date, which quietly made the test database stricter
---    than the real one.
+--    0 rows needed the UPDATE, as expected: createProject coalesces with `|| []` and
+--    updateProject with `?? []`, so nothing ever wrote NULL. A tidiness migration, not
+--    a fix — gallery and solution_bullets, which the code treats identically, were
+--    already NOT NULL.
+--
+--    ⚠️ Inserts that omit the column are unaffected: DEFAULT '[]'::jsonb satisfies the
+--    constraint, which is why the test factories needed no change.
+--    Reverse with: ALTER TABLE projects ALTER COLUMN team_members DROP NOT NULL;
 --
 -- 9. projects.start_date / end_date are dead as of 2026-09-06 — superseded by
 --    semester_id, and nothing reads or writes them any more. They are kept
