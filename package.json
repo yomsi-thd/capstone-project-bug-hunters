@@ -10,6 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:backend": "eslint --config backend/eslint.config.js backend/",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest"

@@ -81,9 +81,11 @@ function describe(err) {
     };
 }
 
-// eslint-disable-next-line no-unused-vars -- Express identifies an error handler by its
-// four-parameter signature; dropping `next` turns this back into ordinary middleware and
-// it silently stops catching anything.
+// ⚠️ Express identifies an error handler by its four-parameter signature; dropping the
+// unused `next` turns this back into ordinary middleware and it silently stops catching
+// anything. (There used to be an `eslint-disable-next-line no-unused-vars` here. It was
+// inert twice over: it sat above a comment line rather than the function, and the rule
+// does not flag this parameter anyway — checked by removing it, 2026-09-08.)
 function errorHandler(err, req, res, next) {
     const { status, code, message, details } = describe(err);
 
