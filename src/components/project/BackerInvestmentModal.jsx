@@ -1,4 +1,5 @@
 import Modal from "../ui/Modal";
+import EmptyState from "../ui/EmptyState";
 import { useState } from "react";
 import { parseAmount } from "../../api/mappers";
 import { meetsMinimum } from "./tierRules";
@@ -6,7 +7,7 @@ import { MAX_CONTRIBUTION, validateContribution } from "./investmentRules";
 
 const QUICK_AMOUNTS = [25, 50, 100];
 
-export default function BackerInvestmentModal({ project, levels = [], balance, onClose, onConfirm }) {
+export default function BackerInvestmentModal({ project, levels = [], balance, onClose, onConfirm, onRequestCoins }) {
   const [amount, setAmount] = useState(0);
   // null = "No level - just support", which is a real choice and the default.
   const [selectedTierId, setSelectedTierId] = useState(null);
@@ -46,6 +47,43 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
 
   // One source for the amount rules, shared with anything else that has to judge one.
   const amountError = validateContribution(amount, balance);
+
+  // ⚠️ An empty wallet gets its OWN SCREEN, not a control panel with everything disabled.
+  // Before A7 this modal still built the whole thing and switched each part off, so
+  // somebody who had just registered went Discover → INVEST and hit a mute dead end: no
+  // reason given, no way out.
+  //
+  // ⚠️ Placed AFTER the hooks above, never before them. An early return above a hook
+  // changes how many hooks run between renders, and React throws "Rendered fewer hooks
+  // than expected" the moment the balance goes from 0 to anything else.
+  if (balance <= 0) {
+    return (
+      <Modal onClose={onClose} maxWidth={440} panelClassName="p-7">
+        <EmptyState
+          icon="◍"
+          title="Your wallet is empty"
+          detail="Class Coins are issued by an administrator. Ask for some and this project will be waiting."
+        >
+          <div className="flex justify-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer rounded-md border border-gray-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-gray-600 transition-colors hover:bg-gray-50"
+            >
+              NOT NOW
+            </button>
+            <button
+              type="button"
+              onClick={onRequestCoins}
+              className="cursor-pointer rounded-md border-none bg-brand px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-brand-dark"
+            >
+              REQUEST CLASS COINS
+            </button>
+          </div>
+        </EmptyState>
+      </Modal>
+    );
+  }
   const isValid = amountError === null && !belowMinimum;
 
   return (

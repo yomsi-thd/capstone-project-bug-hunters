@@ -10,6 +10,7 @@ import CommentList from "../components/project/CommentList";
 import ProjectVideo from "../components/project/ProjectVideo";
 import BackerInvestmentModal from "../components/project/BackerInvestmentModal";
 import BackerInvestmentSuccessModal from "../components/project/BackerInvestmentSuccessModal";
+import RequestCoinsModal from "../components/classcoin/RequestCoinsModal";
 import SupportLevels from "../components/project/SupportLevels";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
@@ -520,6 +521,7 @@ export default function ProjectDetail() {
           balance={balance}
           onClose={closeModals}
           onConfirm={handleConfirmInvestment}
+          onRequestCoins={() => setInvestStep("request")}
         />
       )}
 
@@ -527,6 +529,17 @@ export default function ProjectDetail() {
         <BackerInvestmentSuccessModal
           amount={investedAmount}
           onClose={closeModals}
+        />
+      )}
+
+      {/* ⚠️ One modal CLOSES and the other OPENS — never nested, exactly like the
+          invest → success pair above. A dialog inside a dialog means Escape and a
+          click outside close the wrong one, and two .lp-overlay layers darken the
+          page twice. */}
+      {investStep === "request" && (
+        <RequestCoinsModal
+          onClose={closeModals}
+          onSent={closeModals}
         />
       )}
 

@@ -63,3 +63,20 @@ export const rejectCreatorRequest = async (id) => {
   const response = await api.patch(`/admin/creator-requests/${id}/reject`);
   return response.data;
 }
+// A7 — the coin request queue. Returns PENDING requests only.
+export const getAllCoinRequests = async () => {
+  const response = await api.get("/admin/coin-requests");
+
+  return response.data.items;
+};
+
+// The amount is typed by the admin when approving — the person asking never names one.
+export const approveCoinRequest = async (id, amount) => {
+  const response = await api.patch(`/admin/coin-requests/${id}/approve`, { amount });
+  return response.data;
+};
+
+export const rejectCoinRequest = async (id) => {
+  const response = await api.patch(`/admin/coin-requests/${id}/reject`);
+  return response.data;
+};

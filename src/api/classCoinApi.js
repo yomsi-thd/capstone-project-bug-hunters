@@ -31,3 +31,16 @@ export const getTransactions = async () => {
 
   return response.data.items;
 };
+// A7 — somebody outside RMIT asking for Class Coins. `note` is required; the length rule
+// lives in components/classcoin/coinRequestRules.js and the backend enforces it too (422).
+export const requestCoins = async (note) => {
+  const response = await api.post("/classcoins/requests", { note });
+  return response.data;
+};
+
+// The signed-in user's waiting request, or null when there is none. 200 with a null body
+// is the ordinary answer here — do not read it as an error.
+export const getMyCoinRequest = async () => {
+  const response = await api.get("/classcoins/requests/me");
+  return response.data;
+};

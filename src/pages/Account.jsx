@@ -9,6 +9,8 @@ import { useAuth } from "../context/AuthContext";
 import * as userApi from "../api/userApi";
 import { toProfile } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
+import * as classCoinApi from "../api/classCoinApi";
+import RequestCoinsModal from "../components/classcoin/RequestCoinsModal";
 
 /* ── Small shared pieces ──────────────────────────────────────────────────────
    Top-level functions, never nested inside the page: a component defined during
@@ -79,6 +81,30 @@ export default function Account() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { user, roles, canInvest, balance, isMockSession, updateUser } = useAuth();
+
+  // The waiting coin request, or null. Only asked for when this person could actually
+  // file one — a pure creator has no wallet, so the question is meaningless for them.
+  const [coinRequest, setCoinRequest] = useState(null);
+  const [askingForCoins, setAskingForCoins] = useState(false);
+
+  useEffect(() => {
+    if (!canInvest || balance > 0) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const pending = await classCoinApi.getMyCoinRequest();
+        if (!cancelled) setCoinRequest(pending);
+      } catch {
+        // Deliberately silent. Not knowing whether a request is waiting costs at most an
+        // offer to ask again, which the backend then refuses with a 409 and a sentence. A
+        // red banner on the profile page over a secondary question would be worse.
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [canInvest, balance]);
 
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -265,6 +291,34 @@ export default function Account() {
                 )}
                 {shown.joinedOn && <SummaryRow label="MEMBER SINCE">{shown.joinedOn}</SummaryRow>}
               </div>
+
+              {/* An empty wallet: A7. Somebody outside RMIT gets no automatic grant at
+                  registration, so without this there is no way for them to ask and no way
+                  for an admin to learn they exist. */}
+              {canInvest && balance === 0 && (
+                <div className="mt-4 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
+                  {coinRequest ? (
+                    <p className="m-0 text-[13px] leading-relaxed text-[#8a6100]">
+                      Your request for Class Coins is waiting for an administrator. You will
+                      see the coins in your balance once it is approved.
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="m-0 text-[13px] leading-relaxed text-[#8a6100]">
+                        Your wallet is empty, so you cannot support a project yet. Ask an
+                        administrator to issue you some Class Coins.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setAskingForCoins(true)}
+                        className="shrink-0 cursor-pointer rounded-md border-none bg-brand px-4 py-2.5 text-[13px] font-bold text-white transition-colors hover:bg-brand-dark"
+                      >
+                        REQUEST CLASS COINS
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
               <p className="mx-0 mt-[18px] mb-0 text-[12px] leading-relaxed text-neutral-400">
                 Roles are granted by an administrator — request the Creator role from the sign-up
                 form, or ask an admin to change them.
@@ -367,6 +421,16 @@ export default function Account() {
       </div>
 
       <Footer isMobile={isMobile} />
+
+      {askingForCoins && (
+        <RequestCoinsModal
+          onClose={() => setAskingForCoins(false)}
+          onSent={(request) => {
+            setCoinRequest(request);
+            setAskingForCoins(false);
+          }}
+        />
+      )}
     </div>
   );
 }
