@@ -11,7 +11,7 @@ import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
 } from "../mock";
-import { errorMessage } from "../api/apiError";
+import { errorMessage, errorCode } from "../api/apiError";
 
 /**
  * Was this project filed by the admin who is currently looking at it?
@@ -257,6 +257,8 @@ export default function AdminApprovals() {
   const viewerId = user?.id ?? null;
   const [activeNav, setActiveNav] = useState("approvals");
   const [queue, setQueue] = useState("projects");
+  // Bumped when a verdict is refused as already-given, to reload a stale queue.
+  const [queueVersion, setQueueVersion] = useState(0);
   const [projects, setProjects] = useState([]);
   const [creatorRequests, setCreatorRequests] = useState([]);
   const [loadError, setLoadError] = useState(null);
@@ -289,7 +291,10 @@ export default function AdminApprovals() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+    // queueVersion, not []: a verdict refused with 409 means somebody else already
+    // reviewed that project, so the row on screen is stale. Bumping the version refetches
+    // and the row disappears, instead of sitting there inviting a second identical click.
+  }, [queueVersion]);
 
   // GET /api/admin/creator-requests already returns only PENDING rows.
   useEffect(() => {
@@ -341,6 +346,8 @@ export default function AdminApprovals() {
       setReviewTarget(null);
     } catch (err) {
       setActionError(errorMessage(err, "Could not approve this project"));
+      // Another admin got there first. The queue is stale, so reload it.
+      if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
 
@@ -355,6 +362,8 @@ export default function AdminApprovals() {
       setReviewTarget(null);
     } catch (err) {
       setActionError(errorMessage(err, "Could not reject this project"));
+      // Same as approve: a 409 means the verdict is already given, so the row is stale.
+      if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
 
