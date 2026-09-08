@@ -10,6 +10,7 @@ import SupportLevels from "../components/project/SupportLevels";
 import {
   ADMIN_APPROVAL_DEPT_STYLE as DEPT_STYLE,
   ADMIN_NAV_ITEMS as NAV_ITEMS,
+  DEFAULT_GRANT,
 } from "../mock";
 import { errorMessage, errorCode } from "../api/apiError";
 
@@ -247,6 +248,7 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
 const QUEUES = [
   { id: "projects", label: "Project Submissions" },
   { id: "creators", label: "Creator Requests" },
+  { id: "coins", label: "Coin Requests" },
 ];
 
 export default function AdminApprovals() {
@@ -261,6 +263,10 @@ export default function AdminApprovals() {
   const [queueVersion, setQueueVersion] = useState(0);
   const [projects, setProjects] = useState([]);
   const [creatorRequests, setCreatorRequests] = useState([]);
+  const [coinRequests, setCoinRequests] = useState([]);
+  // The amount per request, keyed by request id. One input per ROW rather than one shared
+  // by the table: an admin may well issue two people two different amounts in one sitting.
+  const [coinAmounts, setCoinAmounts] = useState({});
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
@@ -312,6 +318,22 @@ export default function AdminApprovals() {
     return () => { cancelled = true; };
   }, []);
 
+  // GET /api/admin/coin-requests returns PENDING rows only. queueVersion, not []: the same
+  // reason as the project queue — a 409 means another admin has already given a verdict,
+  // so the row on screen is stale.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await adminApi.getAllCoinRequests();
+        if (!cancelled) setCoinRequests(rows || []);
+      } catch (err) {
+        if (!cancelled) setLoadError(errorMessage(err, "Could not load coin requests"));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [queueVersion]);
+
   const term = search.toLowerCase();
 
   const filtered = projects.filter(p =>
@@ -321,6 +343,11 @@ export default function AdminApprovals() {
 
   const filteredRequests = creatorRequests.filter(r =>
     r.name.toLowerCase().includes(term) || r.email.toLowerCase().includes(term)
+  );
+
+  const filteredCoinRequests = coinRequests.filter(r =>
+    (r.full_name || "").toLowerCase().includes(term) ||
+    (r.email || "").toLowerCase().includes(term)
   );
 
   // Approving grants the CREATOR role inside a DB transaction on the backend; the row is
@@ -335,6 +362,24 @@ export default function AdminApprovals() {
       );
     } catch (err) {
       setActionError(errorMessage(err, "Could not update this request"));
+    }
+  };
+
+  // Approving credits the wallet and closes the request in ONE transaction on the backend.
+  // Here the row simply leaves the list, because this queue only ever holds PENDING rows.
+  const handleCoinDecision = async (id, decision) => {
+    setActionError(null);
+    try {
+      if (decision === "approve") {
+        await adminApi.approveCoinRequest(id, Number(coinAmounts[id] ?? DEFAULT_GRANT));
+      } else {
+        await adminApi.rejectCoinRequest(id);
+      }
+      setCoinRequests(prev => prev.filter(r => r.id !== id));
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not update this request"));
+      // Another admin got there first. The queue is stale, so reload it.
+      if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
 
@@ -447,7 +492,9 @@ export default function AdminApprovals() {
             <p className="text-[14px] text-gray-400">
               {queue === "projects"
                 ? "Review and validate student project submissions for the upcoming funding cycle."
-                : "Students who asked for Creator access when they signed up. Approving one grants the CREATOR role."}
+                : queue === "creators"
+                  ? "Students who asked for Creator access when they signed up. Approving one grants the CREATOR role."
+                  : "People outside RMIT asking for Class Coins. Approving one issues the amount you enter."}
             </p>
           </div>
 
@@ -456,7 +503,9 @@ export default function AdminApprovals() {
             {QUEUES.map(q => {
               const count = q.id === "projects"
                 ? projects.filter(p => p.status === "Pending Review").length
-                : creatorRequests.filter(r => r.status === "PENDING").length;
+                : q.id === "creators"
+                  ? creatorRequests.filter(r => r.status === "PENDING").length
+                  : coinRequests.length;
               return (
                 <button
                   key={q.id}
@@ -486,10 +535,14 @@ export default function AdminApprovals() {
                   { label: "Pending Review", value: pending },
                   { label: "Approved (this session)", value: approved },
                 ]
-              : [
-                  { label: "Pending Requests", value: creatorRequests.filter(r => r.status === "PENDING").length },
-                  { label: "Granted (this session)", value: creatorRequests.filter(r => r.status === "APPROVED").length },
-                ]
+              : queue === "creators"
+                ? [
+                    { label: "Pending Requests", value: creatorRequests.filter(r => r.status === "PENDING").length },
+                    { label: "Granted (this session)", value: creatorRequests.filter(r => r.status === "APPROVED").length },
+                  ]
+                : [
+                    { label: "Waiting for Coins", value: coinRequests.length },
+                  ]
             ).map(c => (
               <div key={c.label} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="text-[11px] font-semibold text-gray-400 mb-2">{c.label}</div>
@@ -574,6 +627,78 @@ export default function AdminApprovals() {
                       <td colSpan={5} className="px-5 py-10 text-center text-[13px] text-gray-400">
                         {creatorRequests.length === 0
                           ? "No creator requests waiting. One appears here when a student ticks “Creator” while signing up."
+                          : "No requests match that filter."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Coin requests queue */}
+          {queue === "coins" && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+              <table className="min-w-[820px] w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    {["Person", "Why they are asking", "Requested On", "Class Coins", "Actions"].map(h => (
+                      <th key={h} className="px-5 py-3 text-[11px] font-bold text-gray-400 tracking-wide text-left">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="lp-stagger">
+                  {filteredCoinRequests.length > 0 ? filteredCoinRequests.map((r, i) => (
+                    <tr key={r.id} className={`hover:bg-gray-50 transition-colors ${i < filteredCoinRequests.length - 1 ? "border-b border-gray-100" : ""}`}>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <Avatar name={r.full_name} size={36} fontSize={12} max={1} tone="brand" />
+                          <div>
+                            <div className="text-[13px] font-bold text-gray-900 leading-snug">{r.full_name}</div>
+                            <div className="text-[11px] text-gray-400">{r.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      {/* The note is the ONLY thing an admin has to decide on: the client
+                          confirmed on 2026-09-08 that she does not know these people in
+                          advance, so a name and an email say nothing. */}
+                      <td className="px-5 py-3.5 max-w-[280px] text-[13px] text-gray-600 leading-relaxed">{r.note}</td>
+                      <td className="px-5 py-3.5 text-[13px] text-gray-500 whitespace-nowrap">
+                        {new Date(r.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            value={coinAmounts[r.id] ?? String(DEFAULT_GRANT)}
+                            onChange={e => setCoinAmounts(prev => ({ ...prev, [r.id]: e.target.value.replace(/[^\d]/g, "") }))}
+                            className="w-24 rounded-md border border-gray-200 px-2 py-1.5 text-[13px] text-gray-700 outline-none focus:border-brand"
+                            aria-label={`Class Coins for ${r.full_name}`}
+                          />
+                          <span className="text-[12px] text-gray-400">CC</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCoinDecision(r.id, "reject")}
+                            className="bg-white border border-gray-200 text-gray-600 rounded-md px-3 py-1.5 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors"
+                          >
+                            DECLINE
+                          </button>
+                          <button
+                            onClick={() => handleCoinDecision(r.id, "approve")}
+                            className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-3 py-1.5 text-[12px] font-bold cursor-pointer transition-colors"
+                          >
+                            GRANT COINS
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr>
+                      <td colSpan={5} className="px-5 py-10 text-center text-[13px] text-gray-400">
+                        {coinRequests.length === 0
+                          ? "Nobody is waiting for Class Coins. A request appears here when someone outside RMIT asks for an allocation."
                           : "No requests match that filter."}
                       </td>
                     </tr>
