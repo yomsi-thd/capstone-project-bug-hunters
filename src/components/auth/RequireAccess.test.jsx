@@ -100,8 +100,9 @@ describe("RequireAccess", () => {
   });
 
   it("gates each permission independently", () => {
-    // An admin is a superuser for creator pages (canCreate is true for them), but the
-    // flags are separate values and the guard must read the one it was given.
+    // ⚠️ isAdmin and canCreate are set together here as a FIXTURE, not because an admin
+    // really holds both - since 2026-08-24 an admin has canCreate false. The point of the
+    // test is that the guard reads the one flag it was given and ignores the others.
     setAuth({ isLoggedIn: true, isAdmin: true, canCreate: true });
     const { unmount } = renderAt("/creator-dashboard", "isAdmin");
     expect(screen.getByTestId("page")).toBeInTheDocument();

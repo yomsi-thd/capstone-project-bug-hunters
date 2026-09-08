@@ -8,11 +8,15 @@ import { serverMessage } from "../api/apiError";
 
 // Fallback accounts, used ONLY when the backend cannot be reached at all.
 // They exist so the UI is still browsable when the API is down — see login().
-// A user can hold multiple roles; these two personas cover the app's cases.
-//   student  = Backer + Creator  -> sees everything
-//   lecturer = Admin  + Backer   -> Admin is a superuser, so this sees everything too
-// Admins can access every function, so admin implies both creator (create/manage
-// projects) and backer (invest) capabilities in the derived permissions below.
+// A non-admin may hold two roles; the four below cover the app's cases.
+//   student1  = Backer + Creator  -> sees everything a member can own
+//   lecturer1 = Backer            -> a plain member
+//   creator1  = Creator           -> no balance, cannot invest
+//   admin1    = Admin             -> owns nothing at all
+// ⚠️ An ADMIN holds ONLY admin since the role separation of 2026-08-24, and admin does
+// NOT imply creator or backer: `canCreate` is creator-only and `canInvest` is
+// backer-only. An admin reaches the project wizard through `canCreateForOthers`, filing
+// on a creator's behalf. See the derived permissions below.
 const ACCOUNTS = {
   student1: {
     password: "student1@",
