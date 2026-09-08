@@ -6,6 +6,8 @@ const authenticate = require("../middlewares/authMiddleware");
 const authorize = require("../middlewares/authorize");
 const { validateBody } = require("../validation/validate");
 const { walletAdjustmentSchema, grantSchema } = require("../validation/schemas/accountSchemas");
+const coinRequestController = require("../controllers/coinRequestController");
+const { coinRequestSchema } = require("../validation/schemas/coinRequestSchemas");
 
 // Get balance
 router.get(
@@ -27,6 +29,28 @@ router.get(
     "/investments",
     authenticate,
     classCoinController.getMyInvestments
+);
+
+// A7 - somebody outside RMIT asking for Class Coins. It sits under /classcoins because it
+// is about the signed-in user's own wallet; the REVIEW routes sit under /admin because
+// they are about an admin's work.
+//
+// No authorize() here on purpose: anyone signed in may file one, and the three real rules
+// (an empty wallet, no request already waiting, not an admin) all need the database, so
+// they live in the service where there is no way around them.
+router.post(
+    "/requests",
+    authenticate,
+    validateBody(coinRequestSchema),
+    coinRequestController.createRequest
+);
+
+// The caller's own waiting request, or null. The Account page asks so that it does not
+// invite somebody who has already asked to ask again.
+router.get(
+    "/requests/me",
+    authenticate,
+    coinRequestController.getMyPending
 );
 
 // Add / deduct ClassCoins by hand. ADMIN ONLY.

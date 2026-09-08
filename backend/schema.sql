@@ -85,6 +85,38 @@ CREATE TABLE creator_requests (
 );
 
 
+-- ─── coin_requests ──────────────────────────────────────────────────────────
+-- Requests for Class Coins from people outside RMIT (A7, 2026-09-08). Tier 3 of N5:
+-- tier 1 is the automatic grant by email domain at registration, tier 2 is an admin
+-- issuing to a pasted list. The client confirmed on 2026-09-08 that she does not know
+-- these people in advance, so they have to be able to ask for themselves.
+CREATE TABLE coin_requests (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    -- Required: the admin does not know who is asking, so the request has to carry
+    -- something to judge it by. The length limit is held by zod, not by VARCHAR(n) -
+    -- going over must be a 422 with a sentence, not a database error.
+    note            TEXT         NOT NULL,
+    status          VARCHAR(20)  NOT NULL DEFAULT 'PENDING'
+                    CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED')),
+    -- NULL until approved. The ledger records this too, but the request must carry its
+    -- own verdict - reading the queue should not require a join to classcoin_transactions.
+    amount_granted  INTEGER,
+    -- No ON DELETE action, like creator_requests.reviewed_by: deleting an admin must not
+    -- silently erase who reviewed what.
+    reviewed_by     INTEGER      REFERENCES users(id),
+    reviewed_at     TIMESTAMPTZ,
+    created_at      TIMESTAMPTZ  DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ⚠️ NOT UNIQUE(user_id). creator_requests uses one and that is known issue 4 at the
+-- bottom of this file: a mis-clicked DECLINE locks that person out for ever. This partial
+-- index allows exactly ONE PENDING request at a time and constrains nothing else - so a
+-- rejected person can ask again, and so can somebody who spent everything they were given.
+CREATE UNIQUE INDEX coin_requests_one_pending
+    ON coin_requests (user_id) WHERE status = 'PENDING';
+
+
 -- ─── semesters ──────────────────────────────────────────────────────────────
 -- Added 2026-09-06. The teaching period a project belongs to, and the ONLY
 -- source of a project's closing date — projects.start_date/end_date used to hold

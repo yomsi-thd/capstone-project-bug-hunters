@@ -34,6 +34,17 @@ const MESSAGES = {
     GRANT_TO_ADMIN: "An administrator account cannot hold Class Coins.",
     GRANT_TARGET_MISSING: "One of those accounts no longer exists.",
 
+    // A7 - somebody outside RMIT asking for Class Coins. One constant per rule: two checks
+    // are fine, two wordings are not - a person refused by one would read a different reason
+    // than a person refused by the other and reasonably think they were two different rules.
+    // The first two are copied WORD FOR WORD into
+    // src/components/classcoin/coinRequestRules.js.
+    COIN_REQUEST_NOTE_REQUIRED: "Tell the admin who you are and why you need Class Coins.",
+    COIN_REQUEST_NOTE_TOO_LONG: "Keep that under 200 characters.",
+    COIN_REQUEST_PENDING: "You already have a request waiting for an admin.",
+    COIN_REQUEST_WALLET_NOT_EMPTY: "You still have Class Coins to spend.",
+    COIN_REQUEST_ALREADY_REVIEWED: "This request has already been reviewed.",
+
     // The wallet to adjust is named in the BODY, never taken from the token - reading
     // it from the token was the whole bug of 2026-08-21, when any signed-in user could
     // mint Class Coins into their own balance.

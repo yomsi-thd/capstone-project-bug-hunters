@@ -9,6 +9,8 @@ const { validateBody } = require("../validation/validate");
 const { validateQuery } = require("../validation/validate");
 const { paginationQuery } = require("../http/envelope");
 const { updateRolesSchema } = require("../validation/schemas/accountSchemas");
+const coinRequestController = require("../controllers/coinRequestController");
+const { coinRequestVerdictSchema } = require("../validation/schemas/coinRequestSchemas");
 
 // :id is a user id on the /users routes and a request id on /creator-requests. Both are
 // SERIAL, and "not found" is the right answer for a value that can be neither.
@@ -85,6 +87,30 @@ router.patch(
     authenticate,
     authorize("ADMIN"),
     adminController.rejectCreatorRequest
+);
+
+// A7 - the coin request queue. PENDING only, exactly like /creator-requests.
+router.get(
+    "/coin-requests",
+    authenticate,
+    authorize("ADMIN"),
+    coinRequestController.getAllPending
+);
+
+// The amount is typed by the admin and arrives in the body; the reviewer comes from the token.
+router.patch(
+    "/coin-requests/:id/approve",
+    authenticate,
+    authorize("ADMIN"),
+    validateBody(coinRequestVerdictSchema),
+    coinRequestController.approve
+);
+
+router.patch(
+    "/coin-requests/:id/reject",
+    authenticate,
+    authorize("ADMIN"),
+    coinRequestController.reject
 );
 
 module.exports = router;
