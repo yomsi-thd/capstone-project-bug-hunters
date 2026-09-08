@@ -91,6 +91,47 @@ async function getMyInvestments(userId) {
 }
 
 /**
+ * Credit ONE wallet and write the ledger row that explains it.
+ *
+ * ⚠️ Takes a `client` and NEVER opens a transaction of its own. Both callers already run
+ * inside one — grantToUsers for the whole pasted list, coinRequestService.approve for the
+ * request it is approving — and withTransaction takes a NEW connection per call, so a
+ * transaction opened in here would commit independently of its caller's and could not be
+ * rolled back with it. That is the exact failure this function exists to make impossible:
+ * approving a request whose UPDATE then returns 0 rows must take the coins back with it.
+ *
+ * `wallet` is an optimisation for the bulk path, which already fetched every wallet in
+ * one query — without it a class of thirty would cost thirty extra lookups.
+ *
+ * ⚠️ Every query below is passed `client`. One that forgets takes its own connection from
+ * the pool: the 2026-08-06 regression, in the one function written to prevent it.
+ */
+async function creditWallet(userId, amount, { grantedBy, description, wallet }, client) {
+    // Make one if this account never had it. Inside the caller's transaction, so a
+    // failure later takes the new wallet back with it.
+    const target =
+        wallet ??
+        (await classCoinRepository.findWalletsByUserIds([userId], client))[0] ??
+        (await classCoinRepository.createClassCoin(userId, client));
+
+    await classCoinRepository.addBalance(userId, amount, client);
+
+    await classCoinRepository.createTransaction(
+        {
+            classcoin_id: target.id,
+            project_id: null,
+            type: "ADMIN_ADD",
+            amount,
+            description,
+            granted_by: grantedBy
+        },
+        client
+    );
+
+    return target;
+}
+
+/**
  * Grant Class Coins to a list of accounts.
  *
  * ⚠️ ONE transaction for the whole list, and that is the entire reason this endpoint
@@ -129,20 +170,13 @@ async function grantToUsers(userIds, amount, grantedBy) {
         const walletByUser = new Map(wallets.map((w) => [w.user_id, w]));
 
         for (const userId of ids) {
-            // Make one if this account never had it. Inside the transaction, so a failure
-            // later in the batch takes the new wallet back with it.
-            const wallet =
-                walletByUser.get(userId) ?? (await classCoinRepository.createClassCoin(userId, client));
-
-            await classCoinRepository.addBalance(userId, amount, client);
-            await classCoinRepository.createTransaction(
+            await creditWallet(
+                userId,
+                amount,
                 {
-                    classcoin_id: wallet.id,
-                    project_id: null,
-                    type: "ADMIN_ADD",
-                    amount,
+                    grantedBy,
                     description: "Granted by an administrator",
-                    granted_by: grantedBy
+                    wallet: walletByUser.get(userId)
                 },
                 client
             );
@@ -213,6 +247,7 @@ module.exports = {
     AUTO_GRANT_DOMAINS,
     REGISTRATION_GRANT,
     grantOnRegistration,
+    creditWallet,
     grantToUsers,
     getClassCoin,
     getTransactions,
