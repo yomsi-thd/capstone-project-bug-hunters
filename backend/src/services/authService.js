@@ -20,8 +20,8 @@ async function register(fullName, email, password, wantCreator) {
         await userRepository.findByEmail(email);
 
     if (existing) {
-        // 409, not 400: the request is well-formed and understood, it just collides
-        // with a row that already exists.
+        // 409 rather than 400: the request is well-formed and understood, it just
+        // collides with a row that already exists.
         throw conflict("Email already exists");
     }
 
@@ -40,9 +40,9 @@ async function register(fullName, email, password, wantCreator) {
 
     await classCoinRepository.createClassCoin(user.id);
 
-    // ⚠️ Deliberately swallowed. A wallet that could not be topped up must not turn a
-    // successful registration into an error: the account exists, the wallet exists, and
-    // an admin can grant later. Failing here would trade a minor gap for a total one.
+    // Swallowed on purpose. A wallet that could not be topped up must not turn a
+    // successful registration into an error: the account and the wallet both exist, and
+    // an admin can grant later.
     try {
         await classCoinService.grantOnRegistration(user.id, email);
     } catch (error) {
@@ -62,8 +62,8 @@ async function login(email, password) {
         await userRepository.findByEmail(email);
 
     if (!user) {
-        // Deliberately the same sentence for "no such email" and "wrong password":
-        // telling them apart is an account-enumeration oracle.
+        // The same sentence for "no such email" and "wrong password". Telling them apart
+        // would let anyone test which addresses have accounts.
         throw unauthenticated("Invalid email or password");
     }
 
@@ -79,7 +79,7 @@ async function login(email, password) {
     const accessToken = generateAccessToken(user, roles);
     const refreshToken = generateRefreshToken(user, roles);
 
-    // expires in 7 days
+    // Expires in 7 days.
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
 
@@ -109,7 +109,7 @@ async function refreshToken(token) {
         ]);
     }
 
-    // Check if token exists in database
+    // The token has to exist in the database.
     const storedToken =
         await refreshTokenRepository.findByToken(token);
 
@@ -117,18 +117,15 @@ async function refreshToken(token) {
         throw unauthenticated("Invalid refresh token");
     }
 
-    //Check Expiration in database
+    // ...and not have expired.
     if (new Date() > storedToken.expires_at) {
         await refreshTokenRepository.deleteToken(token);
         throw unauthenticated("Refresh token expired");
     }
-    // Verify JWT.
-    //
-    // Wrapped rather than left to throw: jsonwebtoken raises its own error type, which
-    // would now reach errorHandler as an unexpected failure and answer 500. The
-    // controller's old blanket catch turned every failure in here into a 401, and for
-    // this one that answer was right — a token whose signature or expiry does not check
-    // out is exactly "your session is not valid".
+    // Wrapped rather than left to throw. jsonwebtoken raises its own error type, which
+    // would reach errorHandler as an unexpected failure and answer 500, where a token
+    // whose signature or expiry does not check out is exactly "your session is not
+    // valid".
     let payload;
 
     try {
@@ -140,15 +137,15 @@ async function refreshToken(token) {
     const user = await userRepository.findById(payload.id);
 
     if (!user) {
-        // 401, not 404. The caller is asking to renew THEIR session, and the session is
-        // what is gone - which is also what the frontend's interceptor needs to hear in
-        // order to clear storage rather than show a "not found" page.
+        // 401 rather than 404. The caller is asking to renew their session and the
+        // session is what is gone, which is also what the frontend's interceptor needs to
+        // hear in order to clear storage rather than show a "not found" page.
         throw unauthenticated("User not found");
     }
 
     const roles = await userRepository.getUserRoles(user.id);
 
-    // Create a new access token
+    // Issue a new access token.
     const accessToken = generateAccessToken(user, roles);
 
     return {

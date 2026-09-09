@@ -13,7 +13,7 @@ const coinRequestController = require("../controllers/coinRequestController");
 const { coinRequestVerdictSchema } = require("../validation/schemas/coinRequestSchemas");
 
 // :id is a user id on the /users routes and a request id on /creator-requests. Both are
-// SERIAL, and "not found" is the right answer for a value that can be neither.
+// serial, and "not found" is the right answer for a value that can be neither.
 guardIdParams(router, { id: "Resource" });
 
 router.patch(
@@ -45,7 +45,7 @@ router.get(
     adminController.getUserById
 );
 
-// Body: { "roles": ["BACKER", "CREATOR"] } — replaces the user's whole role set.
+// Body: { "roles": ["BACKER", "CREATOR"] }, replacing the user's whole role set.
 router.patch(
     "/users/:id/roles",
     authenticate,
@@ -89,7 +89,7 @@ router.patch(
     adminController.rejectCreatorRequest
 );
 
-// A7 - the coin request queue. PENDING only, exactly like /creator-requests.
+// The coin request queue. PENDING only, like /creator-requests.
 router.get(
     "/coin-requests",
     authenticate,
@@ -97,7 +97,8 @@ router.get(
     coinRequestController.getAllPending
 );
 
-// The amount is typed by the admin and arrives in the body; the reviewer comes from the token.
+// The admin types the amount, which arrives in the body; the reviewer comes from the
+// token.
 router.patch(
     "/coin-requests/:id/approve",
     authenticate,

@@ -1,25 +1,22 @@
 const pool = require("../config/db");
 
 /**
- * Support levels — `project_tiers` in the database, "Support Levels" on screen.
+ * Support levels: `project_tiers` in the database, "Support Levels" on screen.
  *
- * A level is a MINIMUM contribution plus a list of lines saying what choosing it
- * signals. Nobody is owed anything: the creator writes the levels, the backer picks
- * one at investment time, and `classcoin_transactions.tier_id` records the choice.
+ * A level is a minimum contribution plus lines saying what choosing it signals. Nobody is
+ * owed anything: the creator writes the levels, the backer picks one at investment time,
+ * and classcoin_transactions.tier_id records the choice.
  *
- * ⚠️ Every function takes `client = pool`. This has bitten the repo twice already —
- * classCoinRepository once made `client` mandatory (so /classcoins/add and /deduct
- * threw) and increaseCurrentAmount once ignored the client it was handed (so a
- * ROLLBACK could not undo the funding bump). Both shapes are wrong; this is the
- * shape that works inside and outside a transaction.
+ * Every function takes `client = pool`. Making it mandatory breaks the callers outside a
+ * transaction, and ignoring it breaks rollback for the callers inside one. This shape
+ * works either way.
  */
 
 // Every level of one project, cheapest first.
 //
-// `backers_count` is the number that makes support levels worth having: it answers
-// "which level attracts the most people". COUNT(DISTINCT classcoin_id), not COUNT(*),
-// so investing three times at one level is still one person — the same rule the
-// project's own backers_count already follows.
+// backers_count is what makes support levels worth having, since it answers which level
+// attracts people. COUNT(DISTINCT classcoin_id) rather than COUNT(*), so repeat
+// investments at one level are still one person, matching the project's own count.
 async function findByProjectId(projectId, { activeOnly = true } = {}, client = pool) {
     const result = await client.query(
         `
@@ -47,9 +44,9 @@ async function findByProjectId(projectId, { activeOnly = true } = {}, client = p
     return result.rows;
 }
 
-// One level, scoped to the project it must belong to. The project id is not
-// decoration: the invest flow gets `tierId` straight from the request body, so this
-// is what stops a backer attaching another project's level to their investment.
+// One level, scoped to the project it must belong to. The project id is not decoration:
+// the invest flow takes `tierId` straight from the request body, so this is what stops a
+// backer attaching another project's level to their investment.
 async function findForProject(tierId, projectId, client = pool) {
     const result = await client.query(
         `
@@ -78,9 +75,10 @@ async function countActiveByProjectId(projectId, client = pool) {
     return result.rows[0].count;
 }
 
-// "Another level already starts at this amount." Only ACTIVE levels count — a hidden
-// one keeps its amount, and blocking a new level because a hidden one shares the price
-// would make hiding a level a permanent reservation of that number.
+// "Another level already starts at this amount." Active levels only: a hidden one keeps
+// its amount, and blocking a new level over it would make hiding one a permanent
+// reservation of that number.
+//
 // `excludeTierId` is the level being edited, which must not collide with itself.
 async function existsWithMinAmount(projectId, minAmount, excludeTierId = null, client = pool) {
     const result = await client.query(
@@ -99,7 +97,7 @@ async function existsWithMinAmount(projectId, minAmount, excludeTierId = null, c
     return result.rowCount > 0;
 }
 
-// Has anybody actually chosen this level? Decides delete vs hide.
+// Has anybody chosen this level? Decides between deleting and hiding.
 async function hasTransactions(tierId, client = pool) {
     const result = await client.query(
         `
@@ -131,10 +129,9 @@ async function create(tier, client = pool) {
             tier.project_id,
             tier.name,
             tier.min_amount,
-            // jsonb, so it has to be stringified. Handing node-postgres a raw JS array
-            // makes it send a Postgres array literal ({...}) and the insert fails with
-            // "invalid input syntax for type json" — the bug that once broke every
-            // PUT /projects/:id because team_members was passed unstringified.
+            // jsonb, so it has to be stringified. A raw JS array makes node-postgres
+            // send a Postgres array literal and the insert fails with "invalid input
+            // syntax for type json".
             JSON.stringify(tier.bullets ?? [])
         ]
     );
@@ -142,9 +139,8 @@ async function create(tier, client = pool) {
     return result.rows[0];
 }
 
-// Editing min_amount deliberately does NOT touch history: an investment already
-// carries its tier_id, so raising the bar on a level never rewrites what somebody
-// signalled last week.
+// Editing min_amount does not touch history: an investment already carries its tier_id,
+// so raising the bar never rewrites what somebody signalled last week.
 async function update(tierId, tier, client = pool) {
     const result = await client.query(
         `
@@ -166,7 +162,7 @@ async function update(tierId, tier, client = pool) {
     return result.rows[0];
 }
 
-// Hide rather than destroy — what "delete" becomes once somebody has chosen the level.
+// Hide rather than destroy, which is what delete becomes once somebody has chosen it.
 async function deactivate(tierId, client = pool) {
     const result = await client.query(
         `
@@ -181,7 +177,7 @@ async function deactivate(tierId, client = pool) {
     return result.rows[0];
 }
 
-// Only ever called for a level with no transactions (see projectService.deleteTier).
+// Only called for a level with no transactions. See tierService.deleteTier.
 async function remove(tierId, client = pool) {
     const result = await client.query(
         `DELETE FROM project_tiers WHERE id = $1 RETURNING *;`,

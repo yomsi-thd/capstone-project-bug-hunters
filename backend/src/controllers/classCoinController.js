@@ -26,20 +26,18 @@ const getMyInvestments = asyncHandler(async (req, res) => {
 });
 
 /**
- * The wallet to credit or debit is named in the BODY, never taken from the token.
+ * The wallet to credit or debit is named in the body, never taken from the token.
  *
- * Reading req.user.id here was the whole bug (fixed 2026-08-21): these routes had no
- * role guard either, so ANY signed-in user could mint Class Coins into their own wallet
- * — and Class Coins are the only measure of a project's popularity, so that made the
- * ranking meaningless. An admin topping up their OWN wallet is not what the endpoint is
- * for either; after the role separation an admin has no balance at all.
+ * Reading req.user.id here, on routes with no role guard, would let any signed-in user
+ * mint Class Coins into their own wallet, and coins are the only measure of a project's
+ * popularity. An admin topping up their own wallet is not what the endpoint is for
+ * either: an admin has no balance at all.
  */
 function targetWallet(req) {
     const { user_id: userId, amount } = req.body;
 
-    // The schema on the route catches this first. Kept as well, and worded from the same
-    // constant, because a controller should not depend on a middleware having run - and
-    // because two checks are fine while two wordings are not.
+    // The schema on the route catches this first. Kept here as well, from the same
+    // constant, because a controller should not depend on a middleware having run.
     if (!userId) {
         throw validationFailed(M.WALLET_TARGET_REQUIRED, [
             { field: "user_id", message: M.WALLET_TARGET_REQUIRED },
@@ -57,9 +55,9 @@ const addCoins = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "ClassCoins added successfully", classCoin });
 });
 
-// Bulk and single are the same call - granting to one person is a list of one. The
-// grantor comes from the TOKEN, never the body: it is an audit trail, and a claim the
-// caller could type would be worth nothing.
+// Bulk and single are the same call, since granting to one person is a list of one. The
+// grantor comes from the token rather than the body: it is an audit trail, and a claim
+// the caller could type would be worth nothing.
 const grantCoins = asyncHandler(async (req, res) => {
     const result = await classCoinService.grantToUsers(req.body.user_ids, req.body.amount, req.user.id);
 

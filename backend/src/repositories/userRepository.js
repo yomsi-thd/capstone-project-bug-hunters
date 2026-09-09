@@ -32,8 +32,8 @@ async function findByEmail(email) {
     return result.rows[0];
 }
 
-// `title` is the creator's academic affiliation shown under their name on the project
-// page ("Lead Researcher, RMIT Robotics Lab"). Optional — pass null to clear it.
+// `title` is the academic affiliation shown under a creator's name on the project page,
+// e.g. "Lead Researcher, RMIT Robotics Lab". Optional; pass null to clear it.
 async function updateProfile(id, fullName, email, title) {
     const result = await pool.query(
         `UPDATE users
@@ -68,14 +68,12 @@ async function deleteUser(id) {
     return result.rows[0];
 }
 
-// adminService.getAllUsers() calls this function, but it did not exist before
-// -> GET /api/admin/users returned "userRepository.findAllUsers is not a function".
-// Returns a roles array because the users table no longer has a role column.
-// Which of these accounts hold ADMIN? Used to refuse a grant BEFORE any of it lands.
-// An admin owns nothing since 2026-08-24, and checking it here rather than only in the
-// screen is the difference between a rule and a suggestion.
-// Which of these ids name a real account? Used by the bulk grant to tell "this person
-// has no wallet yet" (fine, one gets made) apart from "this id names nobody" (a 404).
+// Returns a roles array, since `users` has no role column.
+// Which of these accounts hold ADMIN. Used to refuse a grant before any of it lands, an
+// admin owning nothing. Checking it here rather than only in the screen is the difference
+// between a rule and a suggestion.
+// Which of these ids name a real account. The bulk grant uses it to tell "no wallet yet",
+// which is fine and makes one, apart from "this id names nobody", which is a 404.
 async function findExistingIdsAmong(userIds, client = pool) {
     const result = await client.query("SELECT id FROM users WHERE id = ANY($1)", [userIds]);
 
@@ -107,11 +105,11 @@ async function findAllUsers({ limit = null, offset = 0 } = {}) {
                    ARRAY_AGG(r.name) FILTER (WHERE r.name IS NOT NULL),
                    '{}'
                ) AS roles,
-               -- The admin issues Class Coins from this same table, so the balance has to
-               -- be on the row. ⚠️ LEFT JOIN: four accounts on the shared database have no
-               -- wallet, and an INNER JOIN would drop them off the admin's screen without
-               -- an error - a silent disappearance. NULL here means "no wallet", which is
-               -- a different fact from a balance of 0.
+               -- The admin issues Class Coins from this same table, so the balance has
+               -- to be on the row. A LEFT JOIN, because some accounts have no wallet and
+               -- an inner join would drop them off the admin's screen with no error.
+               -- NULL here means no wallet, which is a different fact from a balance
+               -- of 0.
                cc.balance::int AS balance
         FROM users u
         LEFT JOIN user_roles ur ON ur.user_id = u.id
@@ -164,9 +162,8 @@ async function assignRole(userId, roleName, client = pool) {
     return result.rows[0];
 }
 
-// Replaces a user's whole role set in one shot, for PATCH /admin/users/:id/roles.
-// Pass the transaction client so the DELETE and the INSERT cannot half-apply and
-// leave the user with no roles at all.
+// Replaces a user's whole role set in one shot. Pass the transaction client so the DELETE
+// and the INSERT cannot half-apply and leave the account with no roles at all.
 async function setUserRoles(userId, roleNames, client = pool) {
 
     await client.query(
@@ -193,8 +190,8 @@ async function setUserRoles(userId, roleNames, client = pool) {
     return result.rows;
 }
 
-// The role vocabulary lives in the roles table, so validate against it rather than
-// hardcoding ADMIN / BACKER / CREATOR in the service.
+// The role vocabulary lives in the roles table, so validate against that rather than
+// hardcoding the three names in the service.
 async function findAllRoleNames() {
     const result = await pool.query(
         `SELECT name FROM roles ORDER BY id;`

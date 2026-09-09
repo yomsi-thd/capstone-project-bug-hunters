@@ -1,18 +1,17 @@
 /**
- * assertVisibleTo — who may read an unapproved project, and everything hanging off it.
+ * assertVisibleTo: who may read an unapproved project, and everything hanging off it.
  *
- * This is the rule most at risk from the restructure, because §7 of the design moves
- * comments, updates and tiers into services of their own. Each of the four public reads
- * calls assertVisibleTo today; a copy that gets left behind during the split would hide
- * a project while leaving its discussion readable one URL over, which hides nothing.
+ * Comments, updates and tiers each have a service of their own, and all four public reads
+ * go through this rule. One that got left behind would hide a project while leaving its
+ * discussion readable one URL over, which hides nothing.
  *
- * Two properties are load-bearing and both are pinned below:
+ * Two properties are load-bearing, and both are pinned below.
  *
- *   404, never 403 — "this exists but is pending review" already tells a stranger the
- *   project exists, and ids are sequential integers.
+ * 404 rather than 403: "this exists but is pending review" already tells a stranger the
+ * project exists, and ids are sequential integers.
  *
- *   The test is `status`, never `archived_at` — an archived project MUST stay readable,
- *   because a backer's investment card still links to it.
+ * The test is `status` and never `archived_at`: an archived project stays readable,
+ * because a backer's investment card still links to it.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -100,8 +99,8 @@ describe("an APPROVED project", () => {
 });
 
 describe("an ARCHIVED project", () => {
-    // The visibility rule added for unapproved projects must not accidentally hide
-    // archived ones: a backer who already invested has a card linking straight here.
+    // The rule for unapproved projects must not also hide archived ones: a backer who
+    // already invested has a card linking straight here.
     it("stays readable to everyone while it is still APPROVED", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -131,7 +130,7 @@ describe("an ARCHIVED project", () => {
 
 describe("GET /api/admin/projects/:id", () => {
     // The admin read passes req.user through for the same reason: without it an admin
-    // loses the ability to open a PENDING project, i.e. the whole review screen.
+    // cannot open a PENDING project, which is the whole review screen.
     it("200 for an admin on a PENDING project", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
 

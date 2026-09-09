@@ -1,14 +1,14 @@
 /**
- * Semester resolution (N1) and GET /api/semesters.
+ * Semester resolution and GET /api/semesters.
  *
- * ⚠️ THIS FILE REWRITES THE `semesters` TABLE. That is safe here and only here:
- * vitest.config.mjs runs one file at a time in one process, and the seed from
- * schema.sql is put back in afterAll so a later file finds the schema as it was built.
- * Every other suite only ever reads the semester the factories pick for it.
+ * This file rewrites the `semesters` table, which is safe here and only here: vitest runs
+ * one file at a time in one process, and afterAll puts the seed from schema.sql back so a
+ * later file finds the schema as it was built. Every other suite only reads the semester
+ * the factories pick for it.
  *
- * Fixtures are written as OFFSETS FROM CURRENT_DATE rather than as fixed dates. Fixed
- * dates would make "today is inside a semester" a fact about the calendar, so the suite
- * would start failing on 26 Oct 2026 for reasons that have nothing to do with the code.
+ * Fixtures are offsets from CURRENT_DATE rather than fixed dates. Fixed dates would make
+ * "today is inside a semester" a fact about the calendar, and the suite would start
+ * failing on a particular day for reasons that have nothing to do with the code.
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
@@ -22,11 +22,10 @@ let seeded = [];
 
 /** Replace the table with these rows. Offsets are whole days from today. */
 async function setSemesters(rows) {
-    // projects.semester_id has no ON DELETE action, so the default RESTRICT stands and
-    // a semester holding projects cannot be removed. That is the right behaviour for
-    // the real database and simply has to be unhooked here — the tests below file real
-    // projects against these fixtures. It only ever touches rows created earlier in the
-    // run, and nothing reads semester_id back out of them.
+    // projects.semester_id has no ON DELETE action, so RESTRICT stands and a semester
+    // holding projects cannot be removed. That is right for the real database and simply
+    // has to be unhooked here, since the tests below file real projects against these
+    // fixtures. It only touches rows created earlier in the run.
     await pool.query("UPDATE projects SET semester_id = NULL");
     await pool.query("DELETE FROM semesters");
 
@@ -78,7 +77,7 @@ describe("findOpenSemester / findBrowsableSemester", () => {
         expect(browsable.name).toBe("Now");
     });
 
-    // The rule the whole design rests on: no open semester stops WRITING, never READING.
+    // The rule the whole design rests on: no open semester stops writing, never reading.
     it("today in the gap: open is null, browsable is the semester that just ended", async () => {
         await setSemesters([
             { name: "Just ended", from: -100, to: -1 },
@@ -92,9 +91,8 @@ describe("findOpenSemester / findBrowsableSemester", () => {
         expect(browsable.name).toBe("Just ended");
     });
 
-    // Cannot happen with the real data. It must still not throw: Discover has to show
-    // an empty state, and a 500 on the landing page is the worst way to learn about a
-    // date range somebody typed wrong.
+    // Cannot happen with real data, and must still not throw: Discover has to show an
+    // empty state rather than 500 on the landing page over a mistyped date range.
     it("today before every semester: both null, and neither throws", async () => {
         await setSemesters([{ name: "Future", from: 10, to: 100 }]);
 
@@ -109,10 +107,9 @@ describe("findOpenSemester / findBrowsableSemester", () => {
         await expect(semesterRepository.findBrowsableSemester()).resolves.toBeNull();
     });
 
-    // There is no constraint against overlapping ranges - an EXCLUDE USING gist would be
-    // heavy for three hand-entered rows a year. What replaces it is that both resolvers
-    // order by start_date DESC, so two overlapping rows still give ONE answer, and the
-    // same one every time.
+    // There is no constraint against overlapping ranges, since an exclusion constraint
+    // would be heavy for three hand-entered rows a year. Instead both resolvers order by
+    // start_date DESC, so two overlapping rows still give one answer, every time.
     it("two overlapping semesters: the later start wins, in both", async () => {
         await setSemesters([
             { name: "Earlier start", from: -30, to: 30 },
@@ -125,8 +122,8 @@ describe("findOpenSemester / findBrowsableSemester", () => {
 });
 
 describe("findNextSemester", () => {
-    // The forward-looking one. It exists so a creator refused in the gap is told WHEN
-    // they can submit, rather than meeting a door with no sign on it.
+    // The forward-looking one. It exists so a creator refused in the gap is told when
+    // they can submit rather than meeting a door with no sign on it.
     it("in the gap: the semester that has not started yet", async () => {
         await setSemesters([
             { name: "Just ended", from: -100, to: -1 },
@@ -139,9 +136,9 @@ describe("findNextSemester", () => {
         expect(next.name).toBe("Next");
     });
 
-    // Null is a real answer, not a failure: after the last row on record there is no
-    // next semester until somebody inserts one. The caller has to word its refusal
-    // without a date rather than print `undefined`.
+    // Null is a real answer rather than a failure: after the last row on record there is
+    // no next semester until somebody inserts one, and the caller has to word its refusal
+    // without a date.
     it("null when nothing is scheduled after today", async () => {
         await setSemesters([{ name: "Just ended", from: -100, to: -1 }]);
 
@@ -150,8 +147,8 @@ describe("findNextSemester", () => {
 });
 
 describe("POST /api/projects - the semester gate", () => {
-    // These live here rather than in projects.test.js because they REWRITE the
-    // semesters table, and this file is the one set up to put it back.
+    // These live here rather than in projects.test.js because they rewrite the semesters
+    // table, and this file is the one set up to put it back.
     const body = {
         title: "A project filed against a semester",
         description: "Short blurb.",
@@ -171,8 +168,8 @@ describe("POST /api/projects - the semester gate", () => {
         expect(res.body.project.semester_id).toBe(open.id);
     });
 
-    // 409, not 422: nothing about the request is malformed, the world is simply not
-    // in a state that accepts it — the same class as "this project is archived".
+    // 409 rather than 422: nothing about the request is malformed, the world is simply
+    // not in a state that accepts it, the same class as "this project is archived".
     it("409 in the gap, and the message names the day it reopens", async () => {
         await setSemesters([
             { name: "Just ended", from: -100, to: -1 },
@@ -210,9 +207,9 @@ describe("POST /api/projects - the semester gate", () => {
         expect(after.rows[0].n).toBe(before.rows[0].n);
     });
 
-    // The semester is decided by the server from the day, exactly like creator_id is
-    // decided by the caller's role. A creator picking their own teaching period would
-    // let a project be filed into a semester whose results are already settled.
+    // The server decides the semester from the day, as it decides creator_id from the
+    // caller's role. A creator picking their own teaching period could file a project
+    // into a semester whose results are already settled.
     it("ignores a semester_id sent in the body", async () => {
         await setSemesters([
             { name: "Past", from: -200, to: -100 },
@@ -233,7 +230,7 @@ describe("POST /api/projects - the semester gate", () => {
 
 describe("GET /api/projects - the semester filter", () => {
     // Two approved projects, one in each of two semesters, so "the filter did nothing"
-    // and "the filter worked" cannot look the same.
+    // and "the filter worked" cannot look alike.
     let past;
     let now;
     let inPast;
@@ -271,8 +268,8 @@ describe("GET /api/projects - the semester filter", () => {
         expect(ids).not.toContain(inNow.id);
     });
 
-    // 404, matching every other id in this API. Returning an empty catalogue would
-    // report "this term has no projects" about a term that does not exist.
+    // 404, like every other id in this API. Returning an empty catalogue would report
+    // "this term has no projects" about a term that does not exist.
     it("404 for a semester id that is not a number", async () => {
         const res = await request(app).get("/api/projects?semester=abc");
 
@@ -286,16 +283,16 @@ describe("GET /api/projects - the semester filter", () => {
         expect(res.status).toBe(404);
     });
 
-    // The filter goes into the WHERE clause, so limit/offset shifted from $1/$2 to
-    // $2/$3. Getting that wrong throws rather than misbehaving quietly - but only on
-    // the paged path, which nothing on Discover uses today.
+    // The filter goes into the WHERE clause, so limit and offset shift a placeholder
+    // along. Getting that wrong throws rather than misbehaving quietly, but only on the
+    // paged path, which nothing on Discover uses.
     it("still pages, with the filter applied", async () => {
         const res = await request(app).get(`/api/projects?semester=${now}&limit=1&offset=0`);
 
         expect(res.status).toBe(200);
         expect(res.body.items).toHaveLength(1);
         expect(res.body).toMatchObject({ limit: 1, offset: 0 });
-        // total is the COUNT for that semester alone, not the whole catalogue.
+        // total is the count for that semester alone, not the whole catalogue.
         expect(res.body.items[0].semester_id).toBe(now);
     });
 
@@ -330,9 +327,9 @@ describe("GET /api/projects - the semester filter", () => {
 
 describe("dates leaving the repository", () => {
     // The trap this layer exists to close. node-postgres reads a DATE into a Date at
-    // LOCAL midnight, so on a UTC+7 machine 2026-03-02 leaves as 2026-03-01T17:00:00Z
-    // and a browser in UTC (which is what Render runs) renders 1 March. TIMESTAMPTZ
-    // cannot help: a DATE has no instant to attach a zone to. TO_CHAR does.
+    // local midnight, so on a UTC+7 machine 2026-03-02 leaves as 2026-03-01T17:00:00Z and
+    // a browser in UTC shows 1 March. TIMESTAMPTZ cannot help, since a DATE has no instant
+    // to attach a zone to. TO_CHAR does.
     it("are 'YYYY-MM-DD' strings, not Date objects", async () => {
         await setSemesters([{ name: "Now", from: -10, to: 10 }]);
 
@@ -382,8 +379,8 @@ describe("GET /api/semesters", () => {
         expect(res.body.items.filter((s) => s.is_open).map((s) => s.name)).toEqual(["Now"]);
     });
 
-    // In the gap the picker must still open on something, or Discover has nothing to
-    // show. is_browsable stays set; is_open goes empty.
+    // In the gap the picker still opens on something, or Discover has nothing to show:
+    // is_browsable stays set while is_open goes empty.
     it("in the gap: still exactly one is_browsable, and nothing is_open", async () => {
         await setSemesters([
             { name: "Just ended", from: -100, to: -1 },

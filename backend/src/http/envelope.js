@@ -5,30 +5,24 @@ const { z } = require("zod");
  *
  *     { "items": [...], "total": 3, "limit": null, "offset": 0 }
  *
- * `items` rather than `data`, and that is worth writing down so nobody flips it back and
- * forth. Stripe and JSON:API both use `data`, but with axios that reads
- * `response.data.data`, which is genuinely hard to follow. YouTube's Data API uses
- * `items` and it is the clearer of the two here.
+ * `items` rather than `data`, because with axios the latter reads response.data.data.
  *
- * The envelope is for a UNIFORM CONTRACT, not for pagination. Its value is that the day
- * any of these eleven endpoints does need paging, adding it is no longer a breaking
- * change — and neither is adding a `nextCursor` if offsets ever stop being enough.
+ * The envelope is for a uniform contract rather than for pagination. Its value is that
+ * the day an endpoint does need paging, adding it is not a breaking change, and neither
+ * is adding a cursor if offsets stop being enough.
  *
- * ⚠️ PAGINATION IS OPT-IN AND THERE IS NO DEFAULT LIMIT. This looks like an oversight
- * and is the opposite. Discover deliberately loads the WHOLE catalogue and filters,
- * searches and sorts it client-side — "a query reaches every project" is written into
- * the product notes. A default limit of 20 would quietly reduce the search box to the
- * first twenty projects and report no error at all. If server-side paging is ever wanted
- * there, search and filtering have to move to the server first, and that is a product
- * change with its own spec.
+ * Pagination is opt-in and there is no default limit, which is deliberate. Discover loads
+ * the whole catalogue and filters, searches and sorts it in the browser, so a default
+ * limit would quietly reduce the search box to the first page and report no error.
+ * Server-side paging there means moving search and filtering to the server first.
  */
 function page(items, { total = null, limit = null, offset = 0 } = {}) {
     const list = Array.isArray(items) ? items : [];
 
     return {
         items: list,
-        // Without a limit the caller asked for everything, so the count IS the length —
-        // no second COUNT(*) round trip for a number already in hand.
+        // Without a limit the caller asked for everything, so the count is the length:
+        // no second round trip for a number already in hand.
         total: total ?? list.length,
         limit: limit ?? null,
         offset,
@@ -36,10 +30,8 @@ function page(items, { total = null, limit = null, offset = 0 } = {}) {
 }
 
 /**
- * `?limit=&offset=`, validated like any other input.
- *
- * Absent limit means "everything", which is what keeps every endpoint's behaviour
- * exactly as it was before the envelope landed.
+ * ?limit= and ?offset=, validated like any other input. An absent limit means everything,
+ * which is what keeps each endpoint behaving as it did before the envelope.
  */
 const paginationQuery = z.looseObject({
     limit: z.coerce

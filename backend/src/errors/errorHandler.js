@@ -1,29 +1,25 @@
 const { AppError } = require("./AppError");
 
 /**
- * The ONE place in the backend that decides an error's HTTP status and writes an error
+ * The one place in the backend that decides an error's HTTP status and writes an error
  * body. Mounted in app.js after every route.
  *
- * ⚠️ `message` stays at the TOP LEVEL of the response and is not wrapped in
- * `{ error: {...} }`. 36 places in the frontend read `err.response?.data?.message`, and
- * because they read it with `?.` a wrapper would not throw anywhere — all 36 would
- * quietly render `undefined`. So this shape only ADDS `code` and `details`, which makes
- * the whole error contract a non-breaking change.
+ * `message` stays at the top level rather than being wrapped in { error: {...} }. The
+ * frontend reads it with optional chaining in many places, so a wrapper would not throw
+ * anywhere: every one of them would quietly render undefined. This shape only adds `code`
+ * and `details`, which keeps the error contract backwards-compatible.
  *
- * This is a deliberate deviation from RFC 9457 (Problem Details). That standard's value
- * is interoperability between organisations, and this API has exactly one consumer: the
- * team's own frontend. The deviation is paid for on the frontend side by src/api/apiError.js,
- * which is the only file that knows the shape — so adopting RFC 9457 later is one file
- * to change rather than thirty-six.
+ * It deliberately does not follow RFC 9457. That standard buys interoperability between
+ * organisations, and this API has one consumer. On the frontend side only
+ * src/api/apiError.js knows the shape, so adopting RFC 9457 later is one file to change.
  */
 
 /**
  * Errors thrown by express.json() before any controller runs.
  *
- * These are the reason a 10mb upload currently returns an HTML page instead of JSON: the
- * body parser rejects the request before the router is reached, so no controller's
- * try/catch ever sees it. The team spent time on 2026-08-11 chasing exactly this,
- * because nothing appeared in the service logs at all.
+ * The body parser rejects an oversized or malformed request before the router is reached,
+ * so no controller's try/catch ever sees it. Without this the client gets an HTML error
+ * page and nothing appears in the service logs at all.
  */
 const BODY_PARSER_CODES = {
     "entity.too.large": {
@@ -61,8 +57,8 @@ function describe(err) {
 
     /**
      * http-errors sets `expose: true` on errors whose message is safe to show a client,
-     * and body-parser builds its errors that way. Honouring that flag is reading a
-     * library's own declaration, not guessing from a status number.
+     * and body-parser builds its errors that way. Honouring the flag reads the library's
+     * own declaration rather than guessing from a status number.
      */
     const status = Number(err?.status ?? err?.statusCode);
 
@@ -73,30 +69,28 @@ function describe(err) {
     return {
         status: 500,
         code: "INTERNAL",
-        // ⚠️ Never the real message. An unexpected error here is a bug, a bad query or a
+        // Never the real message. An unexpected error here is a bug, a bad query or a
         // dead connection, and those messages carry table names, column names and
-        // sometimes values. The stack goes to the log, where the team can read it.
+        // sometimes values. The stack goes to the log instead.
         message: "Something went wrong on our side.",
         details: null,
     };
 }
 
-// ⚠️ Express identifies an error handler by its four-parameter signature; dropping the
+// Express identifies an error handler by its four-parameter signature, so dropping the
 // unused `next` turns this back into ordinary middleware and it silently stops catching
-// anything. (There used to be an `eslint-disable-next-line no-unused-vars` here. It was
-// inert twice over: it sat above a comment line rather than the function, and the rule
-// does not flag this parameter anyway — checked by removing it, 2026-09-08.)
+// anything.
 function errorHandler(err, req, res, next) {
     const { status, code, message, details } = describe(err);
 
-    // Only the unexpected ones are logged with a stack. A 404 or a refused permission is
+    // Only unexpected errors are logged with a stack. A 404 or a refused permission is
     // the API working, and logging those buries the entries that matter.
     if (status >= 500) {
         console.error(`[error] ${req.method} ${req.originalUrl}`, err);
     }
 
-    // Express has already begun writing on a streamed or double-sent response; handing
-    // it to Express's default handler is the only safe move left.
+    // Express has already begun writing the response, so handing this to its default
+    // handler is the only safe move left.
     if (res.headersSent) {
         return next(err);
     }

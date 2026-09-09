@@ -1,15 +1,14 @@
 /**
  * The account routes and the Class Coin wallet.
  *
- * Two things here are worth more than the status codes. `POST /classcoins/add|deduct`
- * are ADMIN-only and take the target wallet in the BODY: until 2026-08-21 they had no
- * role guard and read the wallet from the token, so any signed-in user could mint Class
- * Coins into their own balance — and Class Coins are the only measure of a project's
- * popularity, so that made the whole ranking meaningless.
+ * Two things here matter more than the status codes. POST /classcoins/add and /deduct are
+ * admin only and take the target wallet in the body: with no role guard and the wallet
+ * read from the token, any signed-in user could mint coins into their own balance, and
+ * coins are the only measure of a project's popularity.
  *
- * DELETE /users/profile exists and works, and the frontend deliberately never calls it:
- * projects.creator_id is ON DELETE CASCADE, so it erases the user's projects, comments
- * and history in one click. The cascade is measured below rather than described.
+ * DELETE /users/profile works and the frontend never calls it: projects.creator_id is ON
+ * DELETE CASCADE, so it erases the user's projects, comments and history in one click.
+ * The cascade is measured below rather than described.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -49,7 +48,7 @@ describe("PUT /api/users/profile", () => {
         expect(res.body.full_name).toBe("Renamed Person");
     });
 
-    // `title` absent means "keep what is stored", not "clear it".
+    // An absent `title` means "keep what is stored" rather than "clear it".
     it("keeps the stored title when the field is omitted", async () => {
         const user = await makeUser({ roles: ["BACKER"], title: "PhD Candidate" });
 
@@ -93,9 +92,9 @@ describe("PUT /api/users/change-password", () => {
         expect(withNew.status).toBe(200);
     });
 
-    // 422 rather than 401: the caller IS authenticated - they are holding a valid token
-    // for this very account. What is wrong is a value they typed, and naming the field is
-    // what lets the form put the error on the right input.
+    // 422 rather than 401: the caller is authenticated and holding a valid token for this
+    // account. What is wrong is a value they typed, and naming the field lets the form put
+    // the error on the right input.
     it("422 with the field named when the old password is wrong", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
@@ -112,7 +111,7 @@ describe("PUT /api/users/change-password", () => {
 });
 
 describe("DELETE /api/users/profile", () => {
-    // Measured, not assumed: this is why the Account page has no delete button.
+    // Measured rather than assumed, and why the Account page has no delete button.
     it("200, and cascades the user's projects away with them", async () => {
         const doomed = await makeUser({ roles: ["CREATOR"] });
         const project = await makeProject({ creatorId: doomed.id, status: "APPROVED" });
@@ -148,12 +147,8 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         expect(Array.isArray(investments.body.items)).toBe(true);
     });
 
-    // One row per PROJECT.
-    //
-    // ⚠️ This test used to back ONE project twice and assert the amounts were summed.
-    // N4 (2026-09-07) made that illegal — one contribution per person per project — so
-    // the shape is now proved with two different projects instead. The grouping itself
-    // still matters: it is what the page renders one card from.
+    // One row per project, proved with two projects since one person can only contribute
+    // once. The grouping is what the page renders a card from.
     it("returns one row per project backed", async () => {
         const investor = await makeUser({ roles: ["BACKER"], balance: 1000 });
         const one = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -170,9 +165,8 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         expect(mine.find((r) => Number(r.project_id) === two.id).invested_amount).toBe(250);
     });
 
-    // The overwhelming majority of transactions carry tier_id = NULL, so the join to
-    // project_tiers has to be a LEFT JOIN. A plain JOIN would empty this page for
-    // almost everybody.
+    // Most transactions carry tier_id NULL, so the join to project_tiers has to be a LEFT
+    // JOIN. A plain join would empty this page for almost everybody.
     it("still lists an investment made with no support level", async () => {
         const investor = await makeUser({ roles: ["BACKER"], balance: 1000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -184,15 +178,9 @@ describe("GET /api/classcoins/transactions and /investments", () => {
         expect(res.body.items.map((r) => Number(r.project_id))).toContain(project.id);
     });
 
-    // The card names the level the backer chose.
-    //
-    // ⚠️ This used to prove something stronger: that a card covering SEVERAL investments
-    // shows the HIGHEST level ever chosen rather than the latest. N4 ended that — one
-    // contribution per project means one level per card, so the old fixture could not be
-    // built any more. The across-several rule is NOT gone from the app: it still governs
-    // GET /projects/my/backers, where a row groups one PERSON across a creator's
-    // projects, and projects.test.js pins it there. Deleting this test outright would
-    // have quietly left that rule tested in only one of the two queries that share it.
+    // The card names the level the backer chose. One contribution per project means one
+    // level per card here; the "highest across several" rule still governs
+    // GET /projects/my/backers, and projects.test.js pins it there.
     it("names the level the backer chose", async () => {
         const investor = await makeUser({ roles: ["BACKER"], balance: 2000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -243,7 +231,7 @@ describe("POST /api/classcoins/add and /deduct", () => {
         expect(await balanceOf(target.id)).toBe(300);
     });
 
-    // The wallet is named in the body precisely so it cannot be taken from the token.
+    // The wallet is named in the body precisely so it cannot come from the token.
     it("422 when no user_id is given, rather than falling back to the caller", async () => {
         const before = await balanceOf(admin.id);
 
@@ -259,11 +247,11 @@ describe("POST /api/classcoins/add and /deduct", () => {
 });
 
 /**
- * Where a new account's Class Coins come from, since 2026-09-07 (N5).
+ * Where a new account's Class Coins come from.
  *
- * They used to come from `classcoins.balance DEFAULT 4500` — a column default, which
- * meant a throwaway account was worth 4,500 CC of influence over the ranking. Now a
- * wallet starts empty and is filled either by the domain rule below or by an admin.
+ * A wallet starts empty and is filled either by the domain rule below or by an admin. A
+ * column default would make every throwaway account worth real influence over the
+ * ranking.
  */
 describe("the grant at registration", () => {
     const registerAs = (email) =>
@@ -287,9 +275,7 @@ describe("the grant at registration", () => {
         const wallet = await walletOf(email);
         expect(wallet.balance).toBe(4000);
 
-        // ⚠️ Coins must never appear without a transaction to explain them. A balance
-        // that moved with nothing in the ledger is the class of unexplainable figure the
-        // 2026-08-18 pass went through the app deleting.
+        // Coins must never appear without a transaction to explain them.
         const { rows } = await pool.query(
             `SELECT type, amount::int AS amount, granted_by
              FROM classcoin_transactions WHERE classcoin_id = $1`,
@@ -298,7 +284,7 @@ describe("the grant at registration", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0].type).toBe("ADMIN_ADD");
         expect(rows[0].amount).toBe(4000);
-        // NULL means the SYSTEM granted it. An admin's grant carries their id.
+        // NULL means the system granted it; an admin's grant carries their id.
         expect(rows[0].granted_by).toBeNull();
     });
 
@@ -317,12 +303,9 @@ describe("the grant at registration", () => {
         expect(rows).toHaveLength(0);
     });
 
-    // ⚠️ Regression guard, 2026-09-07. grantOnRegistration used to add the balance and
-    // THEN write the ledger row as two separate statements. When the second failed - it
-    // did, against a database that had not been migrated yet - the wallet kept 4,000 CC
-    // that nothing in the system could account for. The two are one transaction now, and
-    // this test fails the moment somebody splits them: a balance and its explanation must
-    // land together or not at all.
+    // A balance and its explanation land together or not at all. As two statements, the
+    // balance moves first and a failure on the second leaves a wallet holding coins
+    // nothing can account for. This test fails the moment somebody splits them.
     it("never leaves a balance without the row that explains it", async () => {
         const email = uniqueEmail("atomic").replace(/@.*/, "@rmit.edu.vn");
 
@@ -334,7 +317,7 @@ describe("the grant at registration", () => {
             [wallet.id]
         );
 
-        // The ledger must account for the balance down to the last coin.
+        // The ledger has to account for the balance down to the last coin.
         expect(rows[0].total).toBe(wallet.balance);
     });
 

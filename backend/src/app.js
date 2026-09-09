@@ -11,56 +11,53 @@ const errorHandler = require("./errors/errorHandler");
 
 const app = express();
 
-// FRONTEND_URL is a COMMA-SEPARATED LIST, not a single origin.
+// FRONTEND_URL is a comma-separated list rather than a single origin. Production has to
+// allow the deployed frontend, while we still run `npm run dev` on localhost against a
+// deployed backend, and one origin forces a choice between the two.
 //
-// It held one origin until deployment made that a problem: production must allow
-// the deployed frontend, but the three of us still run `npm run dev` on
-// localhost:5173 against a deployed backend, and a single-origin value forces a
-// choice between the two. Worse, the failure is disguised — a blocked request
-// reaches axios as a network error rather than an HTTP one, and AuthContext reads
-// that as "backend unreachable", so on screen a correct password comes back as
-// "Invalid email or password". Exactly the 5173/5174 trap, one layer further out.
+// The failure is disguised, which is why this matters: a blocked request reaches axios as
+// a network error rather than an HTTP one, AuthContext reads that as "backend
+// unreachable", and a correct password comes back on screen as "Invalid email or
+// password".
 //
-// Trailing slashes are stripped because a browser's `Origin` header never has one,
-// and `https://x.onrender.com/` pasted into Render's dashboard would otherwise
-// match nothing while looking perfectly correct.
+// Trailing slashes are stripped because a browser's Origin header never has one, so a URL
+// pasted with one would match nothing while looking correct.
 const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || "")
     .split(",")
     .map((o) => o.trim().replace(/\/+$/, ""))
     .filter(Boolean);
 
-// Unset FRONTEND_URL now blocks every browser origin, where it previously fell
-// through to the cors package's default of `*`. Blocking is the safer default, but
-// it is also silent from the browser's side, so say so once at boot — a Render log
-// line is the only place this is diagnosable.
+// An unset FRONTEND_URL blocks every browser origin rather than falling through to `*`.
+// Blocking is the safer default but it is silent from the browser's side, so say so once
+// at boot: the log is the only place this is diagnosable.
 if (ALLOWED_ORIGINS.length === 0) {
     console.warn("[cors] FRONTEND_URL is empty - every browser origin will be blocked.");
 }
 
 app.use(cors({
-    // A function, not the array: `origin: []` would reject everything, and this
-    // way a request with NO Origin header (curl, a health check, a server-to-server
-    // call) is still allowed — CORS only governs browsers.
+    // A function rather than the array, since `origin: []` would reject everything.
+    // This way a request with no Origin header, such as a health check, is still
+    // allowed: CORS governs browsers only.
     origin(origin, callback) {
         if (!origin || ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
-        // `callback(null, false)` — NOT `callback(new Error(...))`. An Error turns a
-        // blocked origin into a 500 with a stack trace, which in Render's log tab
-        // reads as the backend crashing rather than as a rejected origin. Passing
-        // false just omits the header, which is what the single-origin version did
-        // and what the browser needs in order to block the response itself.
+        // callback(null, false) rather than callback(new Error(...)). An Error turns a
+        // blocked origin into a 500 with a stack trace, which in the logs reads as the
+        // backend crashing. Passing false omits the header, which is what the browser
+        // needs in order to block the response itself.
         console.warn(`[cors] blocked origin: ${origin}`);
         return callback(null, false);
     },
     credentials: true,
 }));
 
-// The default body limit is 100kb, which POST /projects blows straight past: the create
-// wizard sends the cover image and up to six gallery images as base64 data URIs inside
-// the JSON, and base64 inflates by ~33%. A single ordinary photo returned 413 before the
-// request ever reached a controller.
-// 10mb is a ceiling, not a target — the client downscales images before encoding, so a
-// full submission lands around 1mb. Raising this without that downscaling would only
-// trade the 413 for a bloated `gallery` column that every Discover request has to carry.
+// The default body limit is 100kb, which POST /projects goes straight past: the wizard
+// sends the cover image and up to six gallery images as base64 data URIs inside the JSON,
+// and base64 inflates by about a third. One ordinary photo would 413 before the request
+// reached a controller.
+//
+// 10mb is a ceiling rather than a target. The client downscales images before encoding, so
+// a full submission lands around 1mb; raising this without that downscaling would only
+// trade the 413 for a bloated gallery column that every Discover request carries.
 app.use(express.json({ limit: "10mb" }));
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
@@ -75,49 +72,42 @@ app.get("/", (req, res) => {
     });
 });
 
-// The endpoint the uptime ping calls. Two jobs: hold Render awake, and prove the
-// DATABASE is reachable - which the route above cannot do.
+// The endpoint the uptime ping calls. It has two jobs: hold the web service awake, and
+// prove the database is reachable, which the route above cannot do.
 //
-// It exists because of an outage on 2026-08-26. The ping pointed at GET /api/projects,
-// which runs `SELECT *` and so carries every project's base64 gallery. That is harmless
-// at today's ~6 KB, but cron-job.org aborts any response past its size limit and records
-// it as "output too large" - so the endpoint most likely to grow without warning was
-// also the one holding the demo awake. This one's body is a fixed ~25 bytes and cannot
-// grow with the data.
+// The body is a fixed few bytes and cannot grow with the data. Pointing the ping at a
+// real listing route instead would work until that response outgrew the ping service's
+// size limit, which then records it as a failure.
 //
-// `SELECT 1` is the point, not decoration. `/` proves only that Node answers, which
-// wakes Render but NOT Supabase - and a free Supabase project pauses after about a week
-// idle, which from outside looks exactly like a broken backend. One round trip keeps
-// both awake.
+// SELECT 1 is the point rather than decoration. Answering from Node alone wakes the web
+// service but not the database, and a free Postgres project pauses after about a week
+// idle, which from outside looks exactly like a broken backend. One round trip keeps both
+// awake.
 //
-// ⚠️ A failing database answers 503, not 200. A health check that says "ok" while the
-// database is down is a button that lies, and the team spent August deleting those. The
-// cost is real and accepted: if the database stays down for hours the ping fails
-// repeatedly and cron-job.org will disable the job, which then has to be re-enabled by
-// hand. That is still the better trade - a silent 200 would hide a paused database until
-// somebody opened the site during a demo.
+// A failing database answers 503 rather than 200. A health check that reports "ok" while
+// the database is down tells us nothing. The cost is accepted: a long outage makes the
+// ping fail repeatedly and the cron service will disable the job, which then has to be
+// re-enabled by hand.
 app.get("/api/health", async (req, res) => {
     try {
         await pool.query("SELECT 1");
 
         res.status(200).json({ status: "ok", db: "up" });
     } catch (error) {
-        // The only place this is diagnosable is Render's log tab, so say which half failed.
+        // The logs are the only place this is diagnosable, so say which half failed.
         console.error("[health] database unreachable:", error.message);
 
         res.status(503).json({ status: "error", db: "down" });
     }
 });
 
-// LAST, after every route: the one place that turns an error into a status code and a
-// JSON body. Anything that reaches here either called next(err) or threw out of an async
-// handler; controllers that still catch their own errors are simply not using it yet.
+// Last, after every route: the one place that turns an error into a status code and a
+// JSON body. Anything reaching here either called next(err) or threw out of an async
+// handler.
 //
-// It earns its place immediately even so. express.json() rejects an oversized or
-// malformed body BEFORE the router runs, so no controller's try/catch has ever seen
-// those — until now they came back as Express's default HTML error page, which is what
-// made the 413 of 2026-08-11 so hard to find: nothing appeared in the service logs at
-// all, because no service code ran.
+// It also catches what no controller can. express.json() rejects an oversized or
+// malformed body before the router runs, so without this those come back as Express's
+// default HTML error page with nothing in the service logs, because no service code ran.
 app.use(errorHandler);
 
 module.exports = app;

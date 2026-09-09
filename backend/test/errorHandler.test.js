@@ -3,12 +3,10 @@
  *
  * Two properties matter more than the rest and are asserted first.
  *
- *   `message` stays at the TOP LEVEL. 36 places in the frontend read
- *   `err.response?.data?.message`, with `?.`, so wrapping it would make all 36 render
- *   `undefined` without a single one of them throwing.
+ * `message` stays at the top level. The frontend reads it with optional chaining in many
+ * places, so wrapping it would have every one of them render undefined without throwing.
  *
- *   `code` and `details` are ADDITIONS. Nothing that reads the old shape changes, which
- *   is what makes the whole error contract non-breaking.
+ * `code` and `details` are additions, so nothing that reads the old shape changes.
  */
 
 import { describe, it, expect } from "vitest";
@@ -51,7 +49,7 @@ describe("AppError through errorHandler", () => {
 
         const res = await request(server).get("/boom");
 
-        // The exact expression the frontend uses in 36 places.
+        // The exact expression the frontend reads errors with.
         expect(res.body?.message).toBe("Not yours.");
         expect(res.body.error).toBeUndefined();
     });
@@ -89,9 +87,9 @@ describe("an error that is not an AppError", () => {
 });
 
 describe("errors from express.json(), which no controller has ever seen", () => {
-    // Before this handler existed these came back as Express's default HTML page. That
-    // is what made the 413 of 2026-08-11 so hard to find: the body parser rejects the
-    // request before the router runs, so nothing appeared in the service logs at all.
+    // Without this handler these come back as Express's default HTML page. The body
+    // parser rejects the request before the router runs, so nothing reaches the service
+    // logs at all.
     it("413 PAYLOAD_TOO_LARGE as JSON, not an HTML page", async () => {
         const server = appThatThrows(async (req, res) => res.json({ ok: true }));
 

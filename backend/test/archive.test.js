@@ -1,15 +1,15 @@
 /**
- * Archive: the two-step bin that replaced plain delete, after the lecturer's demo note.
+ * Archive: the two-step bin that replaced plain delete.
  *
- * Two rules here are load-bearing and easy to break by accident:
+ * Two rules here are load-bearing and easy to break by accident.
  *
- *   Archiving never touches `status`. That is exactly why restore returns a project to
- *   its previous verdict with no re-approval — APPROVED goes straight back to Discover.
+ * Archiving never touches `status`, which is why restore returns a project to its
+ * previous verdict with no re-approval, so an approved one goes straight back to Discover.
  *
- *   An archived project is FROZEN: no edit, invest, comment, update, approve or reject.
- *   Freezing the edit is not tidiness. Without it, archive → edit → restore is a route
- *   onto Discover that skips moderation entirely. If editing while archived is ever
- *   allowed, restore MUST be changed to send the project back to PENDING.
+ * An archived project is frozen: no edit, invest, comment, update or verdict. Freezing
+ * the edit is not tidiness. Without it, archive then edit then restore is a route onto
+ * Discover that skips moderation. If editing while archived is ever allowed, restore has
+ * to send the project back to PENDING.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -38,8 +38,8 @@ describe("PATCH /api/projects/:id/archive", () => {
         expect(res.body.project.status).toBe("APPROVED");
     });
 
-    // An admin archiving someone else's project locks the creator out of restoring it,
-    // so the creator is at least owed the reason.
+    // An admin archiving someone else's project locks the creator out of restoring it, so
+    // the creator is owed the reason.
     it("422 when an admin archives someone else's project with no reason", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -82,8 +82,8 @@ describe("PATCH /api/projects/:id/restore", () => {
         expect(res.body.project.archive_reason).toBeNull();
     });
 
-    // The asymmetry IS the feature: a creator may only undo an archive they performed.
-    // Otherwise they could simply reverse a moderation decision.
+    // The asymmetry is the feature: a creator may only undo an archive they performed,
+    // or they could reverse a moderation decision.
     it("403 for the creator when an ADMIN archived it, 200 for an admin", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -106,7 +106,7 @@ describe("PATCH /api/projects/:id/restore", () => {
         expect(res.body.message).toBe("This project is not archived.");
     });
 
-    // No re-approval: a PENDING project comes back to the queue, an APPROVED one goes
+    // No re-approval: a pending project comes back to the queue and an approved one goes
     // straight back onto Discover.
     it("returns the project to the verdict it already had", async () => {
         const pending = await makeProject({ creatorId: creator.id, status: "PENDING" });
@@ -130,9 +130,9 @@ describe("an archived project is frozen", () => {
         await as(creator.token).patch(`/api/projects/${project.id}/archive`).send({});
     });
 
-    // Every one of these is 409 CONFLICT now: the request is understood and the caller
-    // is allowed in principle, but the project's current state refuses it. That is
-    // exactly the distinction 409 exists to carry, and all six used to be 400.
+    // All of these are 409: the request is understood and the caller is allowed in
+    // principle, but the project's current state refuses it. That is the distinction 409
+    // exists to carry.
     it("refuses an edit", async () => {
         const res = await as(creator.token).put(`/api/projects/${project.id}`).send({ title: "Sneaky" });
 

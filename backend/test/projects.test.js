@@ -1,12 +1,10 @@
 /**
- * Characterisation tests for the project lifecycle: create, read, update, the
- * approve/reject/resubmit verdicts, endorse and permanent delete.
+ * The project lifecycle: create, read, update, the approve, reject and resubmit verdicts,
+ * endorse and permanent delete.
  *
- * The point of this file is the STATUS CODE of every branch, not the payload. Several
- * of the codes recorded here are the ones the API restructure sets out to correct —
- * `updateProject` answering 400 for a project that does not exist is the example the
- * design leads with. They are pinned as they are so that changing them is a visible
- * one-line diff rather than a silent side effect.
+ * This file is about the status code of every branch rather than the payload. The codes
+ * are pinned so that changing one is a visible one-line diff rather than a silent side
+ * effect.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -35,10 +33,9 @@ beforeAll(async () => {
     secondAdmin = await makeUser({ roles: ["ADMIN"] });
 });
 
-// ⚠️ Since 2026-09-06 every POST here also has to pass the SEMESTER gate. It passes
-// silently because globalSetup guarantees one semester contains today; the gate's own
-// tests (409 in the gap, which semester a project is filed under) live in
-// semesters.test.js, which is the file set up to rewrite that table safely.
+// Every POST here also passes the semester gate, silently, because globalSetup
+// guarantees one semester contains today. The gate's own tests live in semesters.test.js,
+// which is set up to rewrite that table safely.
 describe("POST /api/projects", () => {
     it("201 for a creator, and the project starts PENDING", async () => {
         const res = await as(creator.token).post("/api/projects").send(validBody());
@@ -57,8 +54,8 @@ describe("POST /api/projects", () => {
         expect(asBacker.status).toBe(403);
     });
 
-    // resolveOwnership reads the CALLER's role first. A creator who names someone else
-    // is refused rather than having the field ignored: silently dropping it is how a
+    // resolveOwnership reads the caller's role first. A creator who names someone else is
+    // refused rather than having the field ignored, since dropping it silently is how a
     // project ends up filed under another name with nothing recording the attempt.
     it("403 when a creator names a creator_id", async () => {
         const res = await as(creator.token)
@@ -71,8 +68,8 @@ describe("POST /api/projects", () => {
     });
 
     // 422 with the field named: the body is readable, it is just missing something this
-    // caller has to supply. Everything else in resolveOwnership is a 403 (you may not) or
-    // a 409 (the account you named is unusable), and the three are worth telling apart.
+    // caller has to supply. Everything else in resolveOwnership is a 403 for "you may
+    // not" or a 409 for "the account you named is unusable".
     it("422 with creator_id named when an admin omits it", async () => {
         const res = await as(admin.token).post("/api/projects").send(validBody());
 
@@ -92,8 +89,8 @@ describe("POST /api/projects", () => {
         expect(res.body.message).toBe("An admin cannot own a project.");
     });
 
-    // 409: the account exists and the id is fine, but its current state - no CREATOR
-    // role - is what forbids the request. Same shape as "that account is deactivated".
+    // 409: the account exists and the id is fine, but its state, having no CREATOR role,
+    // is what forbids the request. Same shape as "that account is deactivated".
     it("409 when the named account is not a creator", async () => {
         const res = await as(admin.token)
             .post("/api/projects")
@@ -104,7 +101,8 @@ describe("POST /api/projects", () => {
         expect(res.body.message).toContain("not a creator");
     });
 
-    // 422, not 409: an id pointing at nothing is a bad VALUE, not a state conflict.
+    // 422 rather than 409: an id pointing at nothing is a bad value, not a state
+    // conflict.
     it("422 when creator_id names no account at all", async () => {
         const res = await as(admin.token)
             .post("/api/projects")
@@ -124,11 +122,9 @@ describe("POST /api/projects", () => {
         expect(Number(res.body.project.created_by_admin_id)).toBe(admin.id);
     });
 
-    // Replaced the "422 when end_date is not after start_date" test on 2026-09-06.
-    // That rule is gone with resolveCampaignDates: there is no per-project campaign
-    // window to validate any more, and the schema is loose, so the two fields are now
-    // ignored rather than refused. A browser tab left open across the deploy still
-    // submits successfully, which is the reason they are ignored rather than rejected.
+    // There is no per-project campaign window to validate, and the schema is loose, so
+    // these two fields are ignored rather than refused. That is what lets a stale browser
+    // tab still submit successfully.
     it("ignores start_date / end_date instead of refusing them", async () => {
         const res = await as(creator.token)
             .post("/api/projects")
@@ -140,7 +136,7 @@ describe("POST /api/projects", () => {
     });
 
     // Support levels are validated before the transaction opens, so a bad level costs
-    // nothing — and, crucially, leaves no half-created project behind.
+    // nothing and leaves no half-created project behind.
     it("422 and creates nothing when a support level is invalid", async () => {
         const before = await pool.query("select count(*)::int as n from projects");
 
@@ -182,7 +178,7 @@ describe("GET /api/projects", () => {
         expect(Array.isArray(res.body.items)).toBe(true);
         expect(res.body.total).toBe(res.body.items.length);
         // No limit was asked for, so none was applied. See http/envelope.js for why
-        // there is deliberately no default.
+        // there is no default.
         expect(res.body.limit).toBeNull();
         expect(res.body.offset).toBe(0);
     });
@@ -198,13 +194,10 @@ describe("GET /api/projects", () => {
         expect(ids).not.toContain(hidden.id);
     });
 
-    // backers_count is DISTINCT wallets, exactly like findById's — a head count, which
-    // is half of what a card says now that N3 removed the percentage.
-    //
-    // ⚠️ Written with ONE person backing twice until 2026-09-07; N4 made that illegal,
-    // so the same guarantee is now proved with two people. The DISTINCT still earns its
-    // place: transactions on this project can also come from the ADD/DEDUCT side of the
-    // wallet, and a future rule change must not be able to double-count a person.
+    // backers_count counts distinct wallets, like findById's. Proved with two people,
+    // since one person can only contribute once. The DISTINCT still earns its place:
+    // transactions on a project can also come from the add and deduct side of a wallet,
+    // and a future rule change must not be able to double-count somebody.
     it("counts distinct backers, not transactions", async () => {
         const one = await makeUser({ roles: ["BACKER"], balance: 5000 });
         const two = await makeUser({ roles: ["BACKER"], balance: 5000 });
@@ -238,10 +231,9 @@ describe("GET /api/projects/:id", () => {
         expect(res.body.message).toBe("Project not found");
     });
 
-    // A non-numeric id used to reach Postgres as a bad integer cast and answer 404 only
-    // because getProjectById mapped every failure to 404. It is now refused by
-    // numericParam before any query runs, at the same 404 - deliberately the same, since
-    // ProjectDetail shows its "Project not found" screen on exactly that status.
+    // A non-numeric id is refused by numericParam before any query runs, and answers 404
+    // rather than 400: ProjectDetail shows its "Project not found" screen on that status,
+    // which is the right screen for a mistyped link.
     it("404 for a non-numeric id, checked before it reaches a query", async () => {
         const res = await request(app).get("/api/projects/not-a-number");
 
@@ -264,8 +256,8 @@ describe("GET /api/projects/my and /my/backers", () => {
         expect(ids).not.toContain(theirs.id);
     });
 
-    // /my and /my/backers are declared ABOVE /:id. If that order is ever lost, Express
-    // matches /:id with id = "my" and these turn into 404s.
+    // /my and /my/backers are declared above /:id. Lose that order and Express matches
+    // /:id with id = "my", turning both into 404s.
     it('the literal "my" routes are not swallowed by /:id', async () => {
         const projects = await as(creator.token).get("/api/projects/my");
         const backers = await as(creator.token).get("/api/projects/my/backers");
@@ -280,15 +272,13 @@ describe("GET /api/projects/my and /my/backers", () => {
         expect((await request(app).get("/api/projects/my/backers")).status).toBe(401);
     });
 
-    // A row here is one PERSON grouped across every investment they made in this
-    // creator's projects, so it has to pick ONE level to show — and it picks the
-    // HIGHEST they ever chose, matching classCoinRepository.getInvestmentsByUser
-    // exactly. The two queries must never disagree: the same person would then be a
-    // Champion on their own My Investments card and a Supporter on the creator's
-    // dashboard, and neither screen would say which one the creator should believe.
+    // A row here is one person grouped across every investment they made in this
+    // creator's projects, so it has to pick one level to show, and it picks the highest
+    // they ever chose. That has to match getInvestmentsByUser exactly, or the same person
+    // reads as one level on their own card and another on the creator's dashboard.
     //
-    // The higher level is chosen FIRST and on a DIFFERENT project, so neither "latest"
-    // nor "same project as the last one" would produce the expected answer.
+    // The higher level is chosen first and on a different project, so neither "latest" nor
+    // "same project as the last one" would give the expected answer.
     it("names the HIGHEST level a backer ever chose, across all of the creator's projects", async () => {
         const owner = await makeUser({ roles: ["CREATOR"] });
         const investor = await makeUser({ roles: ["BACKER"], balance: 2000 });
@@ -307,7 +297,7 @@ describe("GET /api/projects/my and /my/backers", () => {
         expect(row.top_tier_name).toBe("Champion");
         expect(row.top_tier_min).toBe(500);
         // The "N projects" line under the chip has to stay: the level is across all of
-        // them, not from the project the row happens to be sorted by.
+        // them, not from whichever project the row is sorted by.
         expect(row.project_count).toBe(2);
         expect(row.total_amount).toBe(600);
     });
@@ -324,9 +314,9 @@ describe("PUT /api/projects/:id", () => {
     });
 
     /**
-     * These three are the example the restructure design leads with. Until the error
-     * contract landed, a missing project, somebody else's project and a dead database
-     * all answered 400, so no client could tell a user's mistake from an outage.
+     * A missing project, somebody else's project and a dead database have to answer
+     * differently. Collapsed into one status, no client can tell a user's mistake from an
+     * outage.
      */
     it("404 for a project that does not exist", async () => {
         const res = await as(creator.token).put("/api/projects/99999999").send({ title: "x" });
@@ -347,8 +337,7 @@ describe("PUT /api/projects/:id", () => {
     });
 
     // updateProject compares creator_id to req.user.id and has no admin branch, so an
-    // admin editing someone's project is refused exactly like a stranger. Behaviour left
-    // as it was; only the status is now honest about which of the three cases it is.
+    // admin editing someone's project is refused exactly like a stranger.
     it("403 even for an admin", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
@@ -357,8 +346,8 @@ describe("PUT /api/projects/:id", () => {
         expect(res.status).toBe(403);
     });
 
-    // Three cases, not two: absent leaves the column alone, text stores it, empty stores
-    // NULL — so one column never holds both "" and null meaning "no video".
+    // Three cases rather than two: absent leaves the column alone, text stores it, and
+    // empty stores NULL, so one column never holds both "" and null meaning "no video".
     it("normalises an empty video_url to NULL, and leaves an absent one alone", async () => {
         const project = await makeProject({ creatorId: creator.id });
 
@@ -396,11 +385,9 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect(res.body.review_note).toBe("Needs a clearer budget.");
     });
 
-    // ⚠️ This test CHANGED SHAPE on 2026-09-08, it was not weakened. It used to reject
-    // and then approve the same project, which the race guard now refuses with a 409 -
-    // and left alone it would have gone on "passing" only because the assertion never
-    // ran. The note is seeded directly instead, so the thing being measured (approve
-    // NULLs review_note) is still measured, from a status the verdict is legal from.
+    // The note is seeded directly rather than by rejecting first, because the race guard
+    // refuses approve on a REJECTED project. The thing being measured, that approve clears
+    // review_note, is still measured, from a status the verdict is legal from.
     it("approving clears a review note left on the project", async () => {
         const project = await makeProject({
             creatorId: creator.id,
@@ -414,10 +401,9 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect(res.body.review_note).toBeNull();
     });
 
-    // The race of two admins on one queue. Guarded by `AND status = 'PENDING'` in the
-    // UPDATE itself, not by a read-then-write in the service: both admins read PENDING,
-    // so any check before the write passes for both of them. Postgres decides, and
-    // exactly one wins.
+    // Two admins on one queue. Guarded by `AND status = 'PENDING'` in the UPDATE rather
+    // than a read-then-write in the service: both admins read PENDING, so any check
+    // before the write passes for both. Postgres decides, and exactly one wins.
     it("409 when a second verdict lands on a project already reviewed", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
 
@@ -430,9 +416,9 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect(second.body.message).toContain("already been reviewed");
     });
 
-    // The dangerous direction, and the reason this bug mattered rather than merely being
-    // untidy: a stale REJECT used to overwrite a live APPROVED project, take it off
-    // Discover, and staple a rejection note to it - answering 200 to the admin who did it.
+    // The dangerous direction: without the guard a stale REJECT overwrites a live
+    // APPROVED project, takes it off Discover and staples a rejection note to it, while
+    // answering 200 to the admin who did it.
     it("a late REJECT cannot overwrite an approved project", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "PENDING" });
 
@@ -449,9 +435,9 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect(after.body.review_note).toBeNull();
     });
 
-    // Recorded as a deliberate behaviour change, not a regression: before 2026-09-08 a
-    // hand-made request could approve a REJECTED project directly. No UI path is lost -
-    // AdminApprovals lists only PENDING - and PATCH /:id/resubmit is the route back.
+    // A verdict only applies from PENDING, so a hand-made request cannot approve a
+    // REJECTED project directly. No UI path is lost, since the queue lists PENDING only,
+    // and resubmit is the route back.
     it("409 approving a REJECTED project directly; resubmit is the way back", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "REJECTED" });
 
@@ -462,8 +448,8 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect((await as(admin.token).patch(`/api/projects/${project.id}/approve`)).status).toBe(200);
     });
 
-    // These two are the only handlers that already read error.status, so "not found"
-    // keeps its 404 while everything else falls to 400.
+    // "Not found" keeps its own 404 here rather than collapsing into the generic
+    // failure status.
     it("404 for an id that does not exist", async () => {
         const res = await as(admin.token).patch("/api/projects/99999999/approve");
 
@@ -477,8 +463,8 @@ describe("PATCH /api/projects/:id/approve and /reject", () => {
         expect((await as(backer.token).patch(`/api/projects/${project.id}/reject`)).status).toBe(403);
     });
 
-    // The conflict-of-interest rule. It is why the system needs a second admin account
-    // at all: without one, an on-behalf project is stuck in the queue forever.
+    // The conflict-of-interest rule, and why the system needs a second admin account at
+    // all: without one, an on-behalf project sits in the queue for good.
     it("409 when the reviewing admin is the one who filed the project", async () => {
         const created = await as(admin.token)
             .post("/api/projects")

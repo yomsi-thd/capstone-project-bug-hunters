@@ -1,16 +1,14 @@
 /**
- * Bulk granting — POST /api/classcoins/grant.
+ * Bulk granting, POST /api/classcoins/grant.
  *
- * The point of the endpoint is that it is ATOMIC. An admin issuing coins to a class of
+ * The point of the endpoint is that it is atomic. An admin issuing coins to a class of
  * thirty must never be left with fifteen done and no way to tell which fifteen, which is
- * exactly what looping POST /classcoins/add from the browser would produce. The refusal
- * tests below are worth more than the happy path for that reason: each one checks that
- * NOBODY was credited, not merely that the request failed.
+ * what looping the single-grant route from the browser would produce. The refusal tests
+ * below matter more than the happy path for that reason: each checks that nobody was
+ * credited, not merely that the request failed.
  *
- * ⚠️ An ADMIN account may not hold Class Coins (the role separation of 2026-08-24). That
- * rule is enforced here and not only by hiding a checkbox: hiding it in the UI is how
- * canInvest and POST /classcoins/add were both wrong until somebody made a request by
- * hand.
+ * An admin account may not hold Class Coins, and the rule is enforced here rather than by
+ * hiding a checkbox: a UI-only rule is one a hand-made request walks straight past.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -49,13 +47,13 @@ describe("POST /api/classcoins/grant", () => {
         expect(res.status).toBe(200);
         expect(res.body.granted).toBe(2);
         expect(await balanceOf(one.id)).toBe(4000);
-        // Added to what was already there, not replacing it.
+        // Added to what was already there rather than replacing it.
         expect(await balanceOf(two.id)).toBe(4100);
 
         const rows = await grantedRows([one.id, two.id]);
         expect(rows).toHaveLength(2);
-        // The audit trail this endpoint exists to leave: issuing coins IS the anti-gaming
-        // mechanism, and a mechanism nobody can audit is not one.
+        // The audit trail this endpoint exists to leave. Issuing coins is the
+        // anti-gaming mechanism, and one nobody can audit is not a mechanism.
         expect(rows.every((r) => r.granted_by === admin.id)).toBe(true);
         expect(rows.every((r) => r.type === "ADMIN_ADD" && r.amount === 4000)).toBe(true);
     });
@@ -71,10 +69,9 @@ describe("POST /api/classcoins/grant", () => {
         expect(await balanceOf(alone.id)).toBe(250);
     });
 
-    // ⚠️ Six accounts on the shared database predate createClassCoin and have no wallet
-    // row. Refusing them with "no longer exists" would be a lie about an account sitting
-    // right there in the admin's table, and would leave them unable to receive Class
-    // Coins for ever. A grant makes the wallet.
+    // Some accounts predate automatic wallet creation and have no wallet row. Refusing
+    // them with "no longer exists" would be untrue about an account sitting in the admin's
+    // table, and would leave them unable to receive coins. A grant makes the wallet.
     it("creates a wallet for an account that never had one", async () => {
         const walletless = await makeUser({ roles: ["BACKER"] });
         await pool.query("DELETE FROM classcoins WHERE user_id = $1", [walletless.id]);
@@ -88,8 +85,8 @@ describe("POST /api/classcoins/grant", () => {
         expect(await grantedRows([walletless.id])).toHaveLength(1);
     });
 
-    // ⚠️ The most important test in this file. It checks ATOMICITY: a loop over
-    // POST /add would credit the first account and only then meet the admin.
+    // The most important test here. It checks atomicity: a loop over the single-grant
+    // route would credit the first account and only then meet the admin.
     it("refuses the whole batch when one target is an ADMIN, crediting nobody", async () => {
         const ordinary = await makeUser({ roles: ["BACKER"], balance: 0 });
         const target = await makeUser({ roles: ["ADMIN"] });
@@ -127,14 +124,14 @@ describe("POST /api/classcoins/grant", () => {
 
         expect((await post({ user_ids: [], amount: 100 })).status).toBe(422);
         expect((await post({ user_ids: [backer.id], amount: 0 })).status).toBe(422);
-        // The realistic mistake is a typed extra zero, not a malicious admin.
+        // The realistic mistake is a typed extra zero rather than a malicious admin.
         expect((await post({ user_ids: [backer.id], amount: 100001 })).status).toBe(422);
     });
 });
 
 describe("POST /api/classcoins/add and the admin rule", () => {
-    // The single-target route has to run the same rule, or the batch rule can be walked
-    // around one request at a time.
+    // The single-target route runs the same rule, or the batch rule can be walked around
+    // one request at a time.
     it("refuses to credit an administrator's wallet", async () => {
         const target = await makeUser({ roles: ["ADMIN"] });
 
@@ -146,9 +143,9 @@ describe("POST /api/classcoins/add and the admin rule", () => {
         expect(res.body.message).toBe("An administrator account cannot hold Class Coins.");
     });
 
-    // ⚠️ Deducting from an admin stays legal: cleaning up a wallet that should never have
-    // held coins is exactly the operation the seed needed. The rule is "no GRANTING to an
-    // admin", not "an admin's wallet is untouchable".
+    // Deducting from an admin stays legal: cleaning up a wallet that should never have
+    // held coins is a real operation. The rule is "no granting to an admin", not "an
+    // admin's wallet is untouchable".
     it("still lets an admin's wallet be deducted", async () => {
         const target = await makeUser({ roles: ["ADMIN"], balance: 500 });
 

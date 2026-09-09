@@ -15,7 +15,7 @@ const activateUser = asyncHandler(async (req, res) => {
     res.status(200).json({ message: "User activated successfully", user });
 });
 
-// The other endpoint that accepts ?limit=&offset=. The admin user list is the one place
+// The other endpoint that accepts ?limit= and ?offset=. The admin user list is the one
 // that could plausibly grow past a screenful.
 const getAllUsers = asyncHandler(async (req, res) => {
     const { limit, offset } = pagination(req);
@@ -31,7 +31,7 @@ const getUserById = asyncHandler(async (req, res) => {
     res.status(200).json(user);
 });
 
-// Body: { "roles": ["BACKER", "CREATOR"] } - replaces the user's whole role set.
+// Body: { "roles": ["BACKER", "CREATOR"] }, replacing the user's whole role set.
 const updateUserRoles = asyncHandler(async (req, res) => {
     const user = await adminService.updateUserRoles(req.params.id, req.body.roles, req.user.id);
 
@@ -46,8 +46,8 @@ const getAllProjects = asyncHandler(async (req, res) => {
 
 const getProjectById = asyncHandler(async (req, res) => {
     // Passing req.user matters: getProjectById hides unapproved projects from anyone who
-    // is not the creator or an admin, and reviewing a PENDING project is the entire point
-    // of this route. This one is already behind authorize("ADMIN").
+    // is not the creator or an admin, and reviewing a PENDING project is the point of
+    // this route, which already sits behind authorize("ADMIN").
     const project = await projectService.getProjectById(req.params.id, req.user);
 
     res.status(200).json(project);

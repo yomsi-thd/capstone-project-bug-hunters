@@ -1,15 +1,14 @@
 /**
- * Requests for Class Coins from people outside RMIT — A7.
+ * Requests for Class Coins from people outside RMIT.
  *
- * Tier 3 of N5: tier 1 is the automatic grant by email domain at registration, tier 2 is
- * an admin issuing to a pasted list. The client confirmed on 2026-09-08 that she does not
- * know these people in advance, so they have to ask for themselves and an admin decides.
+ * The third way a wallet gets filled: the first is the automatic grant by email domain at
+ * registration, the second an admin issuing to a pasted list. Nobody knows these people
+ * in advance, so they ask for themselves and an admin decides.
  *
- * ⚠️ The test that matters most here is NOT the happy path — it is "rolls the coins back
- * when the guarded UPDATE loses the race". That one proves the throw sits INSIDE the
- * transaction, so coins already credited are rolled back when another admin got there
- * first. Written with `return` instead of `throw`, every other test stays green and only
- * that one fails.
+ * The test that matters most is not the happy path but "rolls the coins back when the
+ * guarded UPDATE loses the race". That one proves the throw sits inside the transaction.
+ * Written with `return` instead of `throw`, every other test stays green and only that
+ * one fails.
  */
 
 import { describe, it, expect, beforeAll, vi } from "vitest";
@@ -18,9 +17,9 @@ import request from "supertest";
 import { app, pool, makeUser, balanceOf, as } from "./helpers/factories.js";
 import { createRequire } from "node:module";
 
-// ⚠️ createRequire, not `import`. The service loads the repository with require(), so only
-// the same object in the CJS cache can be spied on; an ESM default import can be a
-// different wrapper and the spy then silently does nothing.
+// createRequire rather than import. The service loads the repository with require(), so
+// only the same object in the CommonJS cache can be spied on; an ESM default import can
+// be a different wrapper, and the spy then does nothing.
 const requireCjs = createRequire(import.meta.url);
 const coinRequestRepository = requireCjs("../src/repositories/coinRequestRepository.js");
 
@@ -62,7 +61,7 @@ describe("POST /api/classcoins/requests", () => {
             .send({ note: "Second ask." });
 
         expect(res.status).toBe(409);
-        // One waiting request only — the partial index decides this, not an if.
+        // One waiting request only, decided by the partial index rather than an if.
         expect(await pendingCount(outsider.id)).toBe(1);
     });
 
@@ -116,8 +115,8 @@ describe("GET /api/classcoins/requests/me", () => {
 
         const res = await as(fresh.token).get("/api/classcoins/requests/me");
 
-        // 200 with null, NOT 404. "Never asked" is an ordinary answer, and the Account
-        // page asks this every time it opens.
+        // 200 with null rather than 404. "Never asked" is an ordinary answer, and the
+        // Account page asks this every time it opens.
         expect(res.status).toBe(200);
         expect(res.body).toBeNull();
     });
@@ -216,9 +215,9 @@ describe("PATCH /api/admin/coin-requests/:id/approve", () => {
             .patch(`/api/admin/coin-requests/${filed.id}/approve`)
             .send({ amount: 4000 });
 
-        // This covers the EASY path only: the second verdict is refused by the early
-        // check because the request is no longer PENDING, so it never reaches the
-        // transaction at all. The real race is the test below.
+        // The easy path only: the second verdict is refused by the early check, since the
+        // request is no longer PENDING, so it never reaches the transaction. The real race
+        // is the test below.
         expect(second.status).toBe(409);
         expect(await balanceOf(asker.id)).toBe(4000);
     });
@@ -227,13 +226,13 @@ describe("PATCH /api/admin/coin-requests/:id/approve", () => {
         const asker = await makeUser({ roles: ["BACKER"], balance: 0 });
         const filed = await requestFor(asker);
 
-        // Builds the exact situation the early check CANNOT catch: the request is still
-        // PENDING when the service reads it, but by the time the UPDATE runs another admin
-        // has given a verdict, so it matches 0 rows.
+        // Builds the situation the early check cannot catch: the request is still PENDING
+        // when the service reads it, but by the time the UPDATE runs another admin has
+        // given a verdict, so it matches 0 rows.
         //
-        // ⚠️ Not built from two parallel requests: that ordering is not deterministic, and
-        // a test of a rule has to be. Forcing the repository to return undefined once is
-        // the only way to reach this branch on purpose.
+        // Not built from two parallel requests, whose ordering is not deterministic.
+        // Forcing the repository to return undefined once is the only way to reach this
+        // branch on purpose.
         const spy = vi.spyOn(coinRequestRepository, "approve").mockResolvedValueOnce(undefined);
 
         const res = await as(admin.token)
@@ -243,10 +242,9 @@ describe("PATCH /api/admin/coin-requests/:id/approve", () => {
         spy.mockRestore();
 
         expect(res.status).toBe(409);
-        // ⚠️ THIS is the real test of the throw inside the transaction. creditWallet ran
-        // BEFORE the UPDATE, so only a throw from inside can roll it back. Written with
-        // `return` instead of `throw`, the line above is still 409 while the wallet holds
-        // 4000.
+        // The real test of the throw inside the transaction. creditWallet ran before the
+        // UPDATE, so only a throw from inside rolls it back. With `return` instead, the
+        // line above is still 409 while the wallet keeps the coins.
         expect(await balanceOf(asker.id)).toBe(0);
         expect((await requestRow(filed.id)).status).toBe("PENDING");
     });

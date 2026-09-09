@@ -1,18 +1,17 @@
 const { z } = require("zod");
 
 /**
- * ⚠️ `email` is NOT z.email(), and that is deliberate.
+ * `email` is not z.email(), on purpose.
  *
- * The frontend's own field is deliberately not `type="email"` either — the browser's
- * native validation bubble would pre-empt AuthInput's error line. Both sides check that
- * something was typed and leave the judgement of what a valid address looks like to the
- * one thing that can actually answer it: whether the account exists.
+ * The frontend's field is not type="email" either, since the browser's own validation
+ * bubble would pre-empt AuthInput's error line. Both sides check that something was
+ * typed and leave "is this a valid address" to the only thing that can answer it:
+ * whether the account exists.
  *
- * The seeded test accounts also end in `@test.com`, and the suite uses `.invalid`, which
- * is a reserved TLD. A stricter rule here would be a rule about which addresses may hold
- * an account, which is not a decision this layer gets to make.
+ * A stricter rule here would be a rule about which addresses may hold an account, which
+ * is not this layer's decision.
  */
-// The message is on the TYPE check as well as the length one: zod's default for a
+// The message is on the type check as well as the length one. zod's default for a
 // missing field is "Invalid input: expected string, received undefined", and `details`
 // exists so a form can show a person what is wrong.
 const email = z

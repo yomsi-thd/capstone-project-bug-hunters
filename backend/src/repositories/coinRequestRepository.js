@@ -26,8 +26,8 @@ async function findById(id) {
     return result.rows[0];
 }
 
-// For GET /classcoins/requests/me. Only the waiting one: a request that already has a
-// verdict says nothing about whether this person can ask today.
+// Only the waiting request: one that already has a verdict says nothing about whether
+// this person can ask today.
 async function findPendingByUserId(userId) {
     const result = await pool.query(
         `
@@ -60,8 +60,8 @@ async function findAllPending() {
     return result.rows;
 }
 
-// ⚠️ `AND status = 'PENDING'` lives in the UPDATE itself, not in a check above it. Two
-// admins both read PENDING, so every check-before-write passes for both; only this
+// `AND status = 'PENDING'` lives in the UPDATE rather than in a check above it. Two
+// admins both read PENDING, so a check before the write passes for both and only this
 // statement decides. 0 rows means the other one got there first.
 async function approve(id, adminId, amount, client = pool) {
     const result = await client.query(

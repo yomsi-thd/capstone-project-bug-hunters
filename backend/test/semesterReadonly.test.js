@@ -1,17 +1,15 @@
 /**
- * A project whose semester has ended is READ-ONLY (N2).
+ * A project whose semester has ended is read-only.
  *
- * Design: docs/superpowers/specs/2026-09-06-semester-readonly-design.md
+ * Two halves. The first pins that the reads report whether the semester has closed. The
+ * second pins what assertSemesterOpen blocks and, just as importantly, what it must not
+ * block: nearly every way of getting this feature wrong is the rule applied one place too
+ * far.
  *
- * Two halves. The first pins that the reads REPORT whether the semester has closed; the
- * second pins what assertSemesterOpen blocks and — just as importantly — what it must
- * NOT block. The second half is the one that matters: nearly every way of getting this
- * feature wrong is the rule applied one place too far.
- *
- * ⚠️ LIKE semesters.test.js, THIS FILE REWRITES THE `semesters` TABLE, and it is safe
- * for the same reasons: vitest runs one file at a time in one process, and what
- * schema.sql seeded is restored in afterAll. Fixtures are offsets from CURRENT_DATE, not
- * fixed dates, so the suite does not start failing on a particular day of the calendar.
+ * Like semesters.test.js, this file rewrites the `semesters` table, and it is safe for
+ * the same reasons: vitest runs one file at a time in one process, and afterAll restores
+ * what schema.sql seeded. Fixtures are offsets from CURRENT_DATE rather than fixed dates,
+ * so the suite does not start failing on a particular day.
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
@@ -47,9 +45,8 @@ beforeAll(async () => {
     );
     seeded = rows;
 
-    // Added ALONGSIDE the seeded rows rather than replacing them: makeProject files a
-    // project under whichever semester contains today, and several other suites depend
-    // on that still working.
+    // Added alongside the seeded rows rather than replacing them, since makeProject files
+    // a project under whichever semester contains today.
     closedSemester = await addSemester("ZZ closed semester", -200, -100);
     openSemester = await addSemester("ZZ open semester", -5, 5);
 });
@@ -83,8 +80,8 @@ describe("GET /api/projects/:id reports its semester", () => {
             semesterId: closedSemester.id,
         });
 
-        // Signed out on purpose: the detail page is public, and these three fields go
-        // to every reader, not just the owner.
+        // Signed out on purpose: the detail page is public and these fields go to every
+        // reader, not only the owner.
         const res = await request(app).get(`/api/projects/${project.id}`);
 
         expect(res.status).toBe(200);
@@ -105,10 +102,10 @@ describe("GET /api/projects/:id reports its semester", () => {
         expect(res.body.semester_name).toBe("ZZ open semester");
     });
 
-    // ⚠️ The COALESCE. semester_id is still nullable, and `NULL < CURRENT_DATE` is NULL —
-    // falsy by accident. A project belonging to no semester must be reported as NOT
-    // closed by decision, not by luck: failing open leaves an orphaned project editable,
-    // where failing closed would silently freeze a live one.
+    // The COALESCE. semester_id is nullable and NULL < CURRENT_DATE is NULL, which is
+    // falsy by accident. A project belonging to no semester has to be reported as not
+    // closed by decision rather than by luck: failing open leaves an orphan editable,
+    // where failing closed would freeze a live project.
     it("a project with no semester at all is not closed", async () => {
         const project = await makeProject({
             creatorId: creator.id,
@@ -123,8 +120,8 @@ describe("GET /api/projects/:id reports its semester", () => {
         expect(res.body.semester_name).toBeNull();
     });
 
-    // The LEFT JOIN. A plain JOIN would drop that same project from the detail page
-    // entirely — a 404 on a project that exists.
+    // The LEFT JOIN. A plain join would drop that same project from the detail page
+    // entirely, giving a 404 on a project that exists.
     it("still returns the project when it has no semester", async () => {
         const project = await makeProject({
             creatorId: creator.id,
@@ -139,8 +136,8 @@ describe("GET /api/projects/:id reports its semester", () => {
         expect(res.body.title).toBe("Orphan of no semester");
     });
 
-    // A DATE has no time of day, so it must never become a Date object: parsed as UTC
-    // midnight and printed in the viewer's zone, 25 Oct reads as 24 Oct west of
+    // A DATE has no time of day, so it must never become a Date object: read as UTC
+    // midnight and printed in the viewer's zone, 25 Oct shows as 24 Oct west of
     // Greenwich. Same reason semesterRepository sends strings.
     it("sends semester_end_date as a 'YYYY-MM-DD' string", async () => {
         const project = await makeProject({
@@ -157,8 +154,8 @@ describe("GET /api/projects/:id reports its semester", () => {
 });
 
 describe("GET /api/projects/my reports the same three fields", () => {
-    // My Projects needs them so a card can hide EDIT on a closed semester rather than
-    // offering a button the API will refuse.
+    // My Projects needs these so a card can hide EDIT on a closed semester rather than
+    // offer a button the API refuses.
     it("carries semester_closed per project, closed and open side by side", async () => {
         const owner = await makeUser({ roles: ["CREATOR"] });
 
@@ -176,8 +173,8 @@ describe("GET /api/projects/my reports the same three fields", () => {
         expect(byId[current.id].semester_closed).toBe(false);
     });
 
-    // ⚠️ GET /projects/my is NOT filtered by semester and must never be: a creator has to
-    // be able to look back at what they did last term. Only Discover is scoped.
+    // GET /projects/my is not filtered by semester and must not be: a creator has to be
+    // able to look back at what they did last term. Only Discover is scoped.
     it("still lists a project whose semester has ended", async () => {
         const owner = await makeUser({ roles: ["CREATOR"] });
         const old = await makeProject({ creatorId: owner.id, semesterId: closedSemester.id });
@@ -188,9 +185,7 @@ describe("GET /api/projects/my reports the same three fields", () => {
     });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
 // The rule itself.
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe("a project whose semester has ended", () => {
     let owner;
@@ -205,8 +200,8 @@ describe("a project whose semester has ended", () => {
         secondAdmin = await makeUser({ roles: ["ADMIN"] });
     });
 
-    // Fresh per test: several of these change the project, and one has to be able to
-    // prove that nothing changed.
+    // Fresh per test: several of these change the project, and one has to prove that
+    // nothing changed.
     const closedProject = (overrides = {}) =>
         makeProject({ creatorId: owner.id, status: "APPROVED", semesterId: closedSemester.id, ...overrides });
 
@@ -302,19 +297,19 @@ describe("a project whose semester has ended", () => {
         });
     });
 
-    // ⚠️ THE HALF THAT PROTECTS THE FEATURE FROM A TIDY-UP.
+    // The half that protects the feature from a tidy-up.
     //
     // Every test below goes red the moment somebody adds assertSemesterOpen "for
-    // consistency" to a place that must not have it. Read the reason before changing any
-    // of them to expect a 409.
+    // consistency" somewhere it must not be. Read the reason before changing any of them
+    // to expect a 409.
     describe("still allows the things that must never be blocked", () => {
         it("an admin can APPROVE a project whose term already ended", async () => {
             const project = await closedProject({ status: "PENDING" });
 
             const res = await as(admin.token).patch(`/api/projects/${project.id}/approve`);
 
-            // A project left PENDING when the term closed would otherwise be stuck in the
-            // queue for ever. Approved, it simply belongs to that term's record.
+            // A project left PENDING when the term closed would otherwise sit in the
+            // queue for good. Approved, it belongs to that term's record.
             expect(res.status).toBe(200);
         });
 
@@ -335,7 +330,7 @@ describe("a project whose semester has ended", () => {
             const res = await as(backer.token)
                 .delete(`/api/projects/${project.id}/comments/${comment.id}`);
 
-            // Abusive text does not become acceptable because a term ended - the same
+            // Abusive text does not become acceptable because a term ended, the same
             // reasoning that keeps deletion open on an archived project.
             expect(res.status).toBe(200);
         });
@@ -362,7 +357,7 @@ describe("a project whose semester has ended", () => {
                 .patch(`/api/projects/${project.id}/endorse`)
                 .send({ endorsed: true });
 
-            // Curation, the same family as approving. Nothing about it belongs to the
+            // Curation, the same family as approving, and nothing to do with the
             // creator's editing rights.
             expect(res.status).toBe(200);
         });
@@ -376,7 +371,7 @@ describe("a project whose semester has ended", () => {
 
             const restored = await as(admin.token).patch(`/api/projects/${project.id}/restore`);
 
-            // Two independent axes: the calendar closing a term must not take away the
+            // Two independent axes: the calendar closing a term must not take away an
             // admin's ability to hide or unhide a project.
             expect([archived.status, restored.status]).toEqual([200, 200]);
         });
@@ -397,8 +392,8 @@ describe("a project whose semester has ended", () => {
             expect([edited.status, commented.status, posted.status]).toEqual([200, 201, 201]);
         });
 
-        // The COALESCE again, this time on the rule rather than on the read: an orphaned
-        // project must stay editable rather than be frozen by accident.
+        // The COALESCE again, this time on the rule rather than the read: an orphaned
+        // project stays editable rather than being frozen by accident.
         it("a project with no semester is not frozen either", async () => {
             const orphan = await makeProject({ creatorId: owner.id, status: "APPROVED", semesterId: null });
 

@@ -11,9 +11,9 @@ async function deactivateUser(userId, actingAdminId) {
         throw notFound("User not found");
     }
 
-    // Same rule as updateUserRoles refusing to strip your own ADMIN role: authenticate
-    // rejects an inactive account, so an admin who deactivates themselves is signed out
-    // on their next request with no route left to undo it.
+    // Same idea as refusing to strip your own ADMIN role. authenticate rejects an
+    // inactive account, so an admin who deactivates themselves is signed out on their
+    // next request with no way back.
     if (Number(userId) === Number(actingAdminId)) {
         // 403: an admin may deactivate users, just not this one. The refusal is about
         // the caller's relationship to the target, which is what FORBIDDEN means.
@@ -66,11 +66,11 @@ async function getAllCreatorRequests() {
     return await creatorRequestRepository.findAllPending();
 }
 
-// PATCH /admin/users/:id/roles — the only way to hand out a role by hand.
-// It matters beyond AdminUserManagement: createProject no longer auto-grants
-// CREATOR, and the creator-request queue only covers people who ticked the box at
-// sign-up. Without this route an existing BACKER could never become a CREATOR.
-// `roles` REPLACES the user's whole set, so send every role they should keep.
+// The only way to hand out a role by hand. It matters beyond the admin screen: nothing
+// grants CREATOR automatically, and the creator-request queue covers only people who
+// ticked the box at sign-up, so without this an existing backer could never become one.
+//
+// `roles` replaces the whole set, so send every role the user should keep.
 async function updateUserRoles(userId, roles, actingAdminId) {
 
     if (!Array.isArray(roles)) {
@@ -102,32 +102,30 @@ async function updateUserRoles(userId, roles, actingAdminId) {
         );
     }
 
-    // An admin account holds ADMIN and nothing else (lecturer's rule, 2026-08-21):
-    // it owns no projects and no Class Coins, so the combinations this refuses have
-    // no meaning left. Checked here as well as in the Manage Access modal because the
-    // UI is not a security boundary — the same pair of reasons as the self-lockout
-    // guard below.
-    // ⚠️ Placed BEFORE that guard on purpose: an admin editing their own account is
-    // caught by both, and this is the message that explains the rule.
+    // An admin account holds ADMIN and nothing else: it owns no projects and no Class
+    // Coins, so the combinations refused here have no meaning. Checked on this side as
+    // well as in the Manage Access modal, because the UI is not a security boundary.
+    //
+    // Placed before the self-lockout guard on purpose: an admin editing their own account
+    // trips both, and this is the message that explains the rule.
     if (wanted.includes("ADMIN") && wanted.length > 1) {
-        // 409, not 422: every name in the set is real and spelled correctly. What is
-        // refused is the COMBINATION, which is a rule about the domain rather than about
-        // the shape of the request - the same line the whole error table draws.
+        // 409 rather than 422: every name in the set is real and spelled correctly, and
+        // what is refused is the combination, which is a rule about the domain rather
+        // than about the shape of the request.
         throw conflict(
             "An admin account holds the ADMIN role only. Remove CREATOR/BACKER, " +
             "or use a separate account for those."
         );
     }
 
-    // Without this an admin can strip their own ADMIN role in one request and lock
-    // the whole team out of the admin area, with no route left to undo it.
+    // Without this an admin could strip their own ADMIN role in one request and lock the
+    // team out of the admin area with no way back.
     if (Number(userId) === Number(actingAdminId) && !wanted.includes("ADMIN")) {
         throw forbidden("You cannot remove your own ADMIN role.");
     }
 
     // setUserRoles deletes the whole set before inserting the new one, so a failure
-    // halfway would leave the account holding NO roles at all - locked out of everything
-    // rather than merely unchanged.
+    // halfway would leave the account holding no roles at all rather than unchanged.
     await withTransaction(async (client) => {
         await userRepository.setUserRoles(userId, wanted, client);
     });
@@ -138,9 +136,9 @@ async function updateUserRoles(userId, roles, actingAdminId) {
     };
 }
 
-// One sentence, used by both the early check and the race guard below it. Two checks are
-// fine; two wordings are not - a person refused by one would read a different reason than
-// a person refused by the other and reasonably think they were two different rules.
+// One sentence, shared by the early check and the race guard below. Two checks are fine;
+// two wordings would have people refused by each reading different reasons and assuming
+// two different rules.
 const REQUEST_ALREADY_REVIEWED = "Creator request has already been reviewed.";
 
 async function approveCreatorRequest(requestId, adminId) {
@@ -155,9 +153,9 @@ async function approveCreatorRequest(requestId, adminId) {
         throw conflict(REQUEST_ALREADY_REVIEWED);
     }
 
-    // Granting the role and marking the request reviewed are one step or neither: a
-    // request marked APPROVED without the role is invisible to the queue afterwards, so
-    // nobody would ever notice the creator never got it.
+    // Granting the role and marking the request reviewed happen together or not at all.
+    // A request marked APPROVED without the role leaves the queue, so nobody would notice
+    // the creator never got it.
     return await withTransaction(async (client) => {
 
         await userRepository.assignRole(
@@ -172,13 +170,13 @@ async function approveCreatorRequest(requestId, adminId) {
             client
         );
 
-        // ⚠️ The check above is a read-then-write and closes nothing on its own: two
-        // admins both read PENDING and both pass it. `AND status = 'PENDING'` in the
+        // The check above is a read-then-write and closes nothing on its own, since two
+        // admins can both read PENDING and both pass it. `AND status = 'PENDING'` in the
         // UPDATE is what decides, and 0 rows means the other admin got there first.
         //
-        // Thrown INSIDE the transaction on purpose - assignRole ran first, so the throw
-        // is what rolls the CREATOR grant back. Returning here instead would leave the
-        // role granted against a request somebody else had already rejected.
+        // Thrown inside the transaction on purpose: assignRole ran first, so the throw is
+        // what rolls the grant back. Returning instead would leave the role granted
+        // against a request somebody else had already rejected.
         if (!approved) {
             throw conflict(REQUEST_ALREADY_REVIEWED);
         }

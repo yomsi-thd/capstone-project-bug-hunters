@@ -7,8 +7,8 @@ const M = require("../validation/messages");
 // Comments are public to read and open to any signed-in user to write.
 async function getProjectComments(projectId, viewer = null) {
 
-    // Hiding the project but not its discussion would leave the same content readable
-    // one URL over, so this is the same loader the project itself goes through.
+    // The same loader the project itself goes through: hiding a project but not its
+    // discussion would leave the content readable one URL over.
     await loadVisibleProject(projectId, viewer);
 
     return await commentRepository.findByProjectId(projectId);
@@ -33,8 +33,8 @@ async function createComment(userId, projectId, data) {
     }
 
     assertNotArchived(project);
-    // The semester's own freeze. Posting is what closes; DELETING a comment stays open
-    // on both axes - abusive text does not become acceptable because a term ended.
+    // The semester's freeze closes posting. Deleting stays open on both axes, since
+    // abusive text does not become acceptable because a term ended.
     assertSemesterOpen(project);
 
     let parentId = null;
@@ -46,8 +46,8 @@ async function createComment(userId, projectId, data) {
             throw validationFailed("The comment being replied to does not belong to this project.");
         }
 
-        // The UI only draws one level of nesting, so a reply to a reply is attached to
-        // the top-level comment instead of creating a thread nobody can see.
+        // The UI draws one level of nesting, so a reply to a reply is attached to the
+        // top-level comment rather than creating a thread nobody can see.
         parentId = parent.parent_id ?? parent.id;
     }
 

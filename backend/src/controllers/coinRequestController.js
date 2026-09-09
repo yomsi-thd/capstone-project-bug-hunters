@@ -2,9 +2,9 @@ const coinRequestService = require("../services/coinRequestService");
 const asyncHandler = require("../http/asyncHandler");
 const { page } = require("../http/envelope");
 
-// The person filing is the signed-in user, TAKEN FROM THE TOKEN and never from the body -
-// same reason as targetWallet in classCoinController: an identity the caller could type is
-// worth nothing.
+// The person filing comes from the token and never from the body, for the same reason as
+// the target wallet in classCoinController: an identity the caller could type is worth
+// nothing.
 const createRequest = asyncHandler(async (req, res) => {
     const request = await coinRequestService.createRequest(req.user.id, req.body.note);
 
@@ -23,8 +23,8 @@ const getAllPending = asyncHandler(async (req, res) => {
     res.status(200).json(page(requests));
 });
 
-// The amount comes from the BODY (the admin types it); the reviewer comes from the TOKEN.
-// The reviewer is an audit trail, and a claim the caller could type would be worth nothing.
+// The amount comes from the body, since the admin types it, and the reviewer from the
+// token, since it is an audit trail.
 const approve = asyncHandler(async (req, res) => {
     const request = await coinRequestService.approve(req.params.id, req.user.id, req.body.amount);
 

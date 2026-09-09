@@ -1,9 +1,8 @@
 /**
- * Characterisation tests: what /api/auth and the two auth middlewares answer TODAY.
+ * What /api/auth and the two auth middlewares answer, pinned status code by status code.
  *
- * These record the CURRENT status codes, including the ones the API-restructure design
- * calls wrong. When that design changes one, the change belongs in the same commit as
- * the line below it, so every status change is a deliberate diff and never an accident.
+ * Changing one of these is meant to be a visible diff rather than a side effect, since a
+ * wrong status here logs people out mid-session.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -36,9 +35,8 @@ describe("POST /api/auth/register", () => {
         expect(balance.status).toBe(200);
     });
 
-    // 409 since the error contract landed: the request is well-formed and understood,
-    // it just collides with a row that already exists. It answered 400 before, when
-    // every failure out of authService did.
+    // 409: the request is well-formed and understood, it just collides with a row that
+    // already exists.
     it("409 on a duplicate email", async () => {
         const email = uniqueEmail("dupe");
 
@@ -54,13 +52,9 @@ describe("POST /api/auth/register", () => {
     });
 
     /**
-     * The interim state is over: this is what the whole validation layer was for.
-     *
-     * It used to be 400 echoing a raw Postgres NOT NULL message at the caller, then
-     * briefly 500 with a generic one once the controllers stopped catching. Now it is
-     * 422 naming EVERY field that is wrong at once, which is the thing the API could
-     * never tell a client before — the service checked one field at a time, so a form
-     * could never mark more than one input.
+     * What the validation layer is for: 422 naming every field that is wrong at once.
+     * Checking one field at a time means a form can never mark more than one input, and
+     * letting the body reach a NOT NULL constraint echoes Postgres at the caller.
      */
     it("422 naming every missing field at once when the body is incomplete", async () => {
         const res = await request(app)
@@ -94,25 +88,22 @@ describe("POST /api/auth/login", () => {
     });
 
     /**
-     * The regression test for a real bug, FIXED 2026-08-27.
+     * Two sign-ins inside the same second have to produce different refresh tokens.
      *
-     * generateRefreshToken used to sign { id, roles } only, so `iat` — one-second
-     * resolution — was the sole thing that changed between two sign-ins by the same
-     * account. Two logins inside the same second produced a byte-identical JWT, which
-     * collided with the UNIQUE index on refresh_tokens.token and failed a password that
-     * was correct. Reachable by double-clicking SIGN IN, or by two devices at once.
+     * Signing { id, roles } alone leaves `iat`, with its one-second resolution, as the
+     * only thing separating them, so two logins in the same second produce a
+     * byte-identical JWT that collides with the unique index on refresh_tokens.token and
+     * fails a correct password. Double-clicking SIGN IN is enough to reach it.
      *
-     * The fix is a `jti` (via jwt.sign's `jwtid`), so a token is unique whatever the
-     * clock says. This test used to assert the FAILURE, to stop the bug being buried;
-     * it now asserts the fix, and it is the thing that catches a future "tidy-up" that
-     * drops the jti and silently brings the collision back.
+     * The `jti` claim is what prevents it, and this test is what catches a tidy-up that
+     * drops it and brings the collision back.
      */
     it("lets the same account sign in six times inside one second", async () => {
         const email = uniqueEmail("login-twice");
 
         await request(app).post("/api/auth/register").send({ fullName: "T", email, password: PASSWORD });
 
-        // Six back to back take well under two seconds, so several must share a second.
+        // Six back to back take well under two seconds, so several share one.
         const attempts = [];
 
         for (let i = 0; i < 6; i += 1) {
@@ -121,8 +112,8 @@ describe("POST /api/auth/login", () => {
 
         expect(attempts.map((res) => res.status)).toEqual([200, 200, 200, 200, 200, 200]);
 
-        // Every sign-in must be a SEPARATE session. Identical strings would mean the
-        // second login silently overwrote the first device's token rather than colliding.
+        // Every sign-in is a separate session. Identical strings would mean the second
+        // login overwrote the first device's token rather than colliding.
         const tokens = attempts.map((res) => res.body.refreshToken);
 
         expect(new Set(tokens).size).toBe(6);
@@ -145,8 +136,8 @@ describe("POST /api/auth/login", () => {
         expect(res.status).toBe(401);
     });
 
-    // Case-sensitive sign-in is a DECISION (Huy, 2026-08-06), not an oversight. Pinned
-    // here so a future "cleanup" to LOWER(email) has to argue with a red test first.
+    // Case-sensitive sign-in is a decision rather than an oversight, pinned here so a
+    // cleanup to LOWER(email) has to argue with a red test first.
     it("401 for the right password on a differently-cased email", async () => {
         const user = await makeUser();
 
@@ -157,8 +148,8 @@ describe("POST /api/auth/login", () => {
         expect(res.status).toBe(401);
     });
 
-    // login() has no is_active check of its own: a deactivated account still signs in
-    // and still gets a token. The refusal happens one layer later, in authenticate().
+    // login() has no is_active check of its own, so a deactivated account still signs in
+    // and gets a token. The refusal happens one layer later, in authenticate().
     it("issues a token to a deactivated account, and the middleware is what refuses it", async () => {
         const user = await makeUser({ active: false });
 
@@ -182,9 +173,9 @@ describe("POST /api/auth/refresh", () => {
         expect(res.body.accessToken).toBeTruthy();
     });
 
-    // 422, not 401: nothing was presented to authenticate. The status change is safe
-    // for the interceptor, which only ever refreshes on a 401 from a NON-auth path and
-    // treats any failure of the refresh itself as the end of the session.
+    // 422 rather than 401: nothing was presented to authenticate. Safe for the
+    // interceptor, which only refreshes on a 401 from a non-auth path and treats a failed
+    // refresh as the end of the session.
     it("422 with the field named when the token is missing", async () => {
         const res = await request(app).post("/api/auth/refresh").send({});
 
@@ -246,13 +237,12 @@ describe("authenticate middleware", () => {
     });
 
     /**
-     * The single most expensive thing to get wrong in this whole restructure.
+     * The most expensive status in the API to get wrong.
      *
-     * The frontend refreshes the access token when it sees a 401 and only then. Access
-     * tokens live 15 minutes, so this path runs constantly in an ordinary session. If
-     * an expired token started answering 403 or 422, nothing would refresh and every
-     * user would be thrown back to the sign-in screen a quarter of an hour in — the
-     * worst failure available during a demo.
+     * The frontend refreshes the access token when it sees a 401 and only then, and
+     * access tokens last 15 minutes, so this path runs constantly. If an expired token
+     * started answering 403 or 422, nothing would refresh and every user would land back
+     * on the sign-in screen a quarter of an hour in.
      */
     it("401 on a genuinely EXPIRED token, so the interceptor still refreshes", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
@@ -269,7 +259,7 @@ describe("authenticate middleware", () => {
         expect(res.body.code).toBe("UNAUTHENTICATED");
     });
 
-    // A deactivated account must NOT be 401. The refresh endpoint does not check
+    // A deactivated account must not be 401. The refresh endpoint does not check
     // is_active, so a 401 here would have the interceptor refresh, retry, be refused
     // again, and loop.
     it("403 for a deactivated account, never 401", async () => {
@@ -299,9 +289,9 @@ describe("authorize middleware", () => {
         expect(res.body.message).toBe("Forbidden");
     });
 
-    // authOptional lets a signed-out visitor through, but a BROKEN token still 401s so
-    // the frontend axios interceptor gets its chance to refresh. Quietly downgrading an
-    // expired token to "anonymous" would 404 a creator on their own pending project.
+    // authOptional lets a signed-out visitor through, but a broken token still 401s so
+    // the interceptor gets its chance to refresh. Downgrading an expired token to
+    // anonymous would 404 a creator on their own pending project.
     it("authOptional: no header is fine, a broken header is still 401", async () => {
         const anonymous = await request(app).get(`/api/projects/${project.id}`);
         const broken = await as("expired.token.value").get(`/api/projects/${project.id}`);

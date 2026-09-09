@@ -1,12 +1,12 @@
 /**
- * Support levels (project_tiers in the database).
+ * Support levels, project_tiers in the database.
  *
- * A level is a MINIMUM contribution plus the lines saying what choosing it signals —
- * not a reward, and nothing is owed. What that means for the code is recorded here:
- * levels are content, so they follow updateProject's permission rule rather than
- * createProjectUpdate's; a REJECTED project keeps its levels editable so the creator
- * can revise and resubmit; and a level somebody has already chosen is hidden, never
- * deleted, because their transaction points at the row.
+ * A level is a minimum contribution plus the lines saying what choosing it signals: not a
+ * reward, and nothing is owed. What that means for the code is recorded here. Levels are
+ * content, so they follow updateProject's permission rule rather than
+ * createProjectUpdate's; a rejected project keeps its levels editable so the creator can
+ * revise and resubmit; and a level somebody already chose is hidden rather than deleted,
+ * because their transaction points at the row.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -78,8 +78,7 @@ describe("POST /api/projects/:id/tiers", () => {
         expect(anonymous.status).toBe(401);
     });
 
-    // 422: the level is well-formed JSON that says something unusable. These are the
-    // checks zod takes over later, at the same status, so nothing moves twice.
+    // 422: the level is well-formed JSON that says something unusable.
     it("422 on a missing name, a non-integer minimum, and no bullets", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const post = (body) => as(creator.token).post(`/api/projects/${project.id}/tiers`).send(body);
@@ -90,9 +89,9 @@ describe("POST /api/projects/:id/tiers", () => {
         expect((await post(level({ bullets: [] }))).status).toBe(422);
     });
 
-    // A level above the contribution cap is a level nobody can ever reach: since
-    // 2026-09-07 one person may put at most 500 CC into a project, once. Leaving it
-    // creatable would put a dead control on the project page by construction.
+    // A level above the contribution cap is one nobody can reach, since a person may
+    // contribute once and at most the cap. Allowing it would put a dead control on the
+    // project page by construction.
     it("422 on a level that asks for more than a person may contribute", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
         const post = (body) => as(creator.token).post(`/api/projects/${project.id}/tiers`).send(body);
@@ -102,13 +101,13 @@ describe("POST /api/projects/:id/tiers", () => {
         expect(tooHigh.status).toBe(422);
         expect(tooHigh.body.message).toBe("A support level cannot ask for more than 500 CC.");
 
-        // The cap itself must stay reachable - it is the number backers are shown.
+        // The cap itself stays reachable: it is the number backers are shown.
         expect((await post(level({ name: "At the cap", min_amount: 500 }))).status).toBe(201);
     });
 
-    // Worded identically to the frontend copy in tierRules.js. A creator who gets past
-    // one check and is refused by the other must read the same sentence, not wonder
-    // whether they have hit a second, stricter rule.
+    // Worded to match the frontend copy in tierRules.js. A creator who gets past one
+    // check and is refused by the other should read the same sentence rather than wonder
+    // whether they hit a second, stricter rule.
     it("uses the same wording as the frontend rule for the minimum", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -128,14 +127,15 @@ describe("POST /api/projects/:id/tiers", () => {
             .post(`/api/projects/${project.id}/tiers`)
             .send(level({ name: "Another", min_amount: 100 }));
 
-        // 409, not 422: 100 is a perfectly good amount. What refuses it is another row.
+        // 409 rather than 422: the amount is perfectly good, and what refuses it is
+        // another row.
         expect(res.status).toBe(409);
         expect(res.body.code).toBe("CONFLICT");
         expect(res.body.message).toBe("Another level already starts at 100 CC.");
     });
 
-    // Only ACTIVE levels count. Treating a hidden one's amount as taken forever would
-    // make hiding a level a permanent reservation of the number.
+    // Active levels only. Treating a hidden one's amount as taken would make hiding a
+    // level a permanent reservation of that number.
     it("allows a new level at the minimum of a HIDDEN one", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -146,8 +146,8 @@ describe("POST /api/projects/:id/tiers", () => {
         expect(res.status).toBe(201);
     });
 
-    // ⚠️ The max-5 check runs BEFORE field validation, so on a full project every
-    // request is refused with "at most 5" whatever else is wrong with it.
+    // The level-limit check runs before field validation, so on a full project every
+    // request is refused with that message whatever else is wrong with it.
     it("409 once the project already has five levels, before any other check", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
@@ -161,8 +161,8 @@ describe("POST /api/projects/:id/tiers", () => {
         expect(res.body.message).toBe("A project can have at most 5 support levels.");
     });
 
-    // Levels follow updateProject's rule, NOT createProjectUpdate's: a rejected project
-    // stays editable so the creator can revise it, and the levels are part of that.
+    // Levels follow updateProject's rule rather than createProjectUpdate's: a rejected
+    // project stays editable so the creator can revise it, levels included.
     it("201 on a REJECTED project, but 409 on an archived one", async () => {
         const rejected = await makeProject({ creatorId: creator.id, status: "REJECTED" });
         const archived = await makeProject({ creatorId: creator.id, status: "APPROVED" });
@@ -233,9 +233,8 @@ describe("DELETE /api/projects/:id/tiers/:tierId", () => {
         expect(rows).toHaveLength(0);
     });
 
-    // Somebody's classcoin_transactions row points at this level. Deleting it would
-    // erase what they signalled, so it is hidden and the caller is told which of the
-    // two happened.
+    // A transaction points at this level, so deleting it would erase what somebody
+    // signalled. It is hidden instead, and the caller is told which happened.
     it("200 and only HIDES a level somebody has already chosen", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 5000 });
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });

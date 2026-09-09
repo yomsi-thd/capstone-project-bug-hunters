@@ -1,9 +1,8 @@
 const pool = require("../config/db");
 
-// Create Project.
-// `client = pool` so projectService can wrap the project and its support levels in one
-// transaction — a project that saved but whose levels did not is the worst outcome
-// there, because the wizard latches after a successful submit and the creator would
+// Create project. `client = pool` so projectService can wrap the project and its support
+// levels in one transaction: a project that saved without its levels is the worst
+// outcome, since the wizard latches after a successful submit and the creator would
 // believe the levels exist.
 async function createProject(project, client = pool) {
     const result = await client.query(
@@ -19,10 +18,9 @@ async function createProject(project, client = pool) {
             status,
             team_members,
             -- The teaching period this project counts towards, decided by
-            -- semesterService from whichever semester is open on the day. It replaced
-            -- start_date / end_date here on 2026-09-06: those columns are still on the
-            -- table, holding the old per-project 30-day window for rows created between
-            -- 2026-08-06 and then, but nothing writes them any more.
+            -- semesterService from whichever semester is open on the day. start_date and
+            -- end_date are still on the table, holding an old per-project window on some
+            -- rows, but nothing writes them any more.
             semester_id,
             challenge,
             solution,
@@ -50,11 +48,10 @@ async function createProject(project, client = pool) {
             project.funding_usage,
             JSON.stringify(project.gallery ?? []),
             JSON.stringify(project.solution_bullets ?? []),
-            // A link, not a file. The wizard has always REQUIRED a video and had
-            // nowhere to put it (schema.sql known issue #7) — this is that column.
+            // A link, not a file.
             project.video_url,
-            // NULL unless an ADMIN filed this for the creator named in creator_id.
-            // projectService.resolveOwnership is the only thing that ever sets it.
+            // NULL unless an admin filed this for the creator named in creator_id.
+            // projectService.resolveOwnership is the only thing that sets it.
             project.created_by_admin_id ?? null
         ]
     );
@@ -62,22 +59,21 @@ async function createProject(project, client = pool) {
     return result.rows[0];
 }
 
-// Get all projects.
-// ADMIN-ONLY (adminController.getAllProjects) — it returns every status AND the
-// creator's email, so do not reuse it for a public route.
-// The join replaces the "Creator #14" placeholder in AdminDashboard / AdminApprovals.
+// Every project, for the admin screens only: it returns every status and the creator's
+// email, so it must not be reused on a public route. The join is what gives those screens
+// a creator name rather than an id.
 async function findAll() {
     const result = await pool.query(
         `
         SELECT p.*,
                u.full_name AS creator_name,
                u.email     AS creator_email,
-               -- The admin dashboard lists archived projects too, and has to name who
-               -- archived each one before offering RESTORE / DELETE PERMANENTLY.
+               -- The admin dashboard lists archived projects too, and names who
+               -- archived each one before offering restore or permanent delete.
                a.full_name AS archived_by_name,
-               -- Who FILED it, when that was not the owner. The reviewer needs the
-               -- name on screen ("Created on behalf by …") and AdminApprovals needs
-               -- the id to hide APPROVE/REJECT from the admin who filed it.
+               -- Who filed it, when that was not the owner. The reviewer needs the name
+               -- on screen, and the queue needs the id to hide APPROVE and REJECT from
+               -- the admin who filed it.
                b.full_name AS created_by_admin_name
         FROM projects p
         LEFT JOIN users u ON u.id = p.creator_id
@@ -92,81 +88,63 @@ async function findAll() {
 
 /**
  * The teaching period a project belongs to, joined into the two reads that need it:
- * findById (the detail page and every write that loads the project first) and
- * findByCreatorId (My Projects).
+ * findById, for the detail page and every write that loads the project first, and
+ * findByCreatorId, for My Projects.
  *
- * ⚠️ `semester_closed` IS COMPUTED BY POSTGRES, and that is the whole point.
+ * Postgres computes `semester_closed`, and that is the point. Handing the service
+ * `end_date` to compare against new Date() brings back a timezone bug: end_date is a DATE
+ * column, so node-postgres reads it as local midnight, and new Date() is the server's
+ * clock, which is UTC on Render and UTC+7 on a dev machine. The two would lock a project
+ * at different moments. CURRENT_DATE settles it in one place.
  *
- * The obvious alternative - hand the service `end_date` and let it compare with
- * `new Date()` - puts back the bug this table went to some trouble to avoid. `end_date`
- * is a DATE column, so node-postgres reads it into a Date at LOCAL midnight: on the dev
- * machine (UTC+7) `2026-10-25` becomes `2026-10-24T17:00:00Z`. And `new Date()` in Node
- * is the SERVER's clock, which is UTC on Render and UTC+7 here - so the two would lock a
- * project at two different moments. CURRENT_DATE settles it in one place, with the
- * database's own calendar.
+ * COALESCE(..., false) is load-bearing, since semester_id is nullable and
+ * NULL < CURRENT_DATE is NULL. It states outright that a project belonging to no semester
+ * is not locked: failing open leaves an orphan editable, where failing closed would
+ * freeze a live project.
  *
- * ⚠️ COALESCE(..., false) is load-bearing. projects.semester_id is still nullable
- * (schema known issue 10) and `NULL < CURRENT_DATE` is NULL, which is falsy by accident
- * rather than by decision. Stated outright: a project belonging to no semester is NOT
- * locked. Failing open is the safer default - locking a live project by accident is far
- * worse than leaving an orphaned one editable.
+ * LEFT JOIN, never JOIN. A plain join would drop those same rows from the detail page.
  *
- * ⚠️ LEFT JOIN, never JOIN. A plain join would drop those same rows from the detail page
- * entirely - the trap that would have emptied My Investments when tier_id was mostly
- * NULL.
- *
- * `semester_end_date` goes out as a 'YYYY-MM-DD' string for the same reason
- * semesterRepository does it: a string with no time of day has no timezone to be shifted
- * by.
+ * `semester_end_date` goes out as a "YYYY-MM-DD" string, like semesterRepository does: a
+ * string with no time of day has no timezone to be shifted by.
  */
 const SEMESTER_COLUMNS = `
                COALESCE(s.end_date < CURRENT_DATE, false) AS semester_closed,
                s.name                                     AS semester_name,
                TO_CHAR(s.end_date, 'YYYY-MM-DD')          AS semester_end_date`;
 
-// The PUBLIC catalogue behind Discover. `archived_at IS NULL` is the whole reason
-// archiving hides a project: this is the only list a backer browses from.
-// findAll (admin), findByCreatorId (My Projects) and findById (detail page) all keep
-// returning archived rows on purpose — those three are exactly where you go to see,
-// restore or permanently delete one.
-// `limit` is optional and there is deliberately no default. Discover loads the whole
-// catalogue and filters it client-side, so a default page size would silently reduce its
-// search box to the first page and report nothing wrong. See http/envelope.js.
+// The public catalogue behind Discover. `archived_at IS NULL` is what makes archiving
+// hide a project, since this is the only list a backer browses from. findAll,
+// findByCreatorId and findById all keep returning archived rows, because those three are
+// where you go to see, restore or delete one.
+//
+// `limit` is optional with no default. Discover loads the whole catalogue and filters it
+// in the browser, so a default page size would quietly reduce its search box to the first
+// page. See http/envelope.js.
 async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } = {}) {
     const result = await pool.query(
         `
-        -- Named columns, NOT SELECT *, and the omissions are the point.
+        -- Named columns rather than SELECT *, and the omissions are the point.
         --
-        -- This is the single most-requested query in the app: every visit to Discover,
-        -- and every keystroke in its search box, runs it. SELECT * made each row carry
-        -- the project's whole story AND its gallery - a jsonb array of base64 data
-        -- URIs, one per uploaded photo. Images live inside the project row (schema known
-        -- issue: they belong in Supabase Storage), so a handful of real photo projects
-        -- turn this response from kilobytes into megabytes, on the one endpoint nobody
-        -- can avoid.
+        -- This is the most-requested query in the app: every visit to Discover, and every
+        -- keystroke in its search box, runs it. SELECT * would make each row carry the
+        -- project's whole story and its gallery, a jsonb array of base64 data URIs.
+        -- Images live inside the project row, which is a known schema issue, so a handful
+        -- of real photo projects turn this response from kilobytes into megabytes on the
+        -- one endpoint nobody can avoid.
         --
-        -- It has already cost the team once. The uptime cron used to ping this route,
-        -- and cron-job.org aborts a response past its size cap - so the endpoint most
-        -- likely to grow without warning was also the one holding the live demo awake.
-        --
-        -- The ten columns and one subquery below are exactly what mappers.toCard reads.
+        -- The columns and the subquery below are exactly what mappers.toCard reads.
         -- Adding a field to the Discover card means adding it here too, which is the
-        -- intended friction: it makes the cost of carrying it visible at the point of
-        -- choosing to.
+        -- intended friction: it makes the cost visible at the point of choosing to pay it.
         --
-        -- semester_id joined that list on 2026-09-06 and is the one exception to "only
-        -- what the card renders" - the card shows the semester's NAME, not its id, and
-        -- there is deliberately NO JOIN to semesters here. The frontend has already
-        -- loaded GET /semesters for its picker, so it can name the id itself. This is
-        -- the app's hottest query; a join for one short string is a cost paid on every
-        -- keystroke in the search box.
+        -- semester_id is the exception to "only what the card renders". The card shows
+        -- the semester's name rather than its id, and there is no join to semesters here:
+        -- the frontend has already loaded the semester list for its picker, so it can
+        -- name the id itself, and a join for one short string is a cost paid on every
+        -- keystroke.
         --
-        -- 2026-09-07 (N3): goal_amount left, and start_date / end_date with it - nothing
-        -- has read those two since a project started closing when its SEMESTER closes.
-        -- backers_count arrived in their place. It is a subquery on the app's busiest
-        -- read, which is a cost worth naming: it is the same one findById and
-        -- findByCreatorId already run, it returns a single integer, and the card needs a
-        -- second real number now that there is no percentage to show.
+        -- backers_count is a subquery on the app's busiest read, which is worth naming.
+        -- It is the same one findById and findByCreatorId already run, returns a single
+        -- integer, and is the card's second real number now that there is no percentage.
         SELECT p.id,
                p.creator_id,
                p.title,
@@ -177,8 +155,8 @@ async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } 
                p.current_amount,
                p.semester_id,
                p.created_at,
-               -- DISTINCT wallets, not transactions: backing twice still counts as one
-               -- person. That is the whole point of the number - it is a head count.
+               -- Distinct wallets rather than transactions, so backing twice still
+               -- counts as one person. The number is a head count.
                (
                    SELECT COUNT(DISTINCT ct.classcoin_id)::int
                    FROM classcoin_transactions ct
@@ -189,10 +167,10 @@ async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } 
         WHERE p.status = 'APPROVED'
           AND p.archived_at IS NULL
           AND p.semester_id = $1
-        -- ⚠️ Still created_at, NOT current_amount. Ranking by support lives on Discover
-        -- (the "Most Supported" row and the sort control), and this list has exactly one
-        -- caller, which re-sorts client-side - so ordering by the total here would change
-        -- nothing anybody can see. See §3.1 of the N3 design.
+        -- created_at rather than current_amount. Ranking by support belongs to Discover,
+        -- in its Most Supported row and its sort control, and this list has one caller
+        -- that re-sorts in the browser, so ordering by the total here would change
+        -- nothing anybody can see.
         ORDER BY p.created_at DESC
         ${limit == null ? "" : "LIMIT $2 OFFSET $3"};
         `,
@@ -202,8 +180,8 @@ async function findAllApprovedProjects({ semesterId, limit = null, offset = 0 } 
     return result.rows;
 }
 
-// Only ever called when a caller asked for a page - an unpaginated read already knows
-// its own total, and a second round trip for a number in hand would be waste.
+// Only called when a caller asked for a page. An unpaginated read already knows its own
+// total, so a second round trip would be waste.
 async function countApprovedProjects({ semesterId } = {}) {
     const result = await pool.query(
         `
@@ -219,23 +197,24 @@ async function countApprovedProjects({ semesterId } = {}) {
     return result.rows[0].total;
 }
 
-// Get project by ID.
-// Serves the PUBLIC route GET /projects/:id, so it joins the creator's NAME only —
-// never the email, which would then be readable by anyone.
-// backers_count is DISTINCT wallets, not rows: investing three times still counts
-// as one backer.
-// `viewerId` is the person READING the page, used only by the my_contribution subquery
-// below. It defaults to null because nine of the ten callers are writes that load the
-// project first (invest, archive, approve...) and have no reader to speak of.
+// One project. It serves the public route, so it joins the creator's name and never
+// their email.
+//
+// backers_count counts distinct wallets rather than rows, so investing three times still
+// counts as one backer.
+//
+// `viewerId` is whoever is reading the page and is used only by the my_contribution
+// subquery. It defaults to null because most callers are writes that load the project
+// first and have no reader.
 async function findById(id, client = pool, viewerId = null) {
     const result = await client.query(
         `
         SELECT p.*,
                u.full_name AS creator_name,
                u.title     AS creator_title,
-               -- Who archived it, by name. The UI has to say "Archived by <someone>",
-               -- and a bare id would render as a number. NULL when not archived, and
-               -- also when the archiver's account was since deleted (SET NULL).
+               -- Who archived it, by name, since the UI has to say "Archived by
+               -- someone" and a bare id renders as a number. NULL when not archived, and
+               -- also when the archiver's account has since been deleted.
                a.full_name AS archived_by_name,
                (
                    SELECT COUNT(DISTINCT ct.classcoin_id)::int
@@ -248,13 +227,13 @@ async function findById(id, client = pool, viewerId = null) {
                    FROM comments c
                    WHERE c.project_id = p.id
                ) AS comments_count,
-               -- What the person reading this page already contributed, or NULL. It is
-               -- what lets the sidebar replace the invest button with a confirmation
-               -- instead of leaving a control that can never work again (N4).
+               -- What the reader already contributed, or NULL. It lets the sidebar
+               -- replace the invest button with a confirmation rather than leave a
+               -- control that can never work again.
                --
-               -- ⚠️ NULL for a signed-out visitor, because $2 is NULL and nothing joins -
-               -- which is the right answer rather than a special case. And it can only
-               -- ever describe the caller: the id comes from the token, never the body.
+               -- NULL for a signed-out visitor, because the parameter is NULL and nothing
+               -- joins, which is the right answer rather than a special case. It can only
+               -- describe the caller: the id comes from the token, never the body.
                (
                    SELECT ct.amount::int
                    FROM classcoin_transactions ct
@@ -262,11 +241,10 @@ async function findById(id, client = pool, viewerId = null) {
                    WHERE ct.project_id = p.id
                      AND ct.type = 'INVEST'
                      AND c.user_id = $2
-                   -- Deterministic, and it matches what the N4 seed keeps: the EARLIEST
-                   -- row. There is at most one per person per project now, so this only
-                   -- decides the answer for rows written before that rule existed - but
+                   -- Deterministic: the earliest row. There is at most one per person
+                   -- per project now, so this only decides the answer for older rows, but
                    -- an arbitrary LIMIT 1 would let the same page show different numbers
-                   -- on two refreshes, which is worse than either answer.
+                   -- on two refreshes.
                    ORDER BY ct.created_at
                    LIMIT 1
                ) AS my_contribution,
@@ -289,12 +267,12 @@ async function findByCreatorId(userId) {
     const result = await pool.query(
         `
         SELECT p.*,
-               -- My Projects shows archived cards too. When an ADMIN archived it the
+               -- My Projects shows archived cards too. When an admin archived it the
                -- creator cannot restore it, so the card names who did and why.
                a.full_name AS archived_by_name,
-               -- Same two subqueries findById already runs. They are here so the creator
-               -- dashboard can total backers and comments from THIS one request instead
-               -- of calling GET /projects/:id once per project.
+               -- The same two subqueries findById runs. They are here so the creator
+               -- dashboard can total backers and comments from this one request rather
+               -- than calling GET /projects/:id per project.
                (
                    SELECT COUNT(DISTINCT ct.classcoin_id)::int
                    FROM classcoin_transactions ct
@@ -319,15 +297,14 @@ async function findByCreatorId(userId) {
     return result.rows;
 }
 
-// Everyone who has invested in ANY project owned by this creator, biggest first.
+// Everyone who has invested in any project this creator owns, biggest first.
 //
-// Grouped by WALLET OWNER, not by transaction: investing three times into two of the
-// creator's projects is one row totalling all three. That matches backers_count above,
+// Grouped by wallet owner rather than by transaction, so three investments across two of
+// the creator's projects is one row totalling all three. That matches backers_count above,
 // which also counts distinct wallets.
 //
-// The JOIN to projects is what scopes this to one creator — a transaction whose project
-// was deleted carries project_id = NULL (ON DELETE SET NULL) and drops out here, which
-// is what we want: it is no longer a backer of anything.
+// The join to projects is what scopes this to one creator. A transaction whose project was
+// deleted carries project_id NULL and drops out, which is right: it backs nothing now.
 async function findBackersByCreatorId(userId) {
 
     const result = await pool.query(
@@ -337,18 +314,18 @@ async function findBackersByCreatorId(userId) {
                SUM(ct.amount)::int                 AS total_amount,
                COUNT(DISTINCT ct.project_id)::int  AS project_count,
                MAX(ct.created_at)                  AS last_invested_at,
-               -- The row is one PERSON across several investments, so it has to pick
-               -- ONE support level to show: the highest they ever chose. That is the
-               -- strongest signal they sent, and the one people describe themselves by.
+               -- The row is one person across several investments, so it picks one
+               -- support level: the highest they ever chose, which is the strongest
+               -- signal they sent.
                MAX(t.min_amount)::int                                       AS top_tier_min,
                (ARRAY_AGG(t.name ORDER BY t.min_amount DESC NULLS LAST))[1] AS top_tier_name
         FROM classcoin_transactions ct
         JOIN classcoins c ON c.id = ct.classcoin_id
         JOIN users u      ON u.id = c.user_id
         JOIN projects p   ON p.id = ct.project_id
-        -- LEFT, never a plain JOIN: most transactions have tier_id = NULL (everything
-        -- before 2026-08-20, plus every "no level — just support" choice), and an inner
-        -- join would delete those backers from this list entirely.
+        -- LEFT rather than a plain join: most transactions have tier_id NULL, since
+        -- "just support" is a real choice, and an inner join would delete those backers
+        -- from this list entirely.
         LEFT JOIN project_tiers t ON t.id = ct.tier_id
         WHERE p.creator_id = $1
           AND ct.type = 'INVEST'
@@ -387,10 +364,9 @@ async function updateProject(id, project) {
             project.description,
             project.category,
             project.image_url,
-            // MUST be stringified, exactly like createProject does. team_members is a
-            // jsonb column; handing node-postgres a raw JS array makes it send a Postgres
-            // array literal ({...}) and every save failed with
-            // "invalid input syntax for type json" — so PUT /projects/:id never worked.
+            // Stringified, as createProject does. team_members is jsonb, and handing
+            // node-postgres a raw JS array makes it send a Postgres array literal, which
+            // fails with "invalid input syntax for type json".
             JSON.stringify(project.team_members ?? []),
             project.challenge,
             project.solution,
@@ -405,17 +381,17 @@ async function updateProject(id, project) {
     return result.rows[0];
 }
 
-// review_note is cleared here on purpose: it explains the CURRENT verdict, so leaving a
+// review_note is cleared here because it explains the current verdict: leaving a
 // rejection note on a now-approved project would show the creator a stale complaint about
 // something they have already fixed.
-// ⚠️ `AND status = 'PENDING'` is the race guard, and it has to live HERE rather than as
-// a check in the service. Two admins working the same queue both read a PENDING project,
-// both pass every service check, and both UPDATE - so a read-then-write in the service
-// closes nothing. With the condition in the statement, the second one matches no row and
-// gets back undefined, which moderationService turns into a 409.
 //
-// Only from PENDING on purpose: the queue lists nothing else, and a REJECTED project has
-// to go through resubmit (which returns it to PENDING) before a verdict applies again.
+// `AND status = 'PENDING'` is the race guard, and it has to be in the statement rather
+// than a check in the service. Two admins working the same queue both read a PENDING
+// project and both pass every service check, so a read-then-write closes nothing. In the
+// statement, the second UPDATE matches no row and moderationService turns that into a 409.
+//
+// Only from PENDING: the queue lists nothing else, and a REJECTED project has to go
+// through resubmit before a verdict applies again.
 async function approveProject(id) {
 
     const result = await pool.query(
@@ -433,9 +409,9 @@ async function approveProject(id) {
     return result.rows[0];
 }
 
-// Back into the approval queue after the creator has revised a rejected project.
-// Clears the old note for the same reason approve does — the board is about to write a
-// new verdict, and the previous one no longer describes what they are looking at.
+// Back into the approval queue after the creator has revised a rejected project. It
+// clears the old note for the same reason approve does: a new verdict is coming, and the
+// previous one no longer describes what the reviewer is looking at.
 async function resubmitProject(id) {
 
     const result = await pool.query(
@@ -453,8 +429,8 @@ async function resubmitProject(id) {
     return result.rows[0];
 }
 
-// The "RMIT Endorsed" badge on the project page. Admin-only — it is a university
-// endorsement, so a creator must not be able to award it to themselves.
+// The "RMIT Endorsed" badge on the project page. Admin only, since it is a university
+// endorsement and a creator must not award it to themselves.
 async function setEndorsed(id, endorsed) {
 
     const result = await pool.query(
@@ -471,10 +447,8 @@ async function setEndorsed(id, endorsed) {
     return result.rows[0];
 }
 
-// `note` is the reviewer's explanation. AdminApprovals has always collected it in the
-// review screen's feedback box and then thrown it away, because there was nowhere to put
-// it — that is what the review_note column is for.
-// Same race guard as approveProject above, and for the same reason. See the comment there.
+// `note` is the reviewer's explanation, which the review screen collects and
+// review_note stores. Same race guard as approveProject, for the same reason.
 async function rejectProject(id, note) {
 
     const result = await pool.query(
@@ -492,9 +466,9 @@ async function rejectProject(id, note) {
     return result.rows[0];
 }
 
-// Archive (soft delete). Writes the visibility axis only — `status` is NOT touched,
-// which is what lets restoreProject put the project back on Discover with the same
-// APPROVED verdict instead of sending it round the moderation queue again.
+// Archive, a soft delete. It writes the visibility columns only and leaves `status`
+// alone, which is what lets restoreProject put the project back on Discover with the
+// verdict it already had rather than round the queue again.
 async function archiveProject(id, archivedBy, reason) {
 
     const result = await pool.query(
@@ -513,9 +487,9 @@ async function archiveProject(id, archivedBy, reason) {
     return result.rows[0];
 }
 
-// Restore. Clears all three columns together — "archived" is `archived_at IS NOT NULL`,
-// so leaving archived_by or archive_reason behind would show a stale "archived by X"
-// note on a live project.
+// Restore. It clears all three columns together, since "archived" means archived_at IS
+// NOT NULL and leaving the other two behind would show a stale "archived by X" note on a
+// live project.
 async function restoreProject(id) {
 
     const result = await pool.query(
@@ -534,10 +508,9 @@ async function restoreProject(id) {
     return result.rows[0];
 }
 
-// Permanent delete. Still a hard DELETE with the same cascade as before (comments and
-// project_updates go with it, classcoin_transactions.project_id is set to NULL) — but
-// the service now only reaches it for an ADMIN acting on an already-archived project,
-// so it can no longer be the first thing a mis-click does.
+// Permanent delete. A hard DELETE, cascading into comments and project_updates and
+// setting classcoin_transactions.project_id to NULL. The service reaches it only for an
+// admin acting on an already-archived project, so it is never one mis-click away.
 async function deleteProject(id) {
     await pool.query(
         "DELETE FROM projects WHERE id=$1",
@@ -545,9 +518,9 @@ async function deleteProject(id) {
     );
 }
 
-// `client` is REQUIRED to be the caller's transaction client during an investment.
-// Without the parameter this ran on its own pool connection, so a later ROLLBACK in
-// investProject left the project funded with coins that were never deducted.
+// `client` has to be the caller's transaction client during an investment. On its own
+// pool connection, a later ROLLBACK in investProject would leave the project funded with
+// coins that were never deducted.
 async function increaseCurrentAmount(projectId, amount, client = pool) {
     const result = await client.query(
         `

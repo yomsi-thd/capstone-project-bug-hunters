@@ -2,31 +2,29 @@ const semesterRepository = require("../repositories/semesterRepository");
 const { conflict, notFound } = require("../errors/AppError");
 
 /**
- * Semester resolution — deliberately the ONLY place in the app that answers
- * "which semester is it".
+ * Semester resolution, and the only place in the app that answers "which semester is it".
  *
- * The concept is derived, never stored: there is no `is_current` column and there must
- * not be one, for the same reason `archived_at` has no companion status column. A
- * second copy of one fact is a fact that drifts.
+ * The concept is derived rather than stored: there is no is_current column and there must
+ * not be one, for the same reason archived_at has no companion status column. A second
+ * copy of one fact is a fact that drifts.
  *
- * Two DIFFERENT questions, and keeping them apart is the point:
+ * Two different questions, and keeping them apart is the point:
  *
- *   getOpenSemester()      — the semester containing today. Guards WRITING.
- *                            NULL in the gap between two teaching periods.
- *   getBrowsableSemester() — the most recently started semester. Guards READING,
- *                            and is what Discover defaults to. NULL only before the
- *                            very first semester has begun.
+ *   getOpenSemester()      the semester containing today. Guards writing, and is null in
+ *                          the gap between two teaching periods.
+ *   getBrowsableSemester() the most recently started semester. Guards reading and is what
+ *                          Discover defaults to. Null only before the first semester.
  *
- * |                    | inside a semester | in the gap        |
- * |--------------------|-------------------|-------------------|
- * | browse             | current semester  | the one that just ended |
- * | create a project   | yes               | no                |
- * | invest             | yes               | no (N2)           |
- * | admin approve      | yes               | yes               |
+ * |                  | inside a semester | in the gap              |
+ * |------------------|-------------------|-------------------------|
+ * | browse           | current semester  | the one that just ended |
+ * | create a project | yes               | no                      |
+ * | invest           | yes               | no                      |
+ * | admin approve    | yes               | yes                     |
  *
- * ⚠️ Both return NULL if today is before every semester on record. That cannot happen
- * with the real data, but nothing here may THROW on it: Discover has to show an empty
- * state, not a 500.
+ * Both return null if today falls before every semester on record. That cannot happen
+ * with real data, but nothing here may throw on it: Discover has to show an empty state
+ * rather than a 500.
  */
 
 function getOpenSemester(client) {
@@ -42,19 +40,16 @@ function getNextSemester(client) {
 }
 
 /**
- * The semester named by `?semester=`, or a 404.
+ * The semester named by ?semester=, or a 404.
  *
- * ⚠️ 404 for BOTH a non-integer and an id that names nothing, which is the same answer
- * numericParam gives every id in the path. An id that cannot exist names nothing, and
- * keeping the two cases identical is the reasoning that already makes an unapproved
- * project 404 rather than 403.
+ * 404 for a non-integer as well as for an id that names nothing, which is the same answer
+ * numericParam gives every id in the path: an id that cannot exist names nothing.
  *
- * The alternative - filtering by an unknown id and returning an empty catalogue - would
- * report "this semester has no projects" for a semester that does not exist. That is the
- * class of quiet lie the team spent 2026-08-18 deleting.
+ * Filtering by an unknown id and returning an empty catalogue instead would report "this
+ * semester has no projects" for a semester that does not exist.
  */
 async function requireSemester(id) {
-    // Not Number(): that accepts "12.5", " 7 " and "1e3", none of which is an id.
+    // Not Number(), which accepts "12.5", " 7 " and "1e3", none of which is an id.
     if (!/^\d+$/.test(String(id))) {
         throw notFound("Semester not found");
     }
@@ -73,21 +68,19 @@ function listSemesters() {
 }
 
 /**
- * The open semester, or a refusal that says when the door opens again.
+ * The open semester, or a refusal saying when the door opens again.
  *
- * 409 CONFLICT rather than 422: this is not a badly shaped field, it is the current
- * state of the world refusing the request — the same class as "this project is
- * archived". It also has to read the database to know, which is precisely the line
- * the team draws between a zod schema and a service check.
+ * 409 rather than 422: nothing is badly shaped, it is the state of the world refusing the
+ * request, the same class as "this project is archived". It also has to read the database
+ * to know, which is the line between a zod schema and a service check.
  *
- * ⚠️ The date is passed through as the 'YYYY-MM-DD' string the repository produced.
- * Do NOT `new Date()` it to format it more prettily: that is the exact step that turns
- * 26 Oct into 25 Oct on a machine in a different zone, and a wrong date in the one
- * sentence telling a creator when to come back is worse than an unformatted one.
+ * The date is passed through as the "YYYY-MM-DD" string the repository produced. Don't
+ * build a Date from it to format it more prettily: that is the step that turns 26 Oct
+ * into 25 Oct in another timezone, and a wrong date in the one sentence telling a creator
+ * when to come back is worse than an unformatted one.
  *
- * ⚠️ Both sentences mention the draft on purpose. The wizard autosaves per account
- * (pages/draftStorageKey.js), so nothing a creator typed is lost — but they have no
- * way of knowing that unless the refusal says so.
+ * Both sentences mention the draft on purpose. The wizard autosaves per account, so
+ * nothing typed is lost, but the creator has no way of knowing unless the refusal says so.
  */
 async function requireOpenSemester(client) {
     const open = await getOpenSemester(client);

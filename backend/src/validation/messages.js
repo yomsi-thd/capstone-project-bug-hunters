@@ -1,16 +1,12 @@
 /**
- * Sentences that a zod schema and a service check would otherwise both have to spell out.
+ * Sentences that a zod schema and a service check would otherwise each spell out.
  *
- * ⚠️ This file exists because of a drift the team has already had. On 2026-08-20 the
- * support-level rules were enforced on both sides and the minimum-amount message had
- * quietly gone out of step, so a creator who slipped past the form and was refused by the
- * API read a DIFFERENT sentence and had every reason to think they had hit a second,
- * stricter rule.
- *
- * The schema catches these first, which is the point — it can report several at once and
+ * The schema catches these first, which is the point: it can report several at once and
  * name the field. The service keeps its own check because it must not depend on a
- * middleware having run: a service is the last line, and UI is not a security boundary.
- * Two checks is fine. Two wordings is not.
+ * middleware having run.
+ *
+ * Two checks is fine. Two wordings is not: somebody who slips past the form and is
+ * refused by the API would read a different sentence and assume a second, stricter rule.
  */
 const MESSAGES = {
     COMMENT_EMPTY: "A comment cannot be empty.",
@@ -20,40 +16,34 @@ const MESSAGES = {
     UPDATE_BODY_REQUIRED: "An update needs some content.",
     UPDATE_TITLE_TOO_LONG: "The title must be 200 characters or fewer.",
 
-    // One contribution per person per project (N4, 2026-09-07), so the cap is also the
-    // most a single account can ever put behind one project. The client's number.
+    // One contribution per person per project, so the cap is also the most any single
+    // account can put behind one project. The client's number.
     CONTRIBUTION_TOO_LARGE: "A contribution can be at most 500 CC.",
     CONTRIBUTION_ALREADY_MADE: "You have already supported this project — one contribution per person.",
     CONTRIBUTION_OWN_PROJECT: "You cannot support your own project.",
-    // A level above the cap is a level nobody can reach - a dead control by construction.
+    // A level above the cap is one nobody can reach: a dead control by construction.
     TIER_ABOVE_CAP: "A support level cannot ask for more than 500 CC.",
 
-    // An ADMIN owns nothing (role separation, 2026-08-24), so granting to one is refused
-    // on BOTH coin routes - enforcing it only where the UI hides a checkbox is how
-    // canInvest and /classcoins/add were each wrong until somebody sent a request by hand.
+    // An admin owns nothing, so granting to one is refused on both coin routes.
+    // Enforcing it only where the UI hides a checkbox leaves the rule open to any
+    // hand-made request.
     GRANT_TO_ADMIN: "An administrator account cannot hold Class Coins.",
     GRANT_TARGET_MISSING: "One of those accounts no longer exists.",
 
-    // A7 - somebody outside RMIT asking for Class Coins. One constant per rule: two checks
-    // are fine, two wordings are not - a person refused by one would read a different reason
-    // than a person refused by the other and reasonably think they were two different rules.
-    // The first two are copied WORD FOR WORD into
-    // src/components/classcoin/coinRequestRules.js.
+    // Somebody outside RMIT asking for Class Coins. The first two are copied word for
+    // word into src/components/classcoin/coinRequestRules.js.
     COIN_REQUEST_NOTE_REQUIRED: "Tell the admin who you are and why you need Class Coins.",
     COIN_REQUEST_NOTE_TOO_LONG: "Keep that under 200 characters.",
     COIN_REQUEST_PENDING: "You already have a request waiting for an admin.",
     COIN_REQUEST_WALLET_NOT_EMPTY: "You still have Class Coins to spend.",
     COIN_REQUEST_ALREADY_REVIEWED: "This request has already been reviewed.",
 
-    // The wallet to adjust is named in the BODY, never taken from the token - reading
-    // it from the token was the whole bug of 2026-08-21, when any signed-in user could
-    // mint Class Coins into their own balance.
+    // The wallet to adjust is named in the body, never taken from the token. Reading it
+    // from the token would let any signed-in user mint coins into their own balance.
     WALLET_TARGET_REQUIRED: "user_id is required - name the account to adjust.",
 
-    // Two admins working the same approval queue. Wording fixed by the design spec
-    // (2026-08-28-notifications-design.md §3.2) - do not reword it here without changing
-    // it there too, or the frontend and the API start explaining the same refusal
-    // differently, which is the drift the support-level minimum already caused once.
+    // Two admins working the same approval queue. The frontend quotes this wording, so
+    // changing it here alone would have the two explain the same refusal differently.
     VERDICT_ALREADY_GIVEN: "This project has already been reviewed by another admin.",
 };
 

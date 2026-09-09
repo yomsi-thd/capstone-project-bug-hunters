@@ -1,14 +1,13 @@
 /**
  * The list envelope, and the one property that keeps it from breaking the product.
  *
- * `{ items, total, limit, offset }` on all eleven list endpoints. Only two of them
- * ACCEPT ?limit=&offset=, and neither applies a default — which is the part worth
- * testing, not the shape.
+ * { items, total, limit, offset } on every list endpoint. Only two of them accept ?limit=
+ * and ?offset=, and neither applies a default, which is the part worth testing.
  *
- * ⚠️ Discover deliberately loads the whole catalogue and searches, filters and sorts it
- * client-side. A default page size would quietly reduce its search box to the first page
- * and report nothing wrong at all. The test at the bottom is what stops somebody adding
- * "a sensible default of 20" a month from now.
+ * Discover loads the whole catalogue and searches, filters and sorts it in the browser. A
+ * default page size would quietly reduce its search box to the first page and report
+ * nothing wrong. The test at the bottom is what stops somebody adding "a sensible default
+ * of 20" later.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -83,8 +82,8 @@ describe("all eleven list endpoints answer with the same envelope", () => {
         }
     });
 
-    // Single-object endpoints are untouched. Wrapping them would have been a change with
-    // no purpose, and it would have broken every page that reads a project.
+    // Single-object endpoints are untouched. Wrapping them would break every page that
+    // reads a project, for no gain.
     it("but a single object is still a single object", async () => {
         const detail = await request(app).get(`/api/projects/${project.id}`);
         const balance = await as(backer.token).get("/api/classcoins");
@@ -99,9 +98,9 @@ describe("all eleven list endpoints answer with the same envelope", () => {
 
 describe("pagination is opt-in", () => {
     /**
-     * THE test of this commit. Discover sends no limit and must therefore receive
-     * everything — a default of 20 would silently cap its search to the first twenty
-     * projects with no error anywhere.
+     * The test this file exists for. Discover sends no limit and therefore receives
+     * everything; a default would silently cap its search to the first page with no error
+     * anywhere.
      */
     it("returns the WHOLE catalogue when no limit is sent", async () => {
         for (let i = 0; i < 25; i += 1) {
@@ -122,7 +121,7 @@ describe("pagination is opt-in", () => {
         expect(res.body.items).toHaveLength(5);
         expect(res.body.limit).toBe(5);
         expect(res.body.offset).toBe(0);
-        // The real count, not the page's length - that is what a COUNT(*) is for.
+        // The real count rather than the page's length, which is what the COUNT is for.
         expect(res.body.total).toBeGreaterThan(5);
     });
 
@@ -154,8 +153,8 @@ describe("pagination is opt-in", () => {
         expect(res.body.total).toBeGreaterThan(2);
     });
 
-    // limit and offset are validated like any other input, and answer 422 with the
-    // field named - not a silent clamp, which would hide a caller's mistake.
+    // limit and offset are validated like any other input and answer 422 with the field
+    // named, rather than being silently clamped, which would hide a caller's mistake.
     it("422 for a limit that is out of range, zero, or not a number", async () => {
         for (const query of ["limit=0", "limit=101", "limit=abc", "offset=-1"]) {
             const res = await request(app).get(`/api/projects?${query}`);
@@ -166,9 +165,9 @@ describe("pagination is opt-in", () => {
         }
     });
 
-    // The other nine ignore the two parameters rather than refusing them: comments,
-    // updates and levels of one project are small sets with a natural ceiling, and
-    // CommentList already pages on the client.
+    // The rest ignore both parameters rather than refuse them: the comments, updates and
+    // levels of one project are small sets with a natural ceiling, and CommentList
+    // already pages in the browser.
     it("the other endpoints ignore limit instead of failing on it", async () => {
         const res = await request(app).get(`/api/projects/${project.id}/comments?limit=1`);
 

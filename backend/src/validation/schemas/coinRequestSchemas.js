@@ -6,8 +6,8 @@ const M = require("../messages");
 const NOTE_MAX_LENGTH = 200;
 
 /**
- * ⚠️ SHAPE only. The three real rules - a request already waiting, a wallet that still
- * holds coins, an ADMIN account - all need to read the database, so they live in
+ * Shape only. The three real rules, a request already waiting, a wallet that still holds
+ * coins and an admin account, all need to read the database, so they live in
  * coinRequestService where there is no way around them.
  */
 const coinRequestSchema = z.looseObject({
@@ -19,11 +19,10 @@ const coinRequestSchema = z.looseObject({
 });
 
 /**
- * The amount the admin types when approving - the person asking never names a number.
+ * The amount the admin types when approving; the person asking never names a number.
  *
- * The ceiling matches grantSchema and for the same reason: 100,000 CC is 200 times the
- * contribution cap, wide enough for any real intent and narrow enough to catch a typed
- * extra zero.
+ * The ceiling matches grantSchema, for the same reason: wide enough for any real intent
+ * and narrow enough to catch a typed extra zero.
  */
 const coinRequestVerdictSchema = z.looseObject({
     amount: z.coerce

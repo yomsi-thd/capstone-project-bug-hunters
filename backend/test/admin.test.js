@@ -46,10 +46,9 @@ describe("GET /api/admin/users and /users/:id", () => {
         expect(res.body.total).toBe(res.body.items.length);
     });
 
-    // The admin's screen shows each account's balance so coins can be issued from the
-    // same table. LEFT JOIN, not INNER: four accounts on the shared database have no
-    // wallet row, and an INNER would make them vanish from the admin's screen entirely -
-    // a silent disappearance, which is worse than an error.
+    // The admin's screen shows each balance so coins can be issued from the same table.
+    // LEFT JOIN rather than INNER: accounts with no wallet row would otherwise vanish
+    // from the screen entirely, which is worse than an error.
     it("carries each account's balance, and keeps accounts that have no wallet", async () => {
         const withWallet = await makeUser({ roles: ["BACKER"], balance: 250 });
         const noWallet = await makeUser({ roles: ["BACKER"] });
@@ -61,15 +60,14 @@ describe("GET /api/admin/users and /users/:id", () => {
 
         const missing = rows.find((u) => u.id === noWallet.id);
         expect(missing).toBeDefined();
-        // null, not 0: no wallet at all is a different fact from an empty wallet.
+        // null rather than 0: no wallet at all is a different fact from an empty one.
         expect(missing.balance).toBeNull();
     });
 
     it("200 for one user, 404 for an id that does not exist", async () => {
         expect((await as(admin.token).get(`/api/admin/users/${backer.id}`)).status).toBe(200);
 
-        // This handler maps EVERY failure to 404 — right for "not found", wrong for a
-        // database error, which the restructure separates.
+        // 404 for a missing user, kept distinct from a database failure.
         const missing = await as(admin.token).get("/api/admin/users/99999999");
 
         expect(missing.status).toBe(404);
@@ -87,13 +85,10 @@ describe("GET /api/admin/projects", () => {
         expect(res.body.items.map((p) => p.id)).toContain(pending.id);
     });
 
-    // Once creator_id points at the creator, created_by_admin_id is the ONLY remaining
-    // trace of who actually filed an on-behalf project — and this listing is the only
-    // place it is joined to a name. Two screens depend on it: AdminApprovals reads the
-    // id to HIDE approve/reject from the admin who filed the project, and the review
-    // panel prints the name. Losing the join costs the id as well, and the
-    // conflict-of-interest rule then holds only in the service, with the buttons back
-    // on screen for the one admin who must not press them.
+    // Once creator_id points at the creator, created_by_admin_id is the only trace of who
+    // filed an on-behalf project, and this listing is the only place it is joined to a
+    // name. Two screens depend on it: the queue reads the id to hide approve and reject
+    // from the admin who filed the project, and the review panel prints the name.
     it("joins the name of the admin who filed an on-behalf project", async () => {
         const filingAdmin = await makeUser({ roles: ["ADMIN"], name: "Filing Admin" });
         const onBehalf = await makeProject({
@@ -110,8 +105,8 @@ describe("GET /api/admin/projects", () => {
         expect(Number(filed.created_by_admin_id)).toBe(filingAdmin.id);
         expect(filed.created_by_admin_name).toBe("Filing Admin");
 
-        // NULL means "the creator filed it themselves", which is every project made
-        // before 2026-08-24 — so the join must not invent a name for those.
+        // NULL means the creator filed it themselves, so the join must not invent a
+        // name for those.
         expect(unfiled.created_by_admin_id).toBeNull();
         expect(unfiled.created_by_admin_name).toBeNull();
     });
@@ -130,8 +125,8 @@ describe("PATCH /api/admin/users/:id/deactivate and /activate", () => {
         expect((await as(victim.token).get("/api/users/profile")).status).toBe(200);
     });
 
-    // Without this guard an admin can deactivate themselves and be signed out on the
-    // next request with no route back — authenticate rejects an inactive account.
+    // Without this guard an admin can deactivate themselves and be signed out on their
+    // next request with no way back, since authenticate rejects an inactive account.
     it("403 when an admin deactivates their own account", async () => {
         const res = await as(admin.token).patch(`/api/admin/users/${admin.id}/deactivate`);
 
@@ -181,7 +176,7 @@ describe("PATCH /api/admin/users/:id/roles", () => {
     });
 
     // An admin account holds ADMIN and nothing else: it owns no projects and no Class
-    // Coins, so the combinations refused here have no meaning left.
+    // Coins, so the combinations refused here have no meaning.
     it("409 for ADMIN combined with any other role", async () => {
         const user = await makeUser({ roles: ["BACKER"] });
 
@@ -189,8 +184,8 @@ describe("PATCH /api/admin/users/:id/roles", () => {
             .patch(`/api/admin/users/${user.id}/roles`)
             .send({ roles: ["ADMIN", "BACKER"] });
 
-        // 409, not 422: every name in the set is real and spelled right. What is refused
-        // is the combination, which is a rule about the domain rather than the shape.
+        // 409 rather than 422: every name in the set is real and spelled right, and what
+        // is refused is the combination, a rule about the domain rather than the shape.
         expect(res.status).toBe(409);
         expect(res.body.message).toContain("holds the ADMIN role only");
     });
@@ -204,7 +199,7 @@ describe("PATCH /api/admin/users/:id/roles", () => {
         expect(res.body.message).toBe("You cannot remove your own ADMIN role.");
     });
 
-    // ⚠️ Order: the exclusion check runs BEFORE the self-lockout guard, so an admin
+    // Order matters: the exclusion check runs before the self-lockout guard, so an admin
     // editing their own account reads the rule rather than the lockout.
     it("reports the ADMIN-only rule, not the lockout, when an admin adds a role to themselves", async () => {
         const res = await as(otherAdmin.token)
@@ -246,8 +241,8 @@ describe("the creator-request queue", () => {
         expect(res.body.items.map((r) => r.user_id)).not.toContain(applicant.id);
     });
 
-    // Approving is the only route to CREATOR besides an admin assigning it by hand:
-    // createProject deliberately no longer grants the role.
+    // Approving is the only route to CREATOR besides an admin assigning it by hand,
+    // since creating a project does not grant the role.
     it("approving grants CREATOR, and the account can then create a project", async () => {
         const applicant = await registerWanting(true);
 

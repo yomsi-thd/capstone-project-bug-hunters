@@ -1,7 +1,7 @@
 const pool = require("../config/db");
 
-// Posts a creator writes for the backers of one project. Read publicly on the project
-// page, written only by the project's creator (see projectService.createProjectUpdate).
+// Posts a creator writes for the backers of one project. Publicly readable on the project
+// page, and written only by the project's creator.
 async function create(update, client = pool) {
     const result = await client.query(
         `
@@ -26,9 +26,9 @@ async function create(update, client = pool) {
     return result.rows[0];
 }
 
-// Newest first — the project page lists them in reverse chronological order.
-// The author name is joined in so the UI does not need a second request; author_id is
-// ON DELETE SET NULL, so it can legitimately come back null.
+// Newest first, which is how the project page lists them. The author name is joined in so
+// the UI needs no second request; author_id is ON DELETE SET NULL, so it can come back
+// null.
 async function findByProjectId(projectId) {
     const result = await pool.query(
         `

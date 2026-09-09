@@ -1,23 +1,20 @@
 /**
- * Where the backend tests are allowed to run, and how they are kept away from the
- * team's real data.
+ * Where the backend tests are allowed to run, and how they are kept away from the team's
+ * real data.
  *
  * Two ways in:
  *
- *   TEST_DATABASE_URL set    -> use that server (CI's throwaway Postgres).
- *   not set                  -> fall back to DATABASE_URL, i.e. the SHARED Supabase.
+ *   TEST_DATABASE_URL set  ->  use that server, which is CI's throwaway Postgres.
+ *   not set                ->  fall back to DATABASE_URL, the shared database.
  *
- * The second one is the dangerous default, and it is deliberate: this machine has
- * neither Docker nor psql, so a local Postgres is not an option and the alternative
- * would be "no backend tests at all". What makes it safe is that the tests never run
- * in the `public` schema. Every run gets its OWN schema, `schema.sql` is built into
- * it, and it is dropped again at the end — so the tables the app normally talks to
- * are never opened.
+ * The fallback is the dangerous one, and it is deliberate: without a local Postgres the
+ * alternative is no backend tests at all. What makes it safe is that the tests never run
+ * in the `public` schema. Every run gets its own, schema.sql is built into it, and it is
+ * dropped at the end, so the tables the app normally uses are never opened.
  *
- * ⚠️ ONE RULE, enforced here rather than remembered: the schema must be named
- * `test_…` and must never be `public`. The e2e scripts of 2026-08-20 spent
- * TestBacker's real Class Coins and had to be repaid by hand; that is the accident
- * this guard exists to make impossible, not merely unlikely.
+ * One rule, enforced here rather than remembered: the schema has to be named `test_...`
+ * and must never be `public`. A script that got this wrong once spent a real account's
+ * Class Coins, which had to be repaid by hand.
  */
 
 const SCHEMA_PREFIX = "test_";
@@ -48,8 +45,8 @@ function newSchemaName() {
 }
 
 /**
- * Resolve the database this run uses. Throws — loudly, with the reason — rather than
- * falling back to anything that could touch real rows.
+ * Resolves the database this run uses. Throws with the reason rather than falling back to
+ * anything that could touch real rows.
  */
 function resolveTestDatabase(schemaName) {
     const base = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
@@ -61,7 +58,7 @@ function resolveTestDatabase(schemaName) {
         );
     }
 
-    // A schema named in TEST_DATABASE_URL wins, so CI can pin one; otherwise this run
+    // A schema named in TEST_DATABASE_URL wins, so CI can pin one. Otherwise this run
     // invents its own.
     const schema = schemaOf(base) || schemaName || newSchemaName();
 

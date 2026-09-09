@@ -1,12 +1,13 @@
 /**
  * Comments: posting, one-level threading, and who may delete.
  *
- * The delete rule is the one worth guarding. It is the comment's own AUTHOR, or an
- * ADMIN — and deliberately NOT the project's creator. The platform exists so backers
- * can signal what they think of an idea; a creator who could delete criticism would
- * make the discussion worthless as a signal, so abuse escalates to an admin instead.
- * A refactor that "tidies" this into the same ownership check the rest of the project
- * uses would quietly reverse the product decision.
+ * The delete rule is the one worth guarding: the comment's author or an admin, and
+ * deliberately not the project's creator. The platform exists so backers can signal what
+ * they think of an idea, and a creator who could delete criticism would make that signal
+ * worthless, so abuse escalates to an admin instead.
+ *
+ * A refactor that tidies this into the ownership check the rest of the project uses would
+ * quietly reverse the product decision.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -77,8 +78,8 @@ describe("POST /api/projects/:id/comments", () => {
         expect(res.body.message).toBe("Project not found");
     });
 
-    // The UI draws exactly one level of nesting, so a reply to a reply is re-parented
-    // onto the top-level comment rather than creating depth nobody can see.
+    // The UI draws one level of nesting, so a reply to a reply is re-parented onto the
+    // top-level comment rather than creating depth nobody can see.
     it("re-parents a reply-to-a-reply onto the top-level comment", async () => {
         const top = await makeComment({ projectId: project.id, userId: backer.id, body: "Top" });
 
@@ -124,7 +125,7 @@ describe("DELETE /api/projects/:id/comments/:commentId", () => {
         expect(res.status).toBe(200);
     });
 
-    // The product decision, not an oversight.
+    // The product decision rather than an oversight.
     it("403 for the CREATOR of the project the comment sits on", async () => {
         const comment = await makeComment({ projectId: project.id, userId: backer.id });
 
@@ -150,10 +151,10 @@ describe("DELETE /api/projects/:id/comments/:commentId", () => {
         expect(res.body.message).toBe("Comment not found");
     });
 
-    // comments.parent_id is ON DELETE CASCADE: deleting a top-level comment destroys
-    // its replies too, INCLUDING replies by other people. The team chose the hard
-    // delete over a soft one; the confirmation dialog naming the count is the only
-    // warning anyone gets, so the cascade itself has to stay measured.
+    // comments.parent_id is ON DELETE CASCADE, so deleting a top-level comment destroys
+    // its replies too, including other people's. Deletes are hard rather than soft, and
+    // the confirmation dialog naming the count is the only warning anyone gets, so the
+    // cascade itself stays measured.
     it("takes other people's replies with it", async () => {
         const top = await makeComment({ projectId: project.id, userId: backer.id, body: "Top" });
         const reply = await makeComment({ projectId: project.id, userId: otherBacker.id, parentId: top.id });
@@ -165,7 +166,7 @@ describe("DELETE /api/projects/:id/comments/:commentId", () => {
         expect(rows).toHaveLength(0);
     });
 
-    // Deleting is NOT gated on the archive lock that closes the thread to new posts:
+    // Deleting is not gated on the archive lock that closes the thread to new posts:
     // abusive text does not become acceptable because a project was archived.
     it("still works while the project is archived, even though posting does not", async () => {
         const archived = await makeProject({ creatorId: creator.id, status: "APPROVED" });

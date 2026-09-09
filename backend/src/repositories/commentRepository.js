@@ -1,8 +1,8 @@
 const pool = require("../config/db");
 
-// Threaded one level deep: a comment has parent_id = NULL, a reply points at one.
-// The UI never nests further, so replies to replies are flattened onto the same parent
-// by the service rather than rejected.
+// Threaded one level deep: a comment has parent_id NULL and a reply points at one. The UI
+// never nests further, so the service flattens a reply-to-a-reply onto the same parent
+// rather than rejecting it.
 async function create(comment, client = pool) {
     const result = await client.query(
         `
@@ -22,13 +22,12 @@ async function create(comment, client = pool) {
 }
 
 /**
- * Every comment on a project, flat and oldest-first so the service can thread them.
+ * Every comment on a project, flat and oldest first so the service can thread them.
  *
- * `role` is the badge the UI shows next to the name and is derived here rather than
- * stored: CREATOR when the author owns this project, otherwise BACKER when they have
- * actually invested in it, otherwise null. That matches what the badge means to a
- * reader — "this is the person who built it" / "this person put coins in" — instead of
- * just echoing the author's account roles.
+ * `role` is the badge shown next to the name, derived here rather than stored: CREATOR
+ * when the author owns this project, BACKER when they invested in it, otherwise null.
+ * That is what the badge means to a reader, where echoing the author's account roles
+ * would badge nearly everyone BACKER.
  */
 async function findByProjectId(projectId) {
     const result = await pool.query(

@@ -1,7 +1,7 @@
 /**
- * Project updates. Ownership, not role, is the gate: POST and DELETE compare the
- * project's creator_id to req.user.id inside the service (admins pass too), which is
- * why there is no authorize() on those routes. Reading is public.
+ * Project updates. Ownership rather than role is the gate: POST and DELETE compare the
+ * project's creator_id to req.user.id inside the service, with admins passing too, which
+ * is why there is no authorize() on those routes. Reading is public.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -75,8 +75,8 @@ describe("POST /api/projects/:id/updates", () => {
     });
 
     // An update is a public announcement. A rejected project is not on Discover and has
-    // no audience, and if it were later approved the post would surface carrying a
-    // timestamp from a period during which nobody could see it.
+    // no audience, and if it were later approved the post would surface with a timestamp
+    // from a period nobody could see it.
     it("409 while the project is REJECTED", async () => {
         const rejected = await makeProject({ creatorId: creator.id, status: "REJECTED" });
 
@@ -108,10 +108,10 @@ describe("DELETE /api/projects/:id/updates/:updateId", () => {
         expect((await as(admin.token).delete(`/api/projects/${project.id}/updates/99999999`)).status).toBe(404);
     });
 
-    // author_id is ON DELETE SET NULL, not CASCADE, on purpose: deleting a user must
-    // not erase a project's history. The mapper then falls back to "Unknown creator".
-    // Written with an ADMIN author so the deleted account is not also the project's
-    // owner — creator_id IS a cascade, and it would take the whole project with it.
+    // author_id is ON DELETE SET NULL rather than CASCADE, so deleting a user does not
+    // erase a project's history and the mapper falls back to "Unknown creator". Written
+    // with an admin author so the deleted account is not also the project's owner:
+    // creator_id is a cascade, and that would take the whole project with it.
     it("keeps the update when its author's account is deleted", async () => {
         const guestAdmin = await makeUser({ roles: ["ADMIN"] });
 

@@ -2,12 +2,9 @@ const authService = require("../services/authService");
 const asyncHandler = require("../http/asyncHandler");
 
 /**
- * No try/catch anywhere in this file, and that is the point.
- *
- * Each of these used to end in `catch (error) { res.status(...) }` with a status chosen
- * per handler — 400 for register, 401 for login, 401 for refresh, 400 for logout. The
- * status is decided by the service now, at the line that knows what went wrong, and
- * errorHandler is the only place that writes it.
+ * No try/catch in this file, which is the point. The status is decided in the service, at
+ * the line that knows what went wrong, and errorHandler is the only place that writes it.
+ * A status chosen per handler here would flatten several different failures into one.
  */
 
 const register = asyncHandler(async (req, res) => {

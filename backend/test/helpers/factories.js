@@ -1,11 +1,10 @@
 /**
- * Test data, built the way the app itself builds it wherever that is possible.
+ * Test data, built the way the app builds it wherever that is possible.
  *
- * Accounts are inserted with direct SQL — `POST /auth/register` can only ever produce
- * a BACKER, and most of what these tests check is what happens to a CREATOR or an
- * ADMIN. But the TOKEN always comes from `POST /auth/login`, so every request in the
- * suite carries a token the real sign-in path produced rather than one the test forged.
- * A forged token would keep passing on the day login starts putting something different
+ * Accounts are inserted with direct SQL, since POST /auth/register can only produce a
+ * BACKER and most of these tests are about a CREATOR or an ADMIN. The token always comes
+ * from POST /auth/login though, so every request carries one the real sign-in path
+ * produced: a forged token would keep passing on the day login puts something different
  * in it.
  */
 
@@ -17,7 +16,7 @@ const pool = require("../../src/config/db");
 
 const PASSWORD = "Test1234";
 
-// bcrypt is deliberately slow. One hash for the whole suite, computed once.
+// bcrypt is deliberately slow, so hash once for the whole suite.
 let passwordHash = null;
 
 async function hashOnce() {
@@ -36,8 +35,8 @@ function uniqueEmail(label) {
 /**
  * An account with exactly the roles asked for, a wallet, and a live access token.
  *
- * `roles: []` is a real case, not a mistake — an account holding no role at all is
- * what several of the permission checks fall through to.
+ * `roles: []` is a real case rather than a mistake: an account holding no role at all is
+ * what several permission checks fall through to.
  */
 async function makeUser({ roles = ["BACKER"], balance = 5000, active = true, name = "Test User", title = null } = {}) {
     const email = uniqueEmail(roles.join("-").toLowerCase() || "norole");
@@ -64,9 +63,9 @@ async function makeUser({ roles = ["BACKER"], balance = 5000, active = true, nam
         [user.id, balance]
     );
 
-    // Deactivated accounts cannot sign in through the middleware, but they CAN still
-    // get a token — that is exactly the case `authenticate` has to refuse, so the token
-    // is fetched before the account is of any use to anyone.
+    // A deactivated account cannot get past the middleware but can still hold a token,
+    // which is the case `authenticate` has to refuse. So fetch the token first, then
+    // deactivate.
     const login = await request(app).post("/api/auth/login").send({ email, password: PASSWORD });
 
     return {
@@ -81,10 +80,10 @@ async function makeUser({ roles = ["BACKER"], balance = 5000, active = true, nam
 
 // The semester a project goes into by default.
 //
-// ⚠️ Deliberately NOT cached. semesters.test.js rewrites the table and restores it,
-// and because the ids are SERIAL the restored rows come back with NEW ones - a
-// remembered id would point at a deleted semester and every later makeProject would
-// fail on the foreign key. It is a three-row table; the lookup is free.
+// Not cached. semesters.test.js rewrites the table and restores it, and because the ids
+// are serial the restored rows come back with new ones, so a remembered id would point at
+// a deleted semester and every later makeProject would fail on the foreign key. It is a
+// three-row table, so the lookup is free.
 async function openSemesterId() {
     const { rows } = await pool.query(
         `SELECT id FROM semesters
@@ -96,14 +95,13 @@ async function openSemesterId() {
 }
 
 /**
- * A project row, inserted directly so a test can start from any status without walking
- * the whole create → approve path first. Tests that are ABOUT that path use the API.
+ * A project row, inserted directly so a test can start from any status without walking the
+ * whole create-and-approve path. Tests that are about that path use the API.
  *
- * ⚠️ It is filed under the OPEN semester unless a test says otherwise, because that
- * is what createProject does. Leaving semester_id NULL would take the row out of
- * GET /projects entirely (it filters by semester since 2026-09-06), so a test that had
- * nothing to do with semesters would fail with an empty catalogue and no clue why.
- * globalSetup guarantees one semester contains today, so this lookup always finds one.
+ * It is filed under the open semester unless a test says otherwise, because that is what
+ * createProject does. Leaving semester_id NULL would take the row out of GET /projects
+ * entirely, since that filters by semester, and a test with nothing to do with semesters
+ * would fail with an empty catalogue and no clue why.
  */
 async function makeProject({
     creatorId,

@@ -2,26 +2,22 @@ const projectRepository = require("../repositories/projectRepository");
 const { notFound, conflict } = require("../errors/AppError");
 
 /**
- * The rules every project-shaped service has to agree on: who counts as an admin,
- * who may READ a project, and when a project is frozen.
+ * The rules every project-shaped service has to agree on: who counts as an admin, who
+ * may read a project, and when a project is frozen.
  *
- * ⚠️ They live here rather than in projectService because all five of those services
- * call them, and a shared rule with five homes is a rule that will be updated in one
- * of them. The team spent 2026-08-24 gathering `isAdminRole` back up from ten
- * hand-written copies, and splitting projectService is exactly the occasion for that
- * to happen again. Import from here; do not re-write any of these.
+ * They live here rather than in projectService because all five of those services call
+ * them, and a shared rule with five homes gets updated in one of them. Import from here
+ * rather than rewriting any of these.
  */
 
 function isAdminRole(roles) {
     return Array.isArray(roles) && roles.includes("ADMIN");
 }
 
-// An archived project is frozen: no edits, no investments, no comments, no updates,
-// no approve/reject. Freezing edits is not tidiness — it is what makes "restore puts
-// the project back at its previous status without re-approval" safe. If editing while
-// archived is ever allowed, restore MUST be changed to send the project back to
-// PENDING, otherwise archive → edit → restore is a route onto Discover that skips
-// moderation entirely.
+// An archived project is frozen: no edits, investments, comments, updates or verdicts.
+// Freezing edits is what makes restoring at the previous status safe. If editing while
+// archived is ever allowed, restore has to send the project back to PENDING, or
+// archive - edit - restore becomes a route onto Discover that skips moderation.
 function assertNotArchived(project) {
 
     if (project.archived_at) {
@@ -30,28 +26,25 @@ function assertNotArchived(project) {
 }
 
 /**
- * A project whose SEMESTER has ended is read-only (the client's rule, 2026-09-06).
+ * A project whose semester has ended is read-only.
  *
- * The second freeze axis, and deliberately independent of the first. Archiving is
- * something a PERSON does and it hides the project from Discover; a semester ending is
- * something the CALENDAR does and the project stays perfectly visible under its own
- * term. A project can be in both states at once, and each has to be checked on its own.
+ * The second freeze axis, independent of the first. Archiving is something a person does
+ * and it hides the project from Discover; a semester ending is the calendar's doing and
+ * the project stays visible under its own term. Both can be true at once, so each is
+ * checked separately.
  *
- * ⚠️ Pure and synchronous, because `semester_closed` is computed by Postgres in
- * projectRepository (findById / findByCreatorId) rather than derived here. NEVER add a
- * lookup and a `new Date(...) < new Date()` to this function: `semesters.end_date` is a
- * DATE column with no time of day, so building a Date from it reads a day early west of
- * Greenwich, and `new Date()` is the SERVER's clock - UTC on Render, UTC+7 on a dev
- * machine - so the two would lock a project at two different moments.
+ * Pure and synchronous, because Postgres computes `semester_closed` in projectRepository
+ * rather than deriving it here. Don't add a lookup and a date comparison: end_date is a
+ * DATE column with no time of day, so a Date built from it reads a day early west of
+ * Greenwich, and new Date() is the server's clock, which differs between Render and a
+ * dev machine. The two would lock a project at different moments.
  *
- * ⚠️ A project with no semester is NOT locked (the COALESCE in that query). Failing open
- * is the safer default: an orphaned project stays editable, where failing closed would
- * silently freeze a live one.
+ * A project with no semester is not locked. Failing open keeps an orphaned project
+ * editable, where failing closed would silently freeze a live one.
  *
- * ⚠️ THIS MUST NOT BE ADDED TO approveProject OR rejectProject. A project still PENDING
- * when its term ended has to remain reviewable, or it is stuck in the queue for ever -
- * and once approved it simply belongs to that term's read-only record. Blocking those
- * two looks like consistency and is the one change that breaks the feature.
+ * This must not be added to approveProject or rejectProject. A project still PENDING when
+ * its term ended has to stay reviewable, or it sits in the queue for ever. Blocking those
+ * two looks like consistency and breaks the feature.
  */
 function assertSemesterOpen(project) {
 
@@ -63,20 +56,18 @@ function assertSemesterOpen(project) {
 }
 
 /**
- * Who may READ a project and everything hanging off it (its comments, its updates).
+ * Who may read a project and everything hanging off it, meaning its comments and updates.
  *
  * Only APPROVED projects are public. A PENDING one has been vetted by nobody and a
- * REJECTED one was explicitly refused, so neither should be readable by a stranger who
- * guesses the id — and ids are sequential integers, so guessing is trivial. Serving them
- * anyway left the approval queue decorative: the moderation gate sat on Discover's
- * listing rather than on the project itself.
+ * REJECTED one was refused, so neither should be readable by a stranger who guesses the
+ * id, and ids are sequential integers. Serving them anyway would leave the approval queue
+ * decorative, with the gate on Discover's listing rather than on the project.
  *
- * `viewer` is req.user, which for the public routes comes from authOptional and is NULL
+ * `viewer` is req.user, which on the public routes comes from authOptional and is null
  * for a signed-out visitor.
  *
- * ⚠️ This tests `status` and deliberately NOT `archived_at`. An archived project must
- * stay readable — a backer who already invested still has a card linking to it, which is
- * the documented reason these routes never 404 for archived rows.
+ * It tests `status` and deliberately not `archived_at`: an archived project stays
+ * readable, because a backer who already invested still has a card linking to it.
  */
 function assertVisibleTo(project, viewer) {
 
@@ -88,23 +79,22 @@ function assertVisibleTo(project, viewer) {
         viewer && Number(project.creator_id) === Number(viewer.id);
 
     if (!isOwner && !isAdminRole(viewer?.roles)) {
-        // Deliberately the same message as a missing row. "This exists but is pending
-        // review" already tells a stranger the project exists.
+        // The same message as a missing row. Saying "this exists but is pending review"
+        // already tells a stranger the project exists.
         throw notFound("Project not found");
     }
 }
 
 /**
- * The read every public project route begins with: load it, then apply the
+ * The read every public project route begins with: load the project, then apply the
  * visibility rule.
  *
- * Three routes did this by hand - the project, its comments, its updates - and they
- * must not be able to disagree, because hiding a project while leaving its discussion
- * readable one URL over hides nothing at all.
+ * The project, its comments and its updates all go through this, because hiding a project
+ * while leaving its discussion readable one URL over hides nothing at all.
  */
-// `withContribution` is opt-in, not the default: three of the four callers here load a
-// project only to decide whether its comments / updates / levels may be read, and would
-// pay for a subquery they then throw away. Only the detail page renders it.
+// `withContribution` is opt-in. Most callers load a project only to decide whether its
+// comments, updates or levels may be read, and would pay for a subquery they discard.
+// Only the detail page renders it.
 async function loadVisibleProject(projectId, viewer, { withContribution = false } = {}) {
 
     const project = await projectRepository.findById(

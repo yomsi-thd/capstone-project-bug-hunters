@@ -1,11 +1,10 @@
 /**
- * withTransaction, and the property that matters: a failure leaves NOTHING behind.
+ * withTransaction, and the property that matters: a failure leaves nothing behind.
  *
- * ⚠️ The team has already paid for a broken version of this. On 2026-08-06
- * increaseCurrentAmount ignored the client it was passed, so it ran on a separate
- * connection and committed on its own — an investment that failed afterwards left the
- * project funded by Class Coins the backer still had. These tests are the standing
- * check that the four call sites really are one transaction each.
+ * A repository call that ignores the client it is passed runs on its own connection and
+ * commits separately, so an investment that fails afterwards leaves the project funded by
+ * coins the backer still has. These tests are the standing check that each call site
+ * really is one transaction.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -69,7 +68,7 @@ describe("withTransaction", () => {
 describe("the call sites really are atomic", () => {
     // createProject writes the project and its levels together. Half-saved is the worst
     // outcome: the wizard sends the creator away on success, so they would believe the
-    // levels exist with no way to notice they do not.
+    // levels exist with no way to notice they don't.
     it("createProject leaves no project behind when a level is rejected", async () => {
         const before = await pool.query("select count(*)::int as n from projects");
 
@@ -92,9 +91,9 @@ describe("the call sites really are atomic", () => {
     });
 
     /**
-     * The exact shape of the 2026-08-06 regression: the level check fires AFTER the
-     * project row has been read but BEFORE any write, and the wallet debit and the
-     * funding bump must both be undone together.
+     * The dangerous shape: the level check fires after the project row has been read but
+     * before any write, so the wallet debit and the funding bump have to be undone
+     * together.
      */
     it("investProject leaves neither the wallet nor the funding changed when it fails late", async () => {
         const backer = await makeUser({ roles: ["BACKER"], balance: 1000 });

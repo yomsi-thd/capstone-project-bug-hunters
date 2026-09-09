@@ -1,16 +1,11 @@
 /**
- * GET /projects is the busiest query in the app — every visit to Discover and every
- * keystroke in its search box runs it — and it is the one endpoint whose response can
- * grow without anybody choosing to make it grow.
+ * GET /projects is the busiest query in the app, since every visit to Discover runs it,
+ * and it is the one endpoint whose response can grow without anybody choosing to grow it.
  *
- * ⚠️ Images are stored INSIDE the project row as base64 data URIs (schema known issue:
- * they belong in Supabase Storage). Under SELECT * every Discover request therefore
- * carried every approved project's whole gallery. Harmless at today's handful of
- * pictureless demo rows; megabytes the moment somebody uploads real photos.
- *
- * It has already cost the team once: the uptime cron pinged this route, cron-job.org
- * aborts a response past its size cap, and the endpoint most likely to grow without
- * warning was the one holding the live demo awake.
+ * Images are stored inside the project row as base64 data URIs, which is a known schema
+ * issue: they belong in object storage. Under SELECT * every Discover request would carry
+ * every approved project's whole gallery. That is harmless with a handful of pictureless
+ * demo rows and megabytes the moment somebody uploads real photos.
  *
  * These tests are what stop a later SELECT * putting it back.
  */
@@ -20,8 +15,8 @@ import request from "supertest";
 
 import { app, pool, makeUser, makeProject } from "./helpers/factories.js";
 
-// Exactly what src/api/mappers.js toCard reads. Adding a field to the Discover card
-// means adding it to the query AND to this list — the friction is deliberate.
+// Exactly what toCard in src/api/mappers.js reads. Adding a field to the Discover card
+// means adding it to the query and to this list; the friction is deliberate.
 const CARD_COLUMNS = [
     "id",
     "creator_id",
@@ -30,18 +25,16 @@ const CARD_COLUMNS = [
     "category",
     "status",
     "image_url",
-    // The card's headline number. goal_amount left this list on 2026-09-07 (N3) with the
-    // funding framing, and start_date / end_date went with it: nothing has read those two
-    // since a project started closing when its SEMESTER closes.
+    // The card's headline number. There is no goal to compare it against, and no
+    // per-project dates: a project closes when its semester does.
     "current_amount",
-    // Added 2026-09-06. The one column here that the card does not render directly: it
-    // shows the semester's NAME, which the frontend resolves from GET /semesters rather
-    // than making this query JOIN for a short string on every keystroke.
+    // The one column the card does not render directly. It shows the semester's name,
+    // which the frontend resolves from GET /semesters rather than making this query join
+    // for a short string on every keystroke.
     "semester_id",
     "created_at",
-    // Added 2026-09-07 (N3). A subquery, not a column — DISTINCT wallets, the same one
-    // findById and findByCreatorId already run. It is the second real number the card
-    // has now that there is no percentage, and it costs one integer per row.
+    // A subquery rather than a column, counting distinct wallets, the same one findById
+    // and findByCreatorId already run. It costs one integer per row.
     "backers_count",
 ];
 
@@ -62,11 +55,11 @@ describe("GET /api/projects carries only what a card needs", () => {
         expect(Object.keys(res.body.items[0]).sort()).toEqual([...CARD_COLUMNS].sort());
     });
 
-    // The one that matters. A photo project must not weigh the listing down.
+    // The one that matters: a project with photos must not weigh the listing down.
     it("does not carry the gallery, even for a project full of base64 images", async () => {
         const heavy = await makeProject({ creatorId: creator.id, status: "APPROVED", title: "Photo heavy" });
 
-        // ~120 KB of data URI, roughly one real downscaled photo.
+        // About 120 KB of data URI, roughly one real downscaled photo.
         const image = "data:image/jpeg;base64," + "A".repeat(120_000);
 
         await pool.query(
@@ -95,7 +88,7 @@ describe("GET /api/projects carries only what a card needs", () => {
         expect(JSON.stringify(res.body).length).toBeLessThan(100_000);
     });
 
-    // The detail page is where the gallery belongs, and it must still be there.
+    // The detail page is where the gallery belongs, and it has to still be there.
     it("but GET /projects/:id still carries the full row", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 

@@ -18,14 +18,14 @@ async function updateProfile(userId, fullName, email, title) {
         await userRepository.findByEmail(email);
 
     if (existing && existing.id !== userId)
-        // 409: the address is real and usable, it just already belongs to somebody.
+        // 409: the address is real and usable, it just belongs to somebody already.
         throw conflict("Email already exists");
 
     return await userRepository.updateProfile(
         userId,
         fullName,
         email,
-        // undefined means "not supplied" -> keep what is already stored.
+        // undefined means "not supplied", so keep what is already stored.
         title === undefined ? user.title : title
     );
 }
@@ -52,9 +52,9 @@ async function changePassword(
         );
 
     if (!match)
-        // 422 rather than 401: the caller IS authenticated - they are holding a valid
-        // token for this very account. What is wrong is a value they typed, and naming
-        // the field is what lets the form put the error on the right input.
+        // 422 rather than 401: the caller is authenticated and holding a valid token for
+        // this account. What is wrong is a value they typed, and naming the field lets
+        // the form put the error on the right input.
         throw validationFailed("Old password is incorrect", [
             { field: "oldPassword", message: "Old password is incorrect" },
         ]);
