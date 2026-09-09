@@ -16,6 +16,7 @@ import { useAuth } from "../context/AuthContext";
 import { draftStorageKey } from "./draftStorageKey";
 import { isLinkable } from "../components/project/videoUrl";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
+import { validateTeamMember } from "../components/creator/teamRules";
 import { errorMessage } from "../api/apiError";
 
 const MAX_GALLERY_IMAGES = 6;
@@ -613,7 +614,28 @@ function Step2({ media, setMedia, story, setStory }) {
 }
 
 function Step3({ team, setTeam }) {
-  const [newMember, setNewMember] = useState({ name: "", role: "", rmitId: "" });
+  const [newMember, setNewMember] = useState({ name: "", role: "", email: "" });
+  const [memberError, setMemberError] = useState(null);
+
+  // The same rules the editor applies, so a team list means the same thing whether it was
+  // typed here or corrected later. The role is required here and not there, because this
+  // form has always asked for one.
+  const addMember = () => {
+    const problem =
+      validateTeamMember(newMember) || (newMember.role ? null : "Choose a role for this member.");
+
+    if (problem) {
+      setMemberError(problem);
+      return;
+    }
+
+    setMemberError(null);
+    setTeam([
+      ...team,
+      { ...newMember, name: newMember.name.trim(), email: newMember.email.trim(), id: Date.now() },
+    ]);
+    setNewMember({ name: "", role: "", email: "" });
+  };
   const [inviteEmail, setInviteEmail] = useState("");
 
   return (
@@ -625,7 +647,7 @@ function Step3({ team, setTeam }) {
         <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 mb-0">
           <div>
             <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">FULL NAME</label>
-            <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="e.g., Dr. Jane Smith" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+            <input value={newMember.name} onChange={e => { setNewMember({ ...newMember, name: e.target.value }); setMemberError(null); }} placeholder="e.g., Dr. Jane Smith" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
           </div>
           <div>
             <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">PROJECT ROLE</label>
@@ -635,11 +657,12 @@ function Step3({ team, setTeam }) {
             </select>
           </div>
           <div>
-            <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">RMIT ID</label>
-            <input value={newMember.rmitId} onChange={e => setNewMember({ ...newMember, rmitId: e.target.value })} placeholder="e.g. s123456" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
+            <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">EMAIL</label>
+            <input value={newMember.email} onChange={e => { setNewMember({ ...newMember, email: e.target.value }); setMemberError(null); }} placeholder="name@example.com" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
           </div>
-          <button onClick={() => { if (newMember.name && newMember.role) { setTeam([...team, { ...newMember, id: Date.now() }]); setNewMember({ name: "", role: "", rmitId: "" }); }}} className="w-full sm:w-9 h-9 bg-brand hover:bg-red-800 text-white border-none rounded-md text-lg cursor-pointer flex items-center justify-center transition-colors self-end mt-2 sm:mt-0">+</button>
+          <button onClick={addMember} className="w-full sm:w-9 h-9 bg-brand hover:bg-red-800 text-white border-none rounded-md text-lg cursor-pointer flex items-center justify-center transition-colors self-end mt-2 sm:mt-0">+</button>
         </div>
+        {memberError && <p role="alert" className="mx-0 mt-2 mb-0 text-[12px] text-brand">{memberError}</p>}
       </div>
       {team.length > 0 && (
         <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
@@ -651,7 +674,7 @@ function Step3({ team, setTeam }) {
                   <span className="text-[13px] font-bold text-gray-900">{m.name}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm ${ROLE_BADGE[m.role] || "bg-gray-100 text-gray-600"}`}>{m.role}</span>
                 </div>
-                <div className="text-[11px] text-gray-400">RMIT ID: {m.rmitId || "—"}</div>
+                <div className="text-[11px] text-gray-400">{m.email || "No email"}</div>
               </div>
               <div className="flex gap-1.5">
                 <button className="bg-transparent border-none cursor-pointer text-gray-400 hover:text-gray-600 text-sm">✎</button>
@@ -910,7 +933,7 @@ function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
               <div key={member.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 rounded-lg bg-gray-50 border border-gray-100 p-3">
                 <div>
                   <div className="text-[13px] font-bold text-gray-900">{member.name}</div>
-                  <div className="text-[11px] text-gray-400">RMIT ID: {member.rmitId || "—"}</div>
+                  <div className="text-[11px] text-gray-400">{member.email || "No email"}</div>
                 </div>
                 <span className={`self-start sm:self-auto text-[10px] font-bold px-2 py-0.5 rounded-sm ${ROLE_BADGE[member.role] || "bg-gray-100 text-gray-600"}`}>{member.role}</span>
               </div>
@@ -1199,7 +1222,7 @@ export default function CreateProject() {
         // admin who does not, so it is never optional on either side.
         ...(canCreateForOthers ? { creator_id: Number(ownerId) } : {}),
         image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
-        team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
+        team_members: team.map(m => ({ name: m.name, role: m.role, email: m.email })),
         challenge: story.challenge.trim(),
         solution: story.solution.trim(),
         funding_usage: story.funding.trim(),

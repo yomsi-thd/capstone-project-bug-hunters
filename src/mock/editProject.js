@@ -16,6 +16,6 @@ export const EDIT_PROJECT_INITIAL_DATA = {
 };
 
 export const EDIT_PROJECT_INITIAL_TEAM = [
-  { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  rmitId: "e647291" },
-  { id: 2, name: "Chloe Chen",          role: "Student Developer", rmitId: "s3984021" },
+  { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  email: "" },
+  { id: 2, name: "Chloe Chen",          role: "Student Developer", email: "" },
 ];

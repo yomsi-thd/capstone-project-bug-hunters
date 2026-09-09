@@ -3,14 +3,12 @@ import Modal from "../components/ui/Modal";
 import {
   EDIT_PROJECT_TABS as TABS,
   SCHOOLS,
-  ROLE_BADGE,
   EDIT_PROJECT_INITIAL_DATA,
-  EDIT_PROJECT_INITIAL_TEAM,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
 import { isLinkable } from "../components/project/videoUrl";
 import SupportLevels from "../components/project/SupportLevels";
-import Avatar from "../components/ui/Avatar";
+import TabTeam from "../components/creator/TabTeam";
 import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
 import { toTier, parseAmount } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
@@ -108,50 +106,6 @@ function TabMedia() {
         <div className="flex flex-col sm:flex-row gap-2">
           <input defaultValue="https://vimeo.com/20371781" className="flex-1 border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors w-full" />
           <button className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-4 py-2 text-[12px] font-bold cursor-pointer transition-colors w-full sm:w-auto">SAVE</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function TabTeam({ team, setTeam }) {
-  const [newMember, setNewMember] = useState({ name: "", role: "" });
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="text-[13px] font-bold text-gray-900">Current Team</div>
-      <div className="flex flex-col gap-2">
-        {team.map(m => {
-          return (
-            <div key={m.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-3 bg-gray-50 rounded-lg border border-gray-100 gap-2 sm:gap-0">
-              <div className="flex items-center gap-2.5">
-                <Avatar name={m.name} size={32} tone="blue" />
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[13px] font-semibold text-gray-900">{m.name}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm ${ROLE_BADGE[m.role] || "bg-gray-100 text-gray-600"}`}>{m.role}</span>
-                  </div>
-                  <div className="text-[11px] text-gray-400">RMIT ID: {m.rmitId || "—"}</div>
-                </div>
-              </div>
-              <div className="flex gap-3 self-end sm:self-auto">
-                <button className="bg-transparent border-none text-[12px] text-brand font-semibold cursor-pointer hover:underline">Edit</button>
-                <button onClick={() => setTeam(team.filter(t => t.id !== m.id))} className="bg-transparent border-none text-[12px] text-brand font-semibold cursor-pointer hover:underline">Remove</button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="border-t border-gray-100 pt-4">
-        <div className="text-[13px] font-bold text-gray-900 mb-2.5">Add a Member</div>
-        <div className="flex flex-col gap-2">
-          <input value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="Enter member name" className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
-          <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2 text-[13px] outline-none bg-white focus:border-brand transition-colors">
-            <option value="">Select a role...</option>
-            <option>Lead Researcher</option>
-            <option>Student Developer</option>
-            <option>Co-Investigator</option>
-          </select>
         </div>
       </div>
     </div>
@@ -436,7 +390,17 @@ export default function EditProject({ project, onClose }) {
         }
       : { ...EDIT_PROJECT_INITIAL_DATA, challenge: "", solution: "", funding: "", videoUrl: "" }
   );
-  const [team, setTeam] = useState(project?.team || EDIT_PROJECT_INITIAL_TEAM);
+  // The project's own team, and an empty list when it has none.
+  //
+  // It used to fall back to a sample list of two invented people, which was reached on
+  // every project rather than none: the mapper carried no team at all, so the fallback
+  // was the only branch. Saving then replaced a real team with the sample.
+  //
+  // Rows from the API have no id of their own. TabTeam keys and removes by id, so one is
+  // handed out on the way in; new members get Date.now(), which cannot collide with these.
+  const [team, setTeam] = useState(() =>
+    (project?.team ?? []).map((member, index) => ({ ...member, id: member.id ?? index + 1 }))
+  );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 

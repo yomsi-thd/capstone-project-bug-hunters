@@ -17,8 +17,8 @@ export const SCHOOLS = [
 ];
 
 export const MOCK_TEAM = [
-  { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  rmitId: "a847291" },
-  { id: 2, name: "Chloe Chen",          role: "Student Developer", rmitId: "s3984021" },
+  { id: 1, name: "Dr. Alexander Vance", role: "Lead Researcher",  email: "" },
+  { id: 2, name: "Chloe Chen",          role: "Student Developer", email: "" },
 ];
 
 export const ROLE_BADGE = {

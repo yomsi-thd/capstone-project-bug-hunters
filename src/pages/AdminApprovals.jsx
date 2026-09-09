@@ -205,7 +205,7 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
                       <div>
                         <div className="text-[12px] font-semibold text-gray-900">{name}</div>
                         <div className="text-[10px] text-gray-400">
-                          {[m?.rmitId && `ID: ${m.rmitId}`, m?.role].filter(Boolean).join(" · ") || "No role given"}
+                          {m?.role || "No role given"}
                         </div>
                       </div>
                     </div>
