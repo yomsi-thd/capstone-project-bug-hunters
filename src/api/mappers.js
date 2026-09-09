@@ -185,6 +185,11 @@ export function toDetail(row) {
 
     teamMembers: Array.isArray(row.team_members) ? row.team_members : [],
 
+    // Whether the reader is named on this team, which costs them the invest button. The
+    // browser cannot work it out: team emails never leave the server, so the API answers
+    // and this carries the answer through.
+    viewerIsTeamMember: row.viewer_is_team_member === true,
+
     // Only feeds the "VIEW ALL n COMMENTS" label. The list itself is a separate request.
     totalComments: toNumber(row.comments_count),
 
@@ -263,6 +268,11 @@ export function toCreatorProject(row) {
     // it is only ever set while the project is REJECTED and the card can show it without
     // checking the status.
     reviewNote: row.review_note || null,
+
+    // The card itself never draws the team. It is here because EditProject opens from
+    // this list and edits a copy of it, and without the real list the form starts empty
+    // and saving wipes whatever the project had.
+    team: Array.isArray(row.team_members) ? row.team_members : [],
 
     // Returned by GET /projects/my so CreatorDashboard can total them from the list it
     // already has. `== null` rather than falsy: 0 backers means none, and rendering that

@@ -346,6 +346,32 @@ export default function ProjectDetail() {
             {/* About tab content */}
             {activeTab === "about" && (
               <div>
+                {/* Team members come from projects.team_members (jsonb).
+
+                    Above the story rather than below it. The list stopped being a credit
+                    when it started deciding who may support the project: somebody who
+                    finds the invest button replaced by "you are on this team" reads this
+                    to find out why, and should not have to scroll past the whole pitch.
+
+                    Name and role only. The email is what the server matches on, and it
+                    never leaves the server; marking who is blocked would say which of
+                    these people hold an account. */}
+                {p.teamMembers.length > 0 && (
+                  <div className="mb-7 border-b border-neutral-200 pb-6">
+                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
+                      Team
+                    </h2>
+                    <ul className="m-0 flex list-none flex-col gap-2 p-0">
+                      {p.teamMembers.map((m, i) => (
+                        <li key={i} className="text-[14px] text-neutral-600">
+                          <strong className="text-neutral-900">{m.name ?? m}</strong>
+                          {m.role ? ` — ${m.role}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 <p className="mx-0 mt-0 mb-7 text-[15px] leading-[1.8] text-neutral-700">
                   {p.about}
                 </p>
@@ -414,23 +440,6 @@ export default function ProjectDetail() {
                     <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-10">
                       {p.funding}
                     </p>
-                  </>
-                )}
-
-                {/* Team members come from projects.team_members (jsonb). */}
-                {p.teamMembers.length > 0 && (
-                  <>
-                    <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
-                      Team
-                    </h2>
-                    <ul className="mx-0 mt-0 mb-10 flex list-none flex-col gap-2 p-0">
-                      {p.teamMembers.map((m, i) => (
-                        <li key={i} className="text-[14px] text-neutral-600">
-                          <strong className="text-neutral-900">{m.name ?? m}</strong>
-                          {m.role ? ` — ${m.role}` : ""}
-                        </li>
-                      ))}
-                    </ul>
                   </>
                 )}
 
@@ -731,6 +740,18 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
             You are the creator of this project.
           </p>
         </>
+      ) : p.viewerIsTeamMember ? (
+        /* Named on the team, so there is no later moment at which this button works.
+           Same shape as the blocks above rather than a disabled control. */
+        <div className="rounded-md border border-dashed border-[#d4d4d0] bg-[#f6f6f4] p-3.5 text-center">
+          <div className="mb-1 text-[12px] font-bold tracking-[0.06em] text-[#8a8a85]">
+            YOU ARE ON THIS TEAM
+          </div>
+          <div className="text-[12px] leading-normal text-neutral-400">
+            Team members cannot support their own project, so the total stays a count of
+            other people.
+          </div>
+        </div>
       ) : (
         <>
           <button

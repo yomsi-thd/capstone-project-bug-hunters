@@ -190,8 +190,31 @@ describe("toDetail", () => {
     expect(toDetail(projectRow({ team_members: null })).teamMembers).toEqual([]);
   });
 
+  // The browser cannot work this out for itself. Team emails never leave the server, so
+  // the API answers the question and this only has to carry the answer through.
+  it("maps viewer_is_team_member, defaulting to false when the field is absent", () => {
+    expect(toDetail(projectRow({ viewer_is_team_member: true })).viewerIsTeamMember).toBe(true);
+    expect(toDetail(projectRow({ viewer_is_team_member: false })).viewerIsTeamMember).toBe(false);
+    expect(toDetail(projectRow()).viewerIsTeamMember).toBe(false);
+  });
+
   it("carries creator_id through as ownerId for the edit-vs-invest CTA", () => {
     expect(toDetail(projectRow()).ownerId).toBe(14);
+  });
+});
+
+describe("toCreatorProject team", () => {
+  // EditProject seeds its Team tab from this. While it was missing, the form fell back
+  // to a sample list of two invented people on every project, and saving wrote them over
+  // whatever the project really had.
+  it("carries the project's own team through", () => {
+    const team = [{ name: "Mai", role: "Student Developer", email: "mai@example.com" }];
+    expect(toCreatorProject({ id: 1, team_members: team }).team).toEqual(team);
+  });
+
+  it("gives an empty list rather than undefined when there is no team", () => {
+    expect(toCreatorProject({ id: 1 }).team).toEqual([]);
+    expect(toCreatorProject({ id: 1, team_members: null }).team).toEqual([]);
   });
 });
 
