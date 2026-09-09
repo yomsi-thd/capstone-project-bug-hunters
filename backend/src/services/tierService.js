@@ -120,7 +120,10 @@ async function loadProjectForTierWrite(projectId, userId, roles) {
         throw notFound("Project not found");
     }
 
-    if (Number(project.creator_id) !== Number(userId) && !isAdminRole(roles)) {
+    // Only the creator. A level is the project's own content, and an admin who filed the
+    // project on somebody's behalf has already done their part: they set the levels in
+    // the wizard, which goes through createProject rather than through here.
+    if (Number(project.creator_id) !== Number(userId)) {
         throw forbidden("Only the project's creator can change its support levels.");
     }
 

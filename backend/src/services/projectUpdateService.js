@@ -39,9 +39,10 @@ async function createProjectUpdate(userId, roles, projectId, data) {
         throw notFound("Project not found");
     }
 
-    const isAdmin = isAdminRole(roles);
-
-    if (project.creator_id !== userId && !isAdmin) {
+    // Only the creator. An admin files a project on behalf of a creator and stops there:
+    // posting an update in their name is writing content, not moderating it.
+    // deleteProjectUpdate below stays open to an admin, like deleteComment.
+    if (project.creator_id !== userId) {
         throw forbidden("Only the project's creator can post an update.");
     }
 

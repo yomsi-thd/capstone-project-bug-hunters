@@ -21,6 +21,9 @@ const MESSAGES = {
     CONTRIBUTION_TOO_LARGE: "A contribution can be at most 500 CC.",
     CONTRIBUTION_ALREADY_MADE: "You have already supported this project — one contribution per person.",
     CONTRIBUTION_OWN_PROJECT: "You cannot support your own project.",
+    // Being named on a team is not a punishment. It removes the one action that would
+    // make the project's own total dishonest, and nothing else.
+    CONTRIBUTION_TEAM_MEMBER: "You are listed on this project's team, so you cannot support it.",
     // A level above the cap is one nobody can reach: a dead control by construction.
     TIER_ABOVE_CAP: "A support level cannot ask for more than 500 CC.",
 

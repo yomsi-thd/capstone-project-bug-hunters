@@ -71,6 +71,18 @@ async function runInvestment(userId, projectId, amount, tierId) {
             throw forbidden(M.CONTRIBUTION_OWN_PROJECT);
         }
 
+        // The rest of the team, matched by the email the creator listed them under. The
+        // owner above is caught by creator_id, and nothing else ties a team row to an
+        // account.
+        //
+        // 403 for the same reason as the rule above it: not a state refusing the request
+        // but a door that isn't yours.
+        //
+        // Reads on the transaction's client, like everything else here.
+        if (await projectRepository.isTeamMemberByEmail(projectId, userId, client)) {
+            throw forbidden(M.CONTRIBUTION_TEAM_MEMBER);
+        }
+
         // One contribution per person per project. Read on the transaction's client so
         // two requests arriving together cannot both see "nothing here yet", with the
         // partial unique index on (classcoin_id, project_id) underneath: that is what

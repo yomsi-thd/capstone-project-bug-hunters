@@ -6,6 +6,7 @@ const withTransaction = require("../db/withTransaction");
 const { notFound, forbidden, conflict, validationFailed } = require("../errors/AppError");
 const { isAdminRole, assertNotArchived, assertSemesterOpen, loadVisibleProject } = require("./projectAccess");
 const { normaliseTierBatch } = require("./tierService");
+const { stripTeamEmails } = require("./teamMembers");
 
 /**
  * The project's own lifecycle: create, read, edit, archive, restore, delete.
@@ -145,7 +146,15 @@ async function createProject(userId, roles, data) {
 
 // Get all projects
 async function getAllProjects() {
-    return await projectRepository.findAll();
+    const projects = await projectRepository.findAll();
+
+    // The admin screens show a name and a role, never an address, so the email has no
+    // reason to leave the server here either. findByCreatorId is the exception: it only
+    // ever returns the caller their own projects, so that list is already theirs.
+    return projects.map((project) => ({
+        ...project,
+        team_members: stripTeamEmails(project.team_members),
+    }));
 }
 
 /**
@@ -194,7 +203,27 @@ async function getProjectById(id, viewer = null) {
 
     // The one read that wants my_contribution, which the detail page turns into "you
     // have supported this" in place of the invest button.
-    return await loadVisibleProject(id, viewer, { withContribution: true });
+    const project = await loadVisibleProject(id, viewer, { withContribution: true });
+
+    // The same shape of answer, for the same sidebar. A reader on the team can never
+    // support this project, so the page has to say so instead of offering a button, and
+    // it cannot work this out for itself once the emails are stripped below.
+    //
+    // A signed-out reader costs no query.
+    const viewerIsTeamMember = viewer?.id
+        ? await projectRepository.isTeamMemberByEmail(id, viewer.id)
+        : false;
+
+    return {
+        ...project,
+        // The creator gets their own list back untouched, because EditProject is where
+        // they correct an address they mistyped. Nobody else has any use for it.
+        team_members:
+            viewer?.id === project.creator_id
+                ? project.team_members
+                : stripTeamEmails(project.team_members),
+        viewer_is_team_member: viewerIsTeamMember,
+    };
 }
 
 async function getMyProjects(userId) {

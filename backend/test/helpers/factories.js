@@ -114,6 +114,7 @@ async function makeProject({
     category = "ENGINEERING",
     semesterId,
     reviewNote = null,
+    teamMembers = [],
 } = {}) {
     const semester = semesterId === undefined ? await openSemesterId() : semesterId;
 
@@ -121,8 +122,8 @@ async function makeProject({
         `INSERT INTO projects
              (creator_id, title, description, current_amount, category,
               status, created_by_admin_id, archived_at, archived_by, semester_id,
-              review_note)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+              review_note, team_members)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
          RETURNING *`,
         [
             creatorId,
@@ -136,6 +137,7 @@ async function makeProject({
             archivedBy,
             semester,
             reviewNote,
+            JSON.stringify(teamMembers),
         ]
     );
 

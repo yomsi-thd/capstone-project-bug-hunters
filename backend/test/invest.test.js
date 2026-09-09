@@ -155,6 +155,58 @@ describe("POST /api/projects/:id/invest", () => {
         expect(res.status).toBe(404);
         expect(res.body.message).toBe("Project not found.");
     });
+
+    // The owner is blocked by creator_id. Everybody else on the team is blocked by the
+    // email they were listed under, which is the only thing tying a team row to an
+    // account.
+    it("403 for somebody named on the project's team", async () => {
+        const teamMate = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({
+            creatorId: creator.id,
+            status: "APPROVED",
+            teamMembers: [{ name: "Team mate", role: "Student Developer", email: teamMate.email }],
+        });
+
+        const res = await as(teamMate.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+
+        expect(res.status).toBe(403);
+        expect(res.body.message).toMatch(/listed on this project's team/i);
+        expect(await balanceOf(teamMate.id)).toBe(1000);
+        expect(await fundedAmount(project.id)).toBe(0);
+    });
+
+    it("200 for a backer who is not on the team of a project that has one", async () => {
+        const teamMate = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const outsider = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({
+            creatorId: creator.id,
+            status: "APPROVED",
+            teamMembers: [{ name: "Team mate", role: "Student Developer", email: teamMate.email }],
+        });
+
+        const res = await as(outsider.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+
+        expect(res.status).toBe(200);
+        expect(await balanceOf(outsider.id)).toBe(900);
+    });
+
+    // Project-level answers come first. Somebody on the team of an archived project
+    // should read that it is archived, which is the truer answer and the one everyone
+    // else gets.
+    it("an archived project answers 'archived', not 'you are on the team'", async () => {
+        const teamMate = await makeUser({ roles: ["BACKER"], balance: 1000 });
+        const project = await makeProject({
+            creatorId: creator.id,
+            status: "APPROVED",
+            archivedAt: new Date(),
+            archivedBy: creator.id,
+            teamMembers: [{ name: "Team mate", role: "Student Developer", email: teamMate.email }],
+        });
+
+        const res = await as(teamMate.token).post(`/api/projects/${project.id}/invest`).send({ amount: 100 });
+
+        expect(res.body.message).not.toMatch(/listed on this project's team/i);
+    });
 });
 
 describe("investing at a support level", () => {

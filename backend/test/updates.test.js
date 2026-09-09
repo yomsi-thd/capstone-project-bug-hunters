@@ -1,7 +1,11 @@
 /**
  * Project updates. Ownership rather than role is the gate: POST and DELETE compare the
- * project's creator_id to req.user.id inside the service, with admins passing too, which
- * is why there is no authorize() on those routes. Reading is public.
+ * project's creator_id to req.user.id inside the service, which is why there is no
+ * authorize() on those routes. Reading is public.
+ *
+ * The two verbs differ on admins, and the difference is the point. Posting is writing
+ * content in somebody else's name, so only the creator may. Deleting is taking down an
+ * unsuitable post, so an admin may too, exactly as with comments.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -44,10 +48,13 @@ describe("POST /api/projects/:id/updates", () => {
         expect(res.body.update.title).toBe("Week one");
     });
 
-    it("201 for an admin", async () => {
+    // An admin creates a project on behalf of a creator and stops there. Posting an
+    // update in somebody else's name is writing content, not moderating it.
+    it("403 for an admin", async () => {
         const res = await as(admin.token).post(`/api/projects/${project.id}/updates`).send(body);
 
-        expect(res.status).toBe(201);
+        expect(res.status).toBe(403);
+        expect(res.body.message).toBe("Only the project's creator can post an update.");
     });
 
     it("403 for a creator who does not own the project", async () => {
@@ -112,13 +119,24 @@ describe("DELETE /api/projects/:id/updates/:updateId", () => {
     // erase a project's history and the mapper falls back to "Unknown creator". Written
     // with an admin author so the deleted account is not also the project's owner:
     // creator_id is a cascade, and that would take the whole project with it.
+    // author_id is SET NULL rather than CASCADE: deleting an account must cost a project
+    // its attribution, never its history.
+    //
+    // The row is written with SQL rather than through the route. Only the creator can
+    // post now, and deleting the creator would take the project with it, so there is no
+    // longer any way to reach this state through the API. Rows like it still exist from
+    // when an admin could post, which is what makes the constraint worth pinning.
     it("keeps the update when its author's account is deleted", async () => {
-        const guestAdmin = await makeUser({ roles: ["ADMIN"] });
+        const guest = await makeUser({ roles: ["CREATOR"] });
 
-        const created = await as(guestAdmin.token).post(`/api/projects/${project.id}/updates`).send(body);
-        const updateId = created.body.update.id;
+        const { rows: created } = await pool.query(
+            `INSERT INTO project_updates (project_id, author_id, title, body)
+             VALUES ($1, $2, $3, $4) RETURNING id`,
+            [project.id, guest.id, body.title, body.body]
+        );
+        const updateId = created[0].id;
 
-        await pool.query("delete from users where id = $1", [guestAdmin.id]);
+        await pool.query("delete from users where id = $1", [guest.id]);
 
         const { rows } = await pool.query("select author_id from project_updates where id = $1", [updateId]);
 

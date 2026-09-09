@@ -261,6 +261,45 @@ async function findById(id, client = pool, viewerId = null) {
     return result.rows[0];
 }
 
+// Whether the reader is named on this project's team, matched by email.
+//
+// One query, called by both the invest rule and the project page, so the two can never
+// answer differently. It is not folded into findById because loadVisibleProject shares
+// that read with comments, updates and tiers, which would all pay for a subquery they
+// discard.
+//
+// LOWER on both sides. Sign-in compares an address exactly and that is deliberate, but
+// this is a rule rather than an authentication step, and a capital letter must not be a
+// way around it.
+//
+// The CASE is not defensive noise. jsonb_array_elements raises an error on a value that
+// is not an array, and it sits in a FROM clause, which is evaluated before any WHERE
+// could filter the bad row out. Older rows hold shapes the wizard can no longer produce.
+async function isTeamMemberByEmail(projectId, userId, client = pool) {
+    const result = await client.query(
+        `
+        SELECT EXISTS (
+            SELECT 1
+            FROM jsonb_array_elements(
+                CASE WHEN jsonb_typeof(p.team_members) = 'array'
+                     THEN p.team_members
+                     ELSE '[]'::jsonb
+                END
+            ) m
+            WHERE LOWER(m->>'email') = LOWER(u.email)
+        ) AS is_team_member
+        FROM projects p, users u
+        WHERE p.id = $1
+          AND u.id = $2;
+        `,
+        [projectId, userId]
+    );
+
+    // No row when either the project or the account is gone. Not on a team is the right
+    // answer there: the callers already have their own "does this exist" checks.
+    return result.rows[0]?.is_team_member === true;
+}
+
 //Find all projects by User ID
 async function findByCreatorId(userId) {
 
@@ -543,6 +582,7 @@ module.exports = {
     findAllApprovedProjects,
     countApprovedProjects,
     findById,
+    isTeamMemberByEmail,
     findByCreatorId,
     findBackersByCreatorId,
     updateProject,

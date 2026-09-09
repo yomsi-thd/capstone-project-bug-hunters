@@ -54,7 +54,10 @@ describe("GET /api/projects/:id/tiers", () => {
 });
 
 describe("POST /api/projects/:id/tiers", () => {
-    it("201 for the owner and 201 for an admin", async () => {
+    // 403 for the admin: support levels are the project's own content, and an admin only
+    // files a project on behalf of a creator. They still set the levels while filling in
+    // the wizard, because that goes through createProject rather than through here.
+    it("201 for the owner and 403 for an admin", async () => {
         const project = await makeProject({ creatorId: creator.id, status: "APPROVED" });
 
         const owner = await as(creator.token).post(`/api/projects/${project.id}/tiers`).send(level());
@@ -63,7 +66,7 @@ describe("POST /api/projects/:id/tiers", () => {
             .send(level({ min_amount: 200, name: "Champion" }));
 
         expect(owner.status).toBe(201);
-        expect(byAdmin.status).toBe(201);
+        expect(byAdmin.status).toBe(403);
     });
 
     it("403 for a creator who does not own the project, 401 signed out", async () => {
