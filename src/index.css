@@ -1,22 +1,21 @@
 @import "tailwindcss";
-/* `static` là bắt buộc, không phải cho gọn.
-   Mặc định Tailwind 4 chỉ phát ra biến nào có utility tương ứng được DÙNG trong mã nguồn.
-   Nhưng repo này có 124 chỗ viết `var(--color-brand)` thẳng trong inline style, mà trình
-   quét của Tailwind không coi đó là "đã dùng" — cả 124 chỗ đang sống nhờ tác dụng phụ:
-   Khôi tình cờ dùng class `bg-brand`/`text-brand` ở CreatorSidebar và PostUpdateModal.
-   Ngày nào hai file đó bỏ class ấy đi, 124 chỗ kia IM LẶNG mất màu.
-   Kiểm ngày 20/08: bỏ `static` thì --color-brand-dark và --color-surface không hề xuất
-   hiện trong CSS build ra. `static` phát ra mọi biến, bất kể có utility nào dùng hay không. */
+/* `static` is required, not a shorthand.
+   By default Tailwind 4 only emits a variable when a matching utility appears in the
+   source. This repo writes `var(--color-brand)` directly in 124 places, which the
+   scanner does not count as a use, so all 124 survive only as a side effect: two files
+   (CreatorSidebar, PostUpdateModal) happen to use the `bg-brand`/`text-brand` classes.
+   Without `static`, --color-brand-dark and --color-surface never reach the built CSS.
+   `static` emits every variable whether a utility uses it or not. */
 @theme static {
   --color-brand: #cc0000;
 
-  /* 23 chỗ trong src/ gõ #a00 — luôn là brand tối cho trạng thái hover. Đặt tên ở đây để
-     không ai gõ lại hex và trôi dần thành #a10000. */
+  /* 23 places in src/ type #a00, always the dark brand for a hover state. Named here so
+     nobody retypes the hex and drifts to #a10000. */
   --color-brand-dark: #aa0000;
 
-  /* 11 chỗ gõ #f7f7f5 — nền kem của app. KHÔNG thay bằng neutral-50 (#fafafa) hay
-     gray-50 (#f9fafb): cả hai lạnh hơn thấy rõ trên mảng lớn, mà đây là màu nền nên nó
-     phủ diện tích lớn nhất màn hình. */
+  /* 11 places type #f7f7f5, the app's cream background. Do not swap in neutral-50
+     (#fafafa) or gray-50 (#f9fafb): both read noticeably colder over a large area, and
+     this colour covers more of the screen than any other. */
   --color-surface: #f7f7f5;
 
   /* Makes Tailwind's own `font-sans` resolve to the app typeface, so a component reaching
@@ -36,21 +35,20 @@
   --shadow:
     rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
 
-  /* DM Sans is the app's typeface. It used to be applied by eleven separate inline
-     fontFamily declarations that each overrode this variable; now it IS this variable,
-     so the override is gone and there is one place to change it. */
+  /* DM Sans is the app's typeface. Eleven inline fontFamily declarations used to
+     override this variable. They are gone, so this is the one place to change it. */
   --sans: 'DM Sans', 'Helvetica Neue', Arial, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  /* KHÔNG đặt lại font-size ở :root. Tailwind v4 tính mọi khoảng cách và cỡ chữ theo
-     `rem`, nên dòng `font: 18px/145%` từng ở đây phóng toàn bộ thang đo lên 12,5%, và khối
-     media query đi kèm (16px từ 1024px xuống) làm 864 chỗ khoảng cách trên các trang
-     creator/admin NHẢY 12,5% mỗi lần cửa sổ qua đúng mốc đó.
-     Đo trên app đang chạy ngày 20/08, trước khi gỡ: text-sm = 15,75px thay vì 14px,
-     md:p-8 = 36px thay vì 32px, w-48 = 216px thay vì 192px, và top-14 = 63px trong khi
-     header cao đúng 56px — tức là một khe trắng 7px dưới thanh nav ở 5 chỗ.
-     Cả hai dòng đến từ template Vite, không phải từ thiết kế. Gỡ ngày 20/08. */
+  /* Do not set font-size on :root. Tailwind 4 derives every size and spacing step from
+     `rem`, so the `font: 18px/145%` line that used to sit here scaled the whole type
+     scale up by 12.5%, and its media query (down to 16px below 1024px) made 864 spacing
+     values on the creator and admin pages jump by that much as the window crossed the
+     breakpoint. Measured before removing it: text-sm 15.75px instead of 14px, md:p-8
+     36px instead of 32px, w-48 216px instead of 192px, and top-14 63px under a header
+     that is 56px tall, leaving a 7px white gap below the nav bar in five places.
+     Both lines came from the Vite template, not from the design. */
   font-family: var(--sans);
   line-height: 145%;
   letter-spacing: 0.18px;
@@ -66,12 +64,11 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* The dark-theme override that used to sit here was removed on 2026-08-06.
-   It came from the Vite starter template (along with --accent purple and #social),
-   not from this design: it repainted --text-h to near-white while the pages stayed
-   light, so on a dark-mode machine every heading vanished. There is no dark design
-   to fall back to — if the team ever wants one it has to be built deliberately,
-   page backgrounds included. */
+/* The dark-theme override that used to sit here is gone. It came from the Vite starter
+   template (along with --accent purple and #social), not from this design: it repainted
+   --text-h to near-white while the pages stayed light, so on a dark-mode machine every
+   heading vanished. There is no dark design to fall back to. Building one means doing
+   the page backgrounds too. */
 
 * {
   box-sizing: border-box;
@@ -88,23 +85,21 @@
   box-sizing: border-box;
 }
 
-/* These heading defaults MUST stay inside `@layer base`.
+/* These heading defaults must stay inside `@layer base`.
    Tailwind 4 puts its utilities in `@layer utilities`, and unlayered CSS beats any
-   layered rule no matter the specificity. Unlayered, this block silently overrode
-   every Tailwind class on a heading: `<h1 className="text-[28px] font-extrabold
-   text-gray-900">` rendered at 56px / weight 500 / var(--text-h) instead. That is
-   what made the page titles on the creator + admin pages the wrong size and — on a
-   machine set to dark mode — near-white on a light background, i.e. invisible.
+   layered rule whatever the specificity. Unlayered, this block silently overrode every
+   Tailwind class on a heading: `<h1 className="text-[28px] font-extrabold
+   text-gray-900">` rendered at 56px / weight 500 / var(--text-h). That made the page
+   titles on the creator and admin pages the wrong size, and on a dark-mode machine
+   near-white on a light background, so invisible.
    Inline styles were unaffected, which is why only the Tailwind-styled pages broke. */
 @layer base {
-  /* ⚠️ EVERY bare-element rule below MUST stay inside @layer base.
-     Tailwind 4 emits its utilities in @layer utilities, and UNLAYERED CSS BEATS ANY
-     LAYERED RULE regardless of specificity. While `p { margin: 0 }` sat outside a layer it
-     silently killed the margin on every <p> carrying a Tailwind margin class — 41 of them
-     across the app, most in pages written months ago. Nobody noticed because the pages
-     that predate this used inline styles, and inline beats everything.
-     Same trap for `img { max-width: 100% }` against max-w-*, and for `code`.
-     Moved in on 20/08, found while converting Account: mb-7 on a <p> measured 0px. */
+  /* The same goes for every bare-element rule below, not only the headings. While
+     `p { margin: 0 }` sat outside a layer it killed the margin on all 41 <p> elements
+     carrying a Tailwind margin class. Nobody noticed, because the older pages use inline
+     styles and inline beats everything. `img { max-width: 100% }` does the same to
+     max-w-*, and so does `code`. Found while converting Account: mb-7 on a <p>
+     measured 0px. */
 
   body {
     margin: 0;
@@ -155,20 +150,21 @@
     }
   }
 }
-/* Khối .home-* và .counter bị xoá ngày 20/08 (13 class + .counter).
-   Chúng đến từ Home.jsx (xoá 28/07) và template Vite; không file .jsx nào còn tham chiếu.
-   Kiểm lại bất cứ lúc nào:
+/* The .home-* and .counter rules were deleted (13 classes plus .counter). They came from
+   Home.jsx (since deleted) and the Vite template, and no .jsx file referenced them.
+   To re-check at any time:
      for c in $(grep -o '^\s*\.[a-z-]*' src/index.css | tr -d ' .' | sort -u); do
-       [ "$(grep -rl "$c" src --include=*.jsx | wc -l)" -eq 0 ] && echo "chet: .$c"
+       [ "$(grep -rl "$c" src --include=*.jsx | wc -l)" -eq 0 ] && echo "dead: .$c"
      done
-   Không phải rác vô hại: chúng dùng !important bên trong media query, nên một class trùng
-   tên đặt sau này sẽ bị đè mà không hiểu vì sao. Các lớp .lp-* thì đang dùng thật — giữ. */
+   They were not harmless clutter: they used !important inside a media query, so a later
+   class of the same name would be overridden for no visible reason. The .lp-* classes
+   are in real use, so they stay. */
 
 /* ============================================================
-   Shared motion system — one animation vocabulary for the app.
-   Pages & components reference these classes so entrances and
-   interactions stay consistent across every screen. Add new
-   motion here (not inline) to keep the site in sync.
+   Shared motion system: one animation vocabulary for the app.
+   Pages and components use these classes so entrances and
+   interactions match on every screen. Add new motion here
+   rather than inline, so the site stays in step.
    ============================================================ */
 @keyframes lp-fade-up {
   from { opacity: 0; transform: translateY(16px); }
@@ -200,8 +196,8 @@
 .lp-stagger > *:nth-child(n+9) { animation-delay: 0.44s; }
 
 /* The two drifting blobs behind the sign-in card. Moved out of a <style> tag inside
-   AuthLayout on 20/08 — keyframes belong to the one motion vocabulary, not to a component
-   that re-injects them into the document every time it mounts. */
+   AuthLayout: keyframes belong to the shared motion vocabulary, not to a component that
+   re-injects them into the document on every mount. */
 @keyframes lp-float-a {
   0%, 100% { transform: translate(0, 0); }
   50%      { transform: translate(-20px, 20px); }
@@ -224,10 +220,10 @@
 .lp-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
 .lp-card:hover { transform: translateY(-4px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.10); }
 
-/* Shared 3-state nav underline (default -> hover -> active). Single source for
-   Header nav links AND ProjectDetail's TabNav so the two stay in step (see
-   conventions #3/#7). Base text colour comes from --nav-base so each context
-   can differ (Header #444, TabNav #666); active/hover accent is always red. */
+/* Shared 3-state nav underline (default -> hover -> active). One source for the Header
+   nav links and ProjectDetail's TabNav, so the two stay in step. Base text colour comes
+   from --nav-base so each context can differ (Header #444, TabNav #666); the hover and
+   active accent is always red. */
 .lp-navlink {
   color: var(--nav-base, #444);
   border: 0;
