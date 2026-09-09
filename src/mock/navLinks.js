@@ -1,5 +1,5 @@
-// Centralized nav links so every page stays consistent.
-// Pass the right set into <Header navLinks={...} /> based on auth state.
+// Nav links in one place so every page stays consistent. Pass the right set into
+// <Header navLinks={...} /> for the current auth state.
 
 export const NAV_LINKS_LOGGED_OUT = [
   { label: "Discover", path: "/discover" },
@@ -15,21 +15,21 @@ export const NAV_LINKS_LOGGED_IN = [
   { label: "About", path: "#" },
 ];
 
-// Helper: pick the right nav set from auth state.
+// Picks the right nav set from auth state.
 export function getNavLinks(isLoggedIn) {
   return isLoggedIn ? NAV_LINKS_LOGGED_IN : NAV_LINKS_LOGGED_OUT;
 }
 
-// Role-aware nav links, derived from the current user's roles.
-//   Admin    -> Admin Dashboard ONLY (of the role-specific links)
+// Nav links derived from the current user's roles.
+//   Admin    -> Admin Dashboard only, of the role-specific links
 //   Creator  -> My Projects
 //   Backer   -> My Investments
-// Logged out shows only the public links.
+// Logged out shows the public links alone.
 //
-// ⚠️ Admin lost My Projects and My Investments on 2026-08-24. An admin owns no
-// projects and holds no Class Coins now, so both links led somewhere that has nothing
-// of theirs in it — and /creator-my-projects is behind canCreate, so the link would
-// have landed on the "no access" screen. Mirrors canCreate / canInvest in AuthContext.
+// An admin gets neither My Projects nor My Investments: they own no projects and hold no
+// Class Coins, so both would lead to a page with nothing of theirs in it, and
+// /creator-my-projects is behind canCreate anyway. Mirrors canCreate and canInvest in
+// AuthContext.
 export function getNavLinksForUser(user) {
   const roles = user?.roles ?? [];
   const isAdmin = roles.includes("admin");
@@ -45,5 +45,5 @@ export function getNavLinksForUser(user) {
   return links;
 }
 
-// Kept for backward compatibility with pages still importing NAV_LINKS directly.
+// Kept for pages that still import NAV_LINKS directly.
 export const NAV_LINKS = NAV_LINKS_LOGGED_OUT;

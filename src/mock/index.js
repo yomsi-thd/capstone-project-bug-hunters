@@ -1,12 +1,8 @@
-// What lives in this folder is now UI CONFIGURATION, not mock data.
+// This folder holds UI configuration, not mock data. The project, user and investment
+// fixtures went once every page was wired to the real API.
 //
-// The project / user / investment fixtures were deleted once every page was wired to
-// the real API — see docs/superpowers/specs/2026-08-05-wire-frontend-to-backend-design.md.
-// `projectDetail.js`, `myInvestments.js` and `creatorMyProjects.js` are gone, and
-// `home.js` became `projectTags.js` because only the tag vocabulary survived.
-//
-// The one real exception is the mock ACCOUNTS in src/context/AuthContext.jsx, kept so
-// the UI stays browsable when the backend cannot be reached.
+// The one exception is the mock accounts in src/context/AuthContext.jsx, kept so the UI
+// stays browsable when the backend cannot be reached.
 export * from "./projectTags";
 export * from "./adminDashboard";
 export * from "./adminUserManagement";

@@ -1,9 +1,9 @@
 // URL handling for the creator's pitch video, kept out of ProjectVideo.jsx so that file
-// only exports a component (react-refresh/only-export-components).
+// exports nothing but a component, which react-refresh requires.
 //
-// The stored value is whatever the creator pasted, so it is treated as untrusted: it is
-// only embedded when it parses as a YouTube or Vimeo link, and only ever put in an href
-// when it parses as http(s) — a `javascript:` value there would run on click.
+// The stored value is whatever the creator pasted, so treat it as untrusted: embed it
+// only when it parses as a YouTube or Vimeo link, and put it in an href only when it
+// parses as http(s). A `javascript:` value in an href would run on click.
 
 const YOUTUBE_HOSTS = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"];
 const VIMEO_HOSTS = ["vimeo.com", "www.vimeo.com", "player.vimeo.com"];
@@ -17,15 +17,15 @@ function parse(raw) {
   } catch {
     return null;
   }
-  // Only these two. `javascript:`, `data:` and friends never reach an href.
+  // Only these two, so `javascript:` and `data:` never reach an href.
   if (url.protocol !== "http:" && url.protocol !== "https:") return null;
   return url;
 }
 
 /**
- * A YouTube/Vimeo link -> the URL an <iframe> can load. Null when the link is fine but
- * not embeddable (Google Drive, a university media server), which is the caller's cue to
- * render a plain link instead of an empty player.
+ * A YouTube or Vimeo link -> the URL an <iframe> can load. Null when the link is valid
+ * but not embeddable, such as Google Drive, which is the caller's cue to render a plain
+ * link rather than an empty player.
  */
 export function toEmbedUrl(raw) {
   const url = parse(raw);
@@ -34,9 +34,9 @@ export function toEmbedUrl(raw) {
   const host = url.hostname.toLowerCase();
 
   if (YOUTUBE_HOSTS.includes(host)) {
-    // youtu.be/<id>, /embed/<id> and /shorts/<id> all carry the id in the path; the
-    // classic watch URL carries it in ?v=. Reading only the id is what drops the
-    // ?si=… that YouTube's "Copy link" button appends, and the &t= timestamp.
+    // youtu.be/<id>, /embed/<id> and /shorts/<id> carry the id in the path, while the
+    // classic watch URL has it in ?v=. Taking just the id drops the ?si= that YouTube's
+    // Copy link button appends, and any &t= timestamp.
     const segments = url.pathname.split("/").filter(Boolean);
     let id;
     if (host.endsWith("youtu.be")) {

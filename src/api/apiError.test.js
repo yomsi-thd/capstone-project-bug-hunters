@@ -43,9 +43,8 @@ describe("errorMessage", () => {
         expect(errorMessage(null)).toBe("Something went wrong.");
     });
 
-    // An empty string is not a usable sentence, and `||` is what steps over it — onto
-    // the axios message, since that is the next thing in line. Written down because a
-    // "tidy-up" to `??` would start rendering a blank error box instead.
+    // An empty string is not a usable sentence, and `||` is what steps over it onto the
+    // axios message. A tidy-up to `??` would start rendering a blank error box.
     it("steps over an empty message rather than showing a blank box", () => {
         const err = fromApi({ message: "" });
 
@@ -87,9 +86,8 @@ describe("errorDetails", () => {
 
 describe("the old inline expression and the new function agree", () => {
     /**
-     * This is what all 35 call sites read before the change. Keeping it here means the
-     * migration is proved equivalent rather than eyeballed — the whole point of doing
-     * this commit BEFORE the backend starts changing its error shape.
+     * The expression the pages used to read inline. Keeping it here proves the helper is
+     * equivalent rather than assuming it.
      */
     const oldWay = (err, fallback) => err?.response?.data?.message || err?.message || fallback;
 

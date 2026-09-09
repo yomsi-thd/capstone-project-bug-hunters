@@ -15,18 +15,19 @@ import { MAX_TIERS, validateTiers } from "../components/project/tierRules";
 import { toTier, parseAmount } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
-// The three optional story sections ProjectDetail renders under the blurb. Kept in the
-// Basic Info tab next to the value proposition — the Media tab still has nowhere to save.
+// The three optional story sections ProjectDetail renders under the blurb. They sit in
+// the Basic Info tab beside the value proposition; the Media tab has nowhere to save.
 const STORY_FIELDS = [
   { key: "challenge", label: "The Challenge" },
   { key: "solution", label: "Our Solution" },
-  // Reworded 2026-09-07 (N7); the key stays `funding` and the column stays funding_usage.
+  // The label is worded for the reader; the key stays `funding` and the column
+  // funding_usage.
   { key: "funding", label: "How Support Would Be Used" },
 ];
 
-// projects.category stores the bare department ("ENGINEERING") — the SCHOOLS dropdown
-// offers "School of Engineering". Saving the label verbatim gives the project a category
-// no filter chip and no tag colour can match. Same normalisation as CreateProject.
+// projects.category stores the bare department ("ENGINEERING") while the SCHOOLS
+// dropdown offers "School of Engineering". Saving the label verbatim would give the
+// project a category no filter chip or tag colour matches. Same rule as CreateProject.
 function toCategory(school) {
   return String(school || "").replace(/^School of\s+/i, "").trim().toUpperCase();
 }
@@ -38,16 +39,15 @@ function TabBasicInfo({ data, setData }) {
         <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Project Title</label>
         <input value={data.title} onChange={e => setData({ ...data, title: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none focus:border-brand transition-colors" />
       </div>
-      {/* One column since N3 (2026-09-07): "Funding Goal (CC)" sat beside this until
-          the goal was removed from the product. */}
+      {/* One column, since there is no funding goal to sit beside this. */}
       <div>
         <div>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">School / Department</label>
           <select value={data.school} onChange={e => setData({ ...data, school: e.target.value })} className="w-full border border-gray-200 rounded-md px-3 py-2.5 text-[13px] outline-none bg-white focus:border-brand transition-colors">
-            {/* The existing rows use departments that are not in SCHOOLS (BIOTECH,
-                ARCHITECTURE…). Without keeping the project's own value as an option the
-                select would fall back to the first entry and silently recategorise the
-                project the moment anything else on the tab was saved. */}
+            {/* Existing rows use departments that are not in SCHOOLS, such as BIOTECH.
+                Without keeping the project's own value as an option, the select falls
+                back to the first entry and silently recategorises the project the moment
+                anything else on the tab is saved. */}
             {!SCHOOLS.includes(data.school) && data.school && <option key={data.school}>{data.school}</option>}
             {SCHOOLS.map(s => <option key={s}>{s}</option>)}
           </select>
@@ -76,7 +76,7 @@ function TabBasicInfo({ data, setData }) {
       </div>
 
       {/* The video lives here rather than on the Media tab, for the same reason the
-          story fields do: Basic Info is the tab that actually saves. */}
+          story fields do: Basic Info is the tab that saves. */}
       <div className="border-t border-gray-100 pt-4">
         <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Project Video URL</label>
         <input
@@ -158,23 +158,21 @@ function TabTeam({ team, setTeam }) {
   );
 }
 
-// An empty level form. Bullet lines start with one blank row so the field is visibly
-// there; blanks are filtered out before anything is sent.
+// An empty level form. Bullets start with one blank row so the field is visible; blanks
+// are filtered out before anything is sent.
 const EMPTY_TIER = { name: "", amount: "", bullets: [""] };
 
-// Support Levels - `project_tiers` in the database, and NOT rewards. A level is a
-// minimum contribution plus the lines saying what choosing it signals; the creator owes
-// nothing, so there is no quantity, delivery date or fulfilment state to edit here.
+// Support Levels, `project_tiers` in the database. They are not rewards: a level is a
+// minimum contribution plus the lines saying what choosing it signals, and the creator
+// owes nothing, so there is no quantity, delivery date or fulfilment state to edit.
 //
-// ⚠️ This tab has NO shared Save button - the modal's SAVE CHANGES only writes the
-// Basic Info fields. So every action here calls the API on its own and then refetches.
-// The alternative (collect edits, save with the rest) would silently drop them, which is
-// exactly the class of bug this whole feature was built to end.
+// This tab has no shared Save button, since the modal's SAVE CHANGES writes only the
+// Basic Info fields. Every action here calls the API itself and then refetches. Collecting
+// edits to save with the rest would silently drop them.
 function TabTiers({ projectId }) {
   const [levels, setLevels] = useState([]);
-  // Seeded from projectId rather than always true: with no project there is nothing to
-  // fetch, and flipping it off from inside the effect would be a setState in an effect
-  // body for no reason.
+  // Seeded from projectId rather than always true. With no project there is nothing to
+  // fetch, and turning it off inside the effect would be a setState for nothing.
   const [loading, setLoading] = useState(Boolean(projectId));
   const [loadError, setLoadError] = useState(null);
 
@@ -185,9 +183,9 @@ function TabTiers({ projectId }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Bumped after every add / edit / remove to refetch. Same pattern as ProjectDetail's
-  // commentsVersion, and for the same reason: backersCount on each level is computed in
-  // SQL, so the list has to come back from the server rather than be patched locally.
+  // Bumped after every add, edit and remove to refetch. Same pattern as ProjectDetail's
+  // commentsVersion: backersCount is computed in SQL, so the list has to come back from
+  // the server rather than be patched locally.
   const [version, setVersion] = useState(0);
   const reload = () => setVersion(v => v + 1);
 
@@ -229,9 +227,9 @@ function TabTiers({ projectId }) {
   };
 
   const save = async () => {
-    // Validate the list AS IT WOULD BE, not the one level: the duplicate-minimum and
-    // the 5-level rules only exist across levels. Same function the wizard and the
-    // backend use, so the three cannot drift.
+    // Validate the list as it would be rather than the single level, since the duplicate
+    // minimum and level limit rules only exist across levels. The same function the
+    // wizard and the backend use, so the three cannot drift.
     const candidate = { ...draft, id: editingId ?? "new" };
     const nextList = editingId
       ? levels.map(l => (l.id === editingId ? candidate : { ...l, amount: String(l.minAmount) }))
@@ -250,8 +248,8 @@ function TabTiers({ projectId }) {
     setFormError("");
     try {
       if (editingId) {
-        // Raising the minimum deliberately does not touch history - an investment
-        // already carries its tier_id, so nobody's past choice is rewritten.
+        // Raising the minimum does not touch history: an investment already carries its
+        // tier_id, so nobody's past choice is rewritten.
         await projectApi.updateTier(projectId, editingId, payload);
         setNotice("Level updated.");
       } else {
@@ -271,10 +269,9 @@ function TabTiers({ projectId }) {
     setBusy(true);
     setNotice("");
     try {
-      // The backend decides between deleting and hiding: a level somebody already chose
-      // has to survive, because their investment points at it. Say which happened -
-      // "it vanished from the list but is still in someone's history" is confusing
-      // silence otherwise.
+      // The backend decides between deleting and hiding, since a level somebody already
+      // chose has to survive for their investment to point at. Say which happened, or the
+      // creator has no way to tell.
       const result = await projectApi.deleteTier(projectId, level.id);
       setNotice(result.hidden
         ? "Hidden. Backers who chose it keep their history."
@@ -378,9 +375,9 @@ function TabTiers({ projectId }) {
                 <input value={draft.amount} onChange={e => setDraft({ ...draft, amount: e.target.value })} placeholder="e.g., 250" className="w-full border border-gray-200 rounded-md px-2.5 py-2 text-[13px] outline-none focus:border-brand transition-colors" />
               </div>
             </div>
-            {/* A LIST, not the single textarea this tab used to have. The wizard already
-                collected a list, so the two forms disagreed about the shape of the same
-                thing - one of them had to be losing structure, and it was this one. */}
+            {/* A list rather than one textarea, matching the wizard. Two forms that
+                disagree about the shape of the same field means one of them is losing
+                structure. */}
             <div className="mb-2.5">
               <label className="text-[10px] font-bold text-gray-400 tracking-widest block mb-1">WHAT THIS LEVEL SIGNALS</label>
               {draft.bullets.map((b, i) => (
@@ -420,19 +417,18 @@ function TabTiers({ projectId }) {
 export default function EditProject({ project, onClose }) {
   const [activeTab, setActiveTab] = useState("basic");
 
-  // If a `project` is passed in (e.g. clicked from My Projects), prefill from it.
-  // Otherwise fall back to the static mock defaults so the modal still works standalone.
+  // Prefill from `project` when the caller passes one, otherwise fall back to the static
+  // defaults so the modal still works standalone.
   const [basicData, setBasicData] = useState(() =>
     project
       ? {
           title: project.title || EDIT_PROJECT_INITIAL_DATA.title,
-          // Prefill from the stored category, not from `dept` — dept is a display label
-          // derived from it, so `School of ${dept}` produced "School of School of design"
-          // for anything created through the form.
+          // Prefill from the stored category rather than `dept`, which is a display
+          // label derived from it: "School of ${dept}" would double the prefix.
           school: project.category || EDIT_PROJECT_INITIAL_DATA.school,
-          // description comes from the API (projects.description).
+          // From projects.description.
           proposition: project.description || project.proposition || EDIT_PROJECT_INITIAL_DATA.proposition,
-          // toCreatorProject passes these through from the story columns; "" when unset.
+          // Passed through from the story columns, and "" when unset.
           challenge: project.challenge || "",
           solution: project.solution || "",
           funding: project.funding || "",
@@ -444,19 +440,17 @@ export default function EditProject({ project, onClose }) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
-  // PUT /api/projects/:id — the backend accepts title, description, category,
-  // image_url, team_members and the three story columns. Support Levels
-  // save themselves through their own endpoints (see TabTiers); the Media tab is still
-  // the one with nowhere to save.
+  // PUT /api/projects/:id accepts title, description, category, image_url, team_members
+  // and the three story columns. Support Levels save through their own endpoints, and
+  // the Media tab has nowhere to save yet.
   const handleSave = async () => {
     if (!project?.id) {
       setSaveError("This modal was opened without a project, so there is nothing to save.");
       return;
     }
-    // Same rule the create wizard enforces. Without it, a creator could get past the
-    // wizard's check and then paste anything here — editing would be the way around it.
-    // Empty is allowed on this screen: the video is required to CREATE a project, but
-    // clearing it later is a deliberate choice, not a typo.
+    // The same rule the create wizard enforces, so editing is not a way around it. Empty
+    // is allowed here though: a video is required to create a project, but clearing one
+    // later is a deliberate choice.
     const videoUrl = basicData.videoUrl.trim();
     if (videoUrl && !isLinkable(videoUrl)) {
       setSaveError("That video link does not look like a web address — it should start with https://");
@@ -468,18 +462,18 @@ export default function EditProject({ project, onClose }) {
       await projectApi.updateProject(project.id, {
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
-        // Was `project.category ?? basicData.school`, which always won — the School
-        // dropdown looked editable but every change to it was thrown away on save.
+        // Read from the form, not from the project. Preferring the project's own value
+        // would leave the School dropdown looking editable while discarding every change.
         category: toCategory(basicData.school),
         image_url: project.img || "",
         team_members: team,
-        // The column is funding_usage; the form field is called `funding`.
+        // Column is funding_usage; the form field is called `funding`.
         challenge: basicData.challenge.trim(),
         solution: basicData.solution.trim(),
         funding_usage: basicData.funding.trim(),
         video_url: videoUrl,
-        // Echoed back unchanged: this modal has no editor for either yet, and the
-        // service overwrites the column with whatever it is handed.
+        // Echoed back unchanged. This modal has no editor for either, and the service
+        // overwrites the column with whatever it receives.
         gallery: project.gallery ?? [],
         solution_bullets: project.solutionBullets ?? [],
       });
@@ -496,26 +490,20 @@ export default function EditProject({ project, onClose }) {
       case "basic": return <TabBasicInfo data={basicData} setData={setBasicData} />;
       case "media": return <TabMedia />;
       case "team":  return <TabTeam team={team} setTeam={setTeam} />;
-      // Self-contained: it loads and saves the project's real levels itself, because
-      // SAVE CHANGES below only writes Basic Info.
+      // Self-contained: it loads and saves the project's levels itself, since SAVE
+      // CHANGES below writes only Basic Info.
       case "tiers": return <TabTiers projectId={project?.id} />;
       default: return null;
     }
   };
 
   return (
-    // panelScroll={false}: this dialog is a column with a fixed header and tab bar and a
-    // scrolling body. Letting the whole panel scroll would carry the tabs off the top.
+    // panelScroll={false} because this dialog is a column with a fixed header and tab bar
+    // over a scrolling body; scrolling the whole panel would carry the tabs off the top.
     //
-    // ⚠️ closable={false} is deliberate, and it PRESERVES the behaviour this dialog always
-    // had. Every other modal in the app closes on a backdrop click; this one does not,
-    // because it is a large form holding unsaved edits — a stray click beside it would
-    // throw away everything typed since the dialog opened, with no confirmation and no
-    // undo. The × and CANCEL CHANGES are the deliberate ways out.
-    //
-    // (This was listed as an inconsistency to fix when the shared Modal was planned.
-    //  Reading the form again, it is not one: it is the only dialog here with unsaved work
-    //  in it, so it is the only one that should be hard to dismiss by accident.)
+    // closable={false} because it is the only dialog in the app holding unsaved edits. A
+    // stray click on the backdrop would throw away everything typed since it opened, with
+    // no confirmation and no undo. The close button and CANCEL CHANGES are the ways out.
     <Modal onClose={onClose} closable={false} maxWidth={660} panelScroll={false} panelClassName="flex max-h-[90vh] flex-col overflow-hidden font-sans">
 
         {/* Header */}

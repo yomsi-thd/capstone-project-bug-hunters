@@ -10,11 +10,11 @@ import { errorMessage } from "../api/apiError";
 export default function CreatorDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // There is no stats endpoint — totals are summed client-side from GET /projects/my,
-  // which since 2026-08-18 also carries backers_count and comments_count per project.
+  // There is no stats endpoint, so the totals are summed here from GET /projects/my,
+  // which carries backers_count and comments_count per project.
   // TODO: ask for an aggregate endpoint once a creator can have many projects.
   const [totals, setTotals] = useState({ raised: 0, count: 0, backers: 0, comments: 0 });
-  // Projects that have comments, busiest first — the "Community Discussions" panel.
+  // Projects with comments, busiest first, for the Community Discussions panel.
   const [discussions, setDiscussions] = useState([]);
   const [statsError, setStatsError] = useState(null);
 
@@ -28,8 +28,8 @@ export default function CreatorDashboard() {
         setTotals({
           raised: list.reduce((s, r) => s + toNumber(r.current_amount), 0),
           count: list.length,
-          // Summed across projects, so one person who backed two of them counts twice.
-          // The stat is labelled "backers across projects" for exactly that reason.
+          // Summed across projects, so somebody who backed two counts twice. That is
+          // why the stat reads "backers across projects".
           backers: list.reduce((s, r) => s + toNumber(r.backers_count), 0),
           comments: list.reduce((s, r) => s + toNumber(r.comments_count), 0),
         });
@@ -48,9 +48,8 @@ export default function CreatorDashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  // Loaded separately from the projects above: a failure here must leave the funding
-  // totals on screen rather than blanking the page, the same split ProjectDetail uses
-  // for its updates tab.
+  // Loaded separately from the projects above, so a failure here leaves the funding
+  // totals on screen rather than blanking the page. Same split ProjectDetail uses.
   const [backers, setBackers] = useState([]);
   const [backersError, setBackersError] = useState(null);
 
@@ -86,10 +85,9 @@ export default function CreatorDashboard() {
       {/* ── Main ── */}
       <div className="flex-1 flex flex-col min-w-0">
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">
-          {/* NEW PROJECT used to sit beside this title. It went on 2026-08-28 when the
-              admins' CREATE FOR A CREATOR moved onto the nav bar: START A PROJECT is
-              already there for creators, on every page, so a second copy here was the
-              odd one out. The nav bar is now the one way into the wizard. */}
+          {/* No NEW PROJECT button beside the title. START A PROJECT is on the nav
+              bar for creators, on every page, so the nav bar is the one way into the
+              wizard. */}
           <div className="mb-6">
             <h1 className="text-xl md:text-[22px] font-extrabold text-gray-900 m-0">Dashboard Overview</h1>
             <p className="text-[13px] text-gray-400 mt-1">Track your campaign's performance and manage your active projects.</p>
@@ -103,9 +101,8 @@ export default function CreatorDashboard() {
                 <div className="text-[11px] font-bold text-gray-400 tracking-widest">TOTAL CLASS COINS RECEIVED</div>
                 <span className="bg-white border border-gray-200 rounded-full px-3 py-0.5 text-[11px] font-semibold text-green-600">Active Campaign</span>
               </div>
-              {/* A "/ 12,500 CC" goal, a percentage line and a progress bar sat under
-                  this figure until N3 (2026-09-07). The running total is the measure
-                  now, so there is nothing left to be a percentage of. */}
+              {/* The running total is the measure, so there is nothing for it to be a
+                  percentage of. */}
               <div className="text-3xl md:text-[36px] font-extrabold text-brand leading-none mb-1">
                 {totals.raised.toLocaleString()} CC
               </div>
@@ -116,9 +113,8 @@ export default function CreatorDashboard() {
               </p>
             </div>
 
-            {/* Stat cards.
-                The PAGE VIEWS card that used to sit below was removed: nothing in the
-                system records a view, so it could only ever read "—". */}
+            {/* Stat cards. There is no page-views card, because nothing records a
+                view and it could only ever read as unknown. */}
             <div className="flex flex-col sm:flex-row lg:flex-col gap-4">
               <div className="bg-white border border-gray-200 rounded-xl p-5 flex-1">
                 <div className="flex justify-between items-start mb-2">
@@ -127,8 +123,8 @@ export default function CreatorDashboard() {
                 </div>
                 <div className="text-[28px] font-extrabold text-gray-900">{totals.backers}</div>
                 {/* Not "total backers": the counts are per project and summed, so one
-                    person who backed two of them is counted twice. The list below is
-                    grouped per person and is where the true headcount is. */}
+                    person who backed two is counted twice. The list below is grouped per
+                    person and is where the real head count is. */}
                 <div className="text-[12px] text-gray-400 mt-0.5">
                   Counted once per project backed
                 </div>
@@ -147,9 +143,8 @@ export default function CreatorDashboard() {
           </div>
 
           {/* Bottom row. `items-start` so each panel is only as tall as its own
-              content — the two lists have very different lengths, and a stretched
-              Discussions card left half a panel of white space that read as a
-              failed load rather than as "that is all of them". */}
+              content: the two lists differ a lot in length, and a stretched panel leaves
+              white space that reads as a failed load rather than as "that is all". */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start lp-stagger">
             {/* Discussions */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
@@ -179,16 +174,9 @@ export default function CreatorDashboard() {
               )}
             </div>
 
-            {/* Backers.
-                This panel used to be "Backer Tiers — distribution of funds across
-                defined reward levels", which needed three things that did not exist: a
-                project_tiers table, a tier choice in the invest modal, and a tier_id on
-                the transaction. All three landed on 2026-08-20, so the chip below is
-                real — but the panel stays "who put money in" rather than becoming a
-                distribution chart: "which level attracts people" is already answered on
-                the project page, per level, without another screen.
-                It also absorbed the separate "RECENT BACKERS" block that sat underneath
-                saying the same thing. */}
+            {/* Backers: who put coins in, rather than a distribution chart. "Which
+                level attracts people" is already answered on the project page, per
+                level, without another screen. */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
               <h3 className="text-[15px] font-bold text-gray-900 mb-1">Your Backers</h3>
               <p className="text-[12px] text-gray-400 mb-4">Everyone who has invested in your projects, most first.</p>
@@ -207,11 +195,11 @@ export default function CreatorDashboard() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-[13px] font-semibold text-gray-800 truncate">{b.name}</span>
-                          {/* The highest support level this person ever chose across ALL
-                              your projects — the row is grouped per person, not per
-                              project. The "N projects" line right below keeps that from
-                              being read as "their level on one project". Absent for
-                              anyone who invested before 2026-08-20 or chose no level. */}
+                          {/* The highest level this person chose across all your projects,
+                              since the row is grouped per person rather than per
+                              project. The "N projects" line below keeps that from being
+                              read as their level on one project. Absent for anyone who
+                              chose no level. */}
                           {b.topTier && (
                             <span className="shrink-0 rounded-sm border border-red-200 bg-red-50 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-brand">
                               {b.topTier.name.toUpperCase()}

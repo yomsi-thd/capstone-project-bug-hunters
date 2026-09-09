@@ -16,8 +16,8 @@ export default function Register() {
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  // Everyone signs up as a Backer; Creator is an optional request that an
-  // admin must approve before the user can publish projects.
+  // Everyone signs up as a backer. Creator is an optional request an admin has to
+  // approve before the user can publish projects.
   const [requestCreator, setRequestCreator] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [errors, setErrors] = useState({});
@@ -27,9 +27,8 @@ export default function Register() {
   const validate = () => {
     const next = {};
     if (!fullName.trim()) next.fullName = "Full name is required";
-    // Hiếu confirmed on 2026-08-06 that sign-up is email-only — the users table has
-    // no rmit_id column and there is no plan to add one, so the RMIT ID branch that
-    // used to pass validation and then fail at submit time is gone.
+    // Sign-up is email-only. The users table has no rmit_id column, so accepting one
+    // here would pass validation and then fail at submit.
     if (!identifier.trim()) {
       next.identifier = "Email is required";
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(identifier.trim())) {
@@ -54,11 +53,9 @@ export default function Register() {
 
     setIsSubmitting(true);
     try {
-      // The backend assigns the BACKER role and creates a ClassCoin wallet (4500 CC).
-      // wantCreator writes a PENDING row into creator_requests; an admin approves it
-      // from GET /admin/creator-requests, which is what actually grants CREATOR.
-      // Ticking the box never grants the role by itself, so the "pending admin review"
-      // message in RegisterSuccessModal is now literally true.
+      // The backend assigns the BACKER role and creates a Class Coin wallet. wantCreator
+      // writes a PENDING row into creator_requests, and an admin approving that is what
+      // grants CREATOR: ticking the box never grants the role by itself.
       await authApi.register({
         fullName: fullName.trim(),
         email,
@@ -94,8 +91,8 @@ export default function Register() {
           error={errors.fullName}
         />
 
-        {/* Deliberately not type="email" — the browser's native validation bubble
-            would pre-empt the custom error line rendered under the field. */}
+        {/* Not type="email": the browser's native validation bubble would pre-empt
+            the error line rendered under the field. */}
         <AuthInput
           label="EMAIL"
           value={identifier}
@@ -122,9 +119,9 @@ export default function Register() {
           error={errors.confirmPassword}
         />
 
-        {/* Account type: Backer is granted to everyone; Creator is an
-            approval-gated request. Admin is intentionally NOT self-requestable
-            here — it's provisioned by an existing admin (least privilege). */}
+        {/* Account type. Backer is granted to everyone and Creator is a request an
+            admin approves. Admin is not self-requestable here: an existing admin
+            provisions it. */}
         <div className="mb-[22px]">
           <div className="mb-2.5 text-[11px] font-bold tracking-[0.08em] text-neutral-500">
             ACCOUNT TYPE

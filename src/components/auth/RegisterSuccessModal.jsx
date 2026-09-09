@@ -3,9 +3,9 @@ import SuccessCheck from "../ui/SuccessCheck";
 
 export default function RegisterSuccessModal({ onGoToLogin, requestedRole = null }) {
   return (
-    // closable={false} is deliberate and must stay: this dialog has no onClose, because
-    // the ONLY way out is GO TO LOGIN. Letting a click on the backdrop dismiss it would
-    // strand the user on the registration form with an account that already exists.
+    // closable={false} has to stay. There is no onClose, because the only way out is GO
+    // TO LOGIN: dismissing it would strand the user on the registration form with an
+    // account that already exists.
     <Modal maxWidth={420} closable={false} panelClassName="border-t-[5px] border-brand px-8 pt-10 pb-7 text-center">
         <SuccessCheck />
 

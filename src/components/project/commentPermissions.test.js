@@ -51,7 +51,7 @@ describe("repliesLostBy", () => {
     expect(repliesLostBy(comment())).toBe(0);
   });
 
-  // A reply node carries no `replies` array at all — CommentList builds it only for roots.
+  // A reply node carries no `replies` array: CommentList builds it only for roots.
   it("is 0 when the comment has no replies array", () => {
     expect(repliesLostBy({ id: 4, authorId: 7 })).toBe(0);
   });

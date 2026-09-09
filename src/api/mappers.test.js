@@ -17,8 +17,8 @@ import {
   parseAmount,
 } from "./mappers";
 
-// A project row as Postgres actually returns it through node-postgres: note that
-// numeric columns arrive as STRINGS, and team_members is already parsed jsonb.
+// A project row as node-postgres returns it: numeric columns arrive as strings, and
+// team_members is already parsed jsonb.
 function projectRow(overrides = {}) {
   return {
     id: 4,
@@ -39,9 +39,9 @@ function projectRow(overrides = {}) {
   };
 }
 
-// The same row after an admin archived it. `status` is deliberately still APPROVED —
-// archiving does not touch the moderation verdict, which is what lets restore put the
-// project straight back on Discover without a second approval.
+// The same row after an admin archived it. `status` is still APPROVED, since archiving
+// does not touch the verdict, which is what lets restore put the project back on
+// Discover without a second approval.
 function archivedRow(overrides = {}) {
   return projectRow({
     archived_at: "2026-08-11T04:20:00.000Z",
@@ -59,7 +59,7 @@ describe("toNumber", () => {
   });
 
   it("falls back to 0 rather than producing NaN", () => {
-    // NaN would leak into the UI as "NaN%" or a broken progress bar.
+    // NaN would reach the UI as a broken number.
     expect(toNumber(null)).toBe(0);
     expect(toNumber(undefined)).toBe(0);
     expect(toNumber("not a number")).toBe(0);
@@ -76,8 +76,8 @@ describe("toCard", () => {
       desc: "Coordinated drones for disaster mapping.",
       img: "https://example.test/drone.jpg",
       raised: 500,
-      // Null here because projectRow() carries no backers_count. GET /projects supplies
-      // it; a row from before that subquery existed simply shows no head count.
+      // Null because projectRow() carries no backers_count. A row without the count
+      // shows no head count rather than zero.
       backers: null,
       large: false,
       status: "APPROVED",
@@ -94,13 +94,13 @@ describe("toCard", () => {
   });
 
   it("keeps a real zero backer count instead of turning it into null", () => {
-    // 0 is falsy — the check has to be against null, exactly like stats.backers. A
-    // project nobody has backed reads "0 backers", not a blank.
+    // 0 is falsy, so the check has to be against null, like stats.backers. A project
+    // nobody has backed reads "0 backers" rather than a blank.
     expect(toCard(projectRow({ backers_count: 0 })).backers).toBe(0);
   });
 
   it("uppercases the tag so TAG_COLORS can key on it", () => {
-    // Hiếu's older rows use mixed case ("Education", "Business").
+    // Older rows use mixed case, e.g. "Education".
     expect(toCard(projectRow({ category: "Education" })).tag).toBe("EDUCATION");
     expect(toCard(projectRow({ category: null })).tag).toBe("UNCATEGORIZED");
   });
@@ -117,8 +117,8 @@ describe("toCard", () => {
 describe("toDetail", () => {
   it("carries the semester id so the page can look up its closing date", () => {
     expect(toDetail(projectRow()).semesterId).toBe(2);
-    // An older row filed before the column existed. The sidebar shows a dash rather
-    // than inventing a date.
+    // An older row with no semester. The sidebar shows a dash rather than inventing a
+    // date.
     expect(toDetail(projectRow({ semester_id: null })).semesterId).toBeNull();
   });
 
@@ -134,8 +134,8 @@ describe("toDetail", () => {
   });
 
   it("keeps a real zero backer count instead of turning it into null", () => {
-    // 0 is falsy — the check has to be against null, or a project nobody backed
-    // would render the "not supplied by the API" placeholder.
+    // 0 is falsy, so the check is against null, or a project nobody backed would render
+    // the "not supplied" placeholder.
     expect(toDetail(projectRow({ backers_count: 0 })).stats.backers).toBe(0);
   });
 
@@ -147,7 +147,7 @@ describe("toDetail", () => {
   });
 
   it("maps the three story columns onto the About sections", () => {
-    // The column is funding_usage; the UI prop has always been `funding`.
+    // The column is funding_usage; the UI prop is `funding`.
     const d = toDetail(projectRow({
       challenge: "Rescue teams cannot map a collapsed site fast enough.",
       solution: "A swarm that divides the area between units.",
@@ -159,7 +159,8 @@ describe("toDetail", () => {
   });
 
   it("treats an empty story column as absent so the section is skipped", () => {
-    // ProjectDetail renders each section on truthiness — "" must not open an empty one.
+    // ProjectDetail renders each section on truthiness, so "" must not open an empty
+    // one.
     const d = toDetail(projectRow({ challenge: "", solution: "", funding_usage: "" }));
     expect(d.challenge).toBeNull();
     expect(d.solution).toBeNull();
@@ -168,7 +169,7 @@ describe("toDetail", () => {
 
   it("nulls out every field the backend cannot supply", () => {
     const d = toDetail(projectRow());
-    // No join columns on this fixture — a deleted creator row looks the same.
+    // No join columns on this fixture, which is what a deleted creator row looks like.
     expect(d.creator).toBeNull();
     expect(d.stats.backers).toBeNull();
     expect(d.challenge).toBeNull();
@@ -224,13 +225,13 @@ describe("toCommentThread", () => {
       row({ id: 3, parent_id: 1, body: "reply A" }),
       row({ id: 4, parent_id: 1, body: "reply B" }),
     ]);
-    // CommentItem reads `text`, not `body` — the mapper renames it.
+    // CommentItem reads `text` rather than `body`, so the mapper renames it.
     expect(thread.map(c => c.text)).toEqual(["newer", "older"]);
     expect(thread[1].replies.map(r => r.text)).toEqual(["reply A", "reply B"]);
   });
 
   it("survives a reply whose parent is missing", () => {
-    // comments.user_id is SET NULL and a parent can vanish between requests; an
+    // comments.user_id is SET NULL and a parent can vanish between requests, so an
     // orphaned reply must not throw.
     expect(() => toCommentThread([row({ id: 9, parent_id: 999 })])).not.toThrow();
     expect(toCommentThread([row({ id: 9, parent_id: 999 })])).toEqual([]);
@@ -270,8 +271,8 @@ describe("toProjectUpdate", () => {
 
 describe("the semester fields", () => {
   // Two freeze axes that must not be conflated: archiving hides a project from Discover
-  // and is something a person did; a semester ending leaves it visible and is something
-  // the calendar did. Both mappers carry both.
+  // and is a person's doing, while a semester ending leaves it visible and is the
+  // calendar's. Both mappers carry both.
   it("toDetail carries the semester, and semesterClosed is a real boolean", () => {
     const d = toDetail(
       projectRow({ semester_name: "Semester 1 2026", semester_end_date: "2026-05-23", semester_closed: true })
@@ -290,9 +291,9 @@ describe("the semester fields", () => {
     expect(c.semesterClosed).toBe(true);
   });
 
-  // The API sends `false` for a project with no semester (the COALESCE), but an older
-  // response or a row read some other way could omit the field entirely. Undefined must
-  // not reach a component as `undefined` — it decides whether buttons are drawn.
+  // The API sends false for a project with no semester, but a row read some other way
+  // could omit the field. Undefined must not reach a component, since this decides
+  // whether buttons are drawn.
   it("treats a missing semester as open, never as closed", () => {
     const row = projectRow({ semester_id: null });
     delete row.semester_closed;
@@ -305,9 +306,9 @@ describe("the semester fields", () => {
     expect(d.semesterEndDate).toBeNull();
   });
 
-  // ⚠️ The date stays the raw string. Turning it into a Date here would print the
-  // previous day for any viewer west of Greenwich — the whole reason the API sends
-  // 'YYYY-MM-DD' and formatSemesterDate parses it by hand.
+  // The date stays a raw string. Building a Date from it would print the previous day
+  // west of Greenwich, which is why the API sends "YYYY-MM-DD" and formatSemesterDate
+  // parses it by hand.
   it("keeps semesterEndDate as the raw 'YYYY-MM-DD' string", () => {
     const d = toDetail(projectRow({ semester_end_date: "2026-10-25" }));
 
@@ -353,16 +354,15 @@ describe("toCreatorProject", () => {
   });
 
   it("carries the backer and comment counts the creator dashboard totals up", () => {
-    // GET /projects/my started returning both on 2026-08-18; before that the dashboard
-    // showed "—" in every stat card.
+    // Both come from GET /projects/my, which is what fills the dashboard's stat cards.
     const p = toCreatorProject(projectRow({ backers_count: 3, comments_count: 7 }));
     expect(p.backers).toBe(3);
     expect(p.commentsCount).toBe(7);
   });
 
   it("keeps a real zero as 0 and a missing count as null", () => {
-    // The check has to be `== null`, not falsy: a project nobody has backed yet has 0
-    // backers, and rendering that as "—" would read as "we don't know".
+    // The check is `== null` rather than falsy: a project nobody has backed has 0
+    // backers, and rendering that as a dash would read as "we don't know".
     const none = toCreatorProject(projectRow({ backers_count: 0, comments_count: 0 }));
     expect(none.backers).toBe(0);
     expect(none.commentsCount).toBe(0);
@@ -377,8 +377,8 @@ describe("toBacker", () => {
   const backerRow = (overrides = {}) => ({
     user_id: 31,
     full_name: "Priya Sharma",
-    // SUM()::int comes back as a number, but COUNT/SUM over numeric would be a string —
-    // the same node-postgres trap the amounts have, so the mapper coerces anyway.
+    // SUM()::int comes back as a number, but a sum over numeric would be a string, the
+    // same node-postgres trap the amounts have, so the mapper coerces anyway.
     total_amount: 750,
     project_count: 2,
     last_invested_at: "2026-08-14T09:15:00.000Z",
@@ -406,10 +406,10 @@ describe("toBacker", () => {
   });
 
   it("has no support level when the person never chose one", () => {
-    // The common case by far: every investment made before 2026-08-20, plus every
-    // "No level — just support" choice. The LEFT JOIN leaves both columns NULL.
+    // The common case: a "just support" investment, where the LEFT JOIN leaves both
+    // columns NULL.
     expect(toBacker(backerRow({ top_tier_name: null, top_tier_min: null })).topTier).toBeNull();
-    // Absent entirely, e.g. an older cached response.
+    // Absent entirely, as in an older cached response.
     expect(toBacker(backerRow()).topTier).toBeNull();
   });
 
@@ -433,10 +433,8 @@ describe("toAdminProject", () => {
 });
 
 describe("toApprovalProject", () => {
-  // Neither a funding goal nor a campaign duration reaches the review screen since N3
-  // (2026-09-07). The duration went with them rather than surviving alone: it read
-  // start_date / end_date, which createProject stopped writing on 2026-09-06, so it had
-  // already been answering "Not set" for every project filed since.
+  // Neither a funding goal nor a campaign duration reaches the review screen. There is
+  // no goal, and a project closes with its semester rather than on dates of its own.
   it("carries no funding goal and no campaign duration", () => {
     const row = projectRow({ start_date: "2026-08-01T00:00:00.000Z", end_date: "2026-09-01T00:00:00.000Z" });
     expect(toApprovalProject(row).goal).toBeUndefined();
@@ -458,8 +456,8 @@ describe("toApprovalProject", () => {
 
   it("carries who filed the project on the creator's behalf", () => {
     const filed = projectRow({ created_by_admin_id: 3, created_by_admin_name: "Test Admin" });
-    // The id decides whether APPROVE/REJECT are hidden — an admin may not review a
-    // project they filed themselves — and the name is what the OTHER admin reads.
+    // The id decides whether APPROVE and REJECT are hidden, since an admin may not review
+    // a project they filed, and the name is what the reviewing admin reads.
     expect(toApprovalProject(filed).createdByAdminId).toBe(3);
     expect(toApprovalProject(filed).createdByAdminName).toBe("Test Admin");
     expect(toAdminProject(filed).createdByAdminId).toBe(3);
@@ -467,15 +465,15 @@ describe("toApprovalProject", () => {
   });
 
   it("returns null for a project the creator made themselves", () => {
-    // Every project before 2026-08-24, and every one a creator files for themselves.
-    // Null is the signal that no on-behalf rule applies at all.
+    // Null on anything a creator filed themselves, which is the signal that no on-behalf
+    // rule applies.
     expect(toApprovalProject(projectRow()).createdByAdminId).toBeNull();
     expect(toApprovalProject(projectRow()).createdByAdminName).toBeNull();
   });
 
   it("still gives the id when only the name join is missing", () => {
-    // GET /admin/projects joins the name; other reads return the bare column. The
-    // "hide the buttons" rule must not quietly stop working on a row without the join.
+    // GET /admin/projects joins the name while other reads return the bare column, and
+    // the "hide the buttons" rule must keep working on a row without the join.
     const noJoin = projectRow({ created_by_admin_id: 3 });
     expect(toApprovalProject(noJoin).createdByAdminId).toBe(3);
     expect(toApprovalProject(noJoin).createdByAdminName).toBeNull();
@@ -499,28 +497,29 @@ describe("toAdminUser", () => {
   // The admin issues Class Coins from this table, so the balance rides along.
   it("carries the balance, and keeps 'no wallet' distinct from 'empty wallet'", () => {
     expect(toAdminUser(userRow({ balance: 4000 })).balance).toBe(4000);
-    // 0 is a real balance and must survive — the row says "0 CC".
+    // 0 is a real balance and has to survive: the row says "0 CC".
     expect(toAdminUser(userRow({ balance: 0 })).balance).toBe(0);
-    // null is not 0: this account has no wallet row at all, and the row says "—".
+    // null is not 0: this account has no wallet row at all, and the row shows a dash.
     expect(toAdminUser(userRow({ balance: null })).balance).toBeNull();
     expect(toAdminUser(userRow()).balance).toBeNull();
   });
 
   it("shows a dash for a user with no roles", () => {
-    // user id 12 in the shared database really is in this state.
+    // Real accounts are in this state, so it is not a hypothetical.
     expect(toAdminUser(userRow({ roles: [] })).role).toBe("—");
     expect(toAdminUser(userRow({ roles: undefined })).role).toBe("—");
   });
 
   it("also hands back the raw uppercase roles the edit checkboxes bind to", () => {
-    // `role` above is a display string; PATCH /admin/users/:id/roles wants the array.
+    // `role` above is a display string, while PATCH /admin/users/:id/roles wants the
+    // array.
     expect(toAdminUser(userRow()).roles).toEqual(["ADMIN", "BACKER"]);
     expect(toAdminUser(userRow({ roles: undefined })).roles).toEqual([]);
   });
 
   it("invents no student id and no project assignment", () => {
-    // Both used to be filled in — studentId was "#15" and project was always
-    // "Unassigned" — which put numbers on screen that exist nowhere in the database.
+    // Neither exists in the database, so inventing them would put figures on screen that
+    // nothing backs.
     const u = toAdminUser(userRow());
     expect(u.studentId).toBeUndefined();
     expect(u.project).toBeUndefined();
@@ -553,7 +552,7 @@ describe("toProfile", () => {
     expect(p.joinedOn).toBeTruthy();
   });
 
-  // The three text fields are bound to controlled inputs, so null would make them
+  // The three text fields bind to controlled inputs, so null would make them
   // uncontrolled and React would warn as soon as the user typed.
   it("turns missing text columns into empty strings, never null", () => {
     const p = toProfile(profileRow({ title: null, full_name: null, email: null }));
@@ -577,9 +576,8 @@ describe("toProfile", () => {
   });
 });
 
-// GET /classcoins/investments returns one row per PROJECT, already grouped and joined —
-// it replaced "read every transaction, then fetch each project" on 2026-08-18. So this
-// mapper takes one row, not a (transaction, project) pair.
+// GET /classcoins/investments returns one row per project, already grouped and joined, so
+// this mapper takes one row rather than a transaction-and-project pair.
 describe("toInvestment", () => {
   const investmentRow = (overrides = {}) => ({
     project_id: 4,
@@ -600,17 +598,14 @@ describe("toInvestment", () => {
     expect(inv.projectId).toBe(4);
     expect(inv.title).toBe("Autonomous Swarm Drones");
     expect(inv.investedAmount).toBe(500);
-    // The PROJECT's total, not this backer's share — it replaced the funding-progress
-    // bar on the card when the goal went (N3).
+    // The project's total rather than this backer's share.
     expect(inv.projectTotal).toBe(500);
     expect(inv.investmentDate).toMatch(/Aug \d{2}, 2026/);
   });
 
-  // ⚠️ This used to prove that several investments in one project were TOTALLED into a
-  // single card, with a count beside it. N4 (2026-09-07) made a second contribution
-  // illegal, so `investmentCount` and `firstInvestmentDate` were dropped rather than
-  // left reporting 1 forever. The row is still a GROUP BY — one row per project — which
-  // is what this now checks.
+  // One contribution per project means one card per project, so there is no count or
+  // first-investment date to carry. The row is still a GROUP BY, which is what this
+  // checks.
   it("reads the grouped row as one card per project", () => {
     const inv = toInvestment(investmentRow({ invested_amount: 500 }));
     expect(inv.projectId).toBe(4);
@@ -625,7 +620,8 @@ describe("toInvestment", () => {
   });
 
   it("badges an investment in an archived project instead of dropping it", () => {
-    // Archiving must never erase somebody's spend history — the card stays, marked.
+    // Archiving must never erase somebody's spend history, so the card stays and is
+    // marked.
     const inv = toInvestment(investmentRow({ archived_at: "2026-08-11T10:00:00.000Z" }));
     expect(inv.archived).toBe(true);
     expect(inv.investedAmount).toBe(500);
@@ -639,9 +635,9 @@ describe("toInvestment", () => {
   });
 });
 
-// The archive columns, added 2026-08-11 when delete was replaced by a two-step bin.
-// The point of these is that archiving is a SECOND axis: it must never disturb the
-// moderation status, because restore relies on that status surviving untouched.
+// The archive columns. The point of these is that archiving is a second axis: it must
+// never disturb the moderation status, because restore relies on that status surviving
+// untouched.
 describe("toInvestment support level", () => {
   const row = (overrides = {}) => ({
     project_id: 4,
@@ -696,8 +692,8 @@ describe("toTier", () => {
   });
 
   it("coerces min_amount and backers_count to numbers", () => {
-    // COUNT() and INTEGER columns have both arrived as strings from node-postgres in
-    // this codebase, and the resulting bugs were silent.
+    // COUNT() and integer columns have both arrived as strings from node-postgres here,
+    // and the resulting bugs were silent.
     const t = toTier(tierRow({ min_amount: "250", backers_count: "12" }));
     expect(t.minAmount).toBe(250);
     expect(t.backersCount).toBe(12);
@@ -739,15 +735,15 @@ describe("archive fields", () => {
   });
 
   it("keeps archivedBy as the raw id, since CreatorMyProjects compares it to user.id", () => {
-    // A creator may only restore an archive they performed themselves. That check is
-    // `archivedBy === user.id`, so this must stay a number and never become a name.
+    // A creator may only restore an archive they performed themselves, and that check
+    // compares ids, so this stays a number and never becomes a name.
     const c = toCreatorProject(archivedRow({ archived_by: 14 }));
     expect(c.archivedBy).toBe(14);
     expect(typeof c.archivedBy).toBe("number");
   });
 
   it("leaves the moderation status alone — archived is a separate axis", () => {
-    // The whole reason restore needs no re-approval: `status` survives the round trip.
+    // Why restore needs no re-approval: `status` survives the round trip.
     expect(toDetail(archivedRow()).status).toBe("APPROVED");
     expect(toCreatorProject(archivedRow()).status).toBe("Active");
     expect(toAdminProject(archivedRow()).status).toBe("Active");
@@ -761,8 +757,8 @@ describe("archive fields", () => {
   });
 
   it("maps an absent or empty review note to null, not an empty string", () => {
-    // The queue's one-click REJECT stores no note, so this is a normal state — the card
-    // branches on it to say "The board did not leave a note."
+    // The queue's one-click REJECT stores no note, so this is a normal state and the card
+    // says so.
     expect(toCreatorProject(projectRow({ status: "REJECTED" })).reviewNote).toBeNull();
     expect(toCreatorProject(projectRow({ status: "REJECTED", review_note: "" })).reviewNote).toBeNull();
   });
@@ -786,8 +782,8 @@ describe("parseAmount", () => {
     expect(parseAmount("1,234.56")).toBe(1234.56);
   });
 
-  // CLAUDE.md's rule: strip /[^0-9.]/g, NOT /[$,]/g. The string is "1,050 CC", not
-  // "$1,050", so a $-and-comma strip leaves " CC" behind and Number() returns NaN.
+  // Strip /[^0-9.]/g rather than /[$,]/g. The string is "1,050 CC", so a dollar-and-comma
+  // strip leaves " CC" behind and Number() returns NaN.
   it("strips a trailing unit, which a /[$,]/ strip would leave behind", () => {
     expect(parseAmount("1,050 CC")).not.toBeNaN();
     expect(String("1,050 CC").replace(/[$,]/g, "")).toBe("1050 CC");
@@ -797,10 +793,9 @@ describe("parseAmount", () => {
     expect(parseAmount("250 CC", { integer: true })).toBe(250);
   });
 
-  // ⚠️ Deliberately preserved from BackerInvestmentModal:19. The invest field filters on
-  // every keystroke, so "12.5" becomes "125" — the dot is stripped, not rounded. An
-  // investment is a whole number of Class Coins, and the user sees immediately that the
-  // field will not take a dot.
+  // The invest field filters on every keystroke, so "12.5" becomes "125": the dot is
+  // stripped rather than rounded. An investment is a whole number of Class Coins, and the
+  // user sees at once that the field takes no dot.
   it("removes the dot rather than rounding, in integer mode", () => {
     expect(parseAmount("12.5", { integer: true })).toBe(125);
   });
@@ -819,10 +814,9 @@ describe("parseAmount", () => {
 });
 
 describe("formatSemesterDate", () => {
-  // ⚠️ The whole point of this function. A semester's dates are `DATE` columns and
-  // arrive as plain strings; `new Date("2026-10-25").toLocaleDateString()` prints
-  // 24 Oct for any viewer west of Greenwich, which is the same family of bug as the
-  // investment dates that read a day early until the TIMESTAMPTZ migration.
+  // The point of this function. Semester dates are DATE columns and arrive as plain
+  // strings; parsing one into a Date and formatting it prints 24 Oct for any viewer west
+  // of Greenwich.
   it("reads the string and never builds a Date from it", () => {
     expect(formatSemesterDate("2026-10-25")).toBe("25 Oct 2026");
     expect(formatSemesterDate("2026-01-01")).toBe("1 Jan 2026");
@@ -834,9 +828,9 @@ describe("formatSemesterDate", () => {
     expect(formatSemesterDate(undefined)).toBe("");
     expect(formatSemesterDate("")).toBe("");
     expect(formatSemesterDate("not-a-date")).toBe("");
-    // A full timestamp is deliberately refused rather than half-parsed: this function
-    // is only ever handed a DATE column, and accepting more would invite a caller to
-    // pass a created_at and get a date shifted by the viewer's zone.
+    // A full timestamp is refused rather than half-parsed. This function is only handed
+    // a DATE column, and accepting more would invite a caller to pass a created_at and
+    // get a date shifted by their timezone.
     expect(formatSemesterDate("2026-10-25T00:00:00.000Z")).toBe("");
   });
 

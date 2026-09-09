@@ -15,11 +15,9 @@ import {
 import { errorMessage, errorCode } from "../api/apiError";
 
 /**
- * Was this project filed by the admin who is currently looking at it?
- *
- * `createdByAdminId` is null for every project a creator made themselves, so this is
- * false for almost everything — which is the point: the rule only bites on the
- * on-behalf projects the admin role separation introduced.
+ * Was this project filed by the admin currently looking at it? `createdByAdminId` is null
+ * for anything a creator made themselves, so this is false for almost every row: the rule
+ * only bites on projects an admin filed for somebody else.
  */
 function isOwnFiling(project, viewerId) {
   return (
@@ -29,12 +27,11 @@ function isOwnFiling(project, viewerId) {
 }
 
 /**
- * The one line that tells a reviewer an admin filed this project rather than its owner.
+ * Tells a reviewer that an admin filed this project rather than its owner.
  *
- * Two audiences, two messages: the admin who filed it is told why the verdict buttons
- * are gone, and every other admin is told who filed it before they decide. Both matter
- * — a project that arrives in the queue via an admin is not the same thing as one a
- * creator submitted, and nothing else on screen would say so.
+ * Two audiences, two messages: the admin who filed it learns why the verdict buttons are
+ * gone, and every other admin learns who filed it before deciding. Nothing else on screen
+ * distinguishes an on-behalf project from one a creator submitted.
  */
 function OnBehalfNote({ project, viewerId, className = "" }) {
   if (project?.createdByAdminId == null) return null;
@@ -64,15 +61,14 @@ function OnBehalfNote({ project, viewerId, className = "" }) {
   );
 }
 
-// ── Project Review Page ──
+// Project review page.
 function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
   const [feedback, setFeedback] = useState("");
 
-  // Loaded here rather than carried on the queue row: GET /admin/projects does not join
-  // the levels (they are per-project detail, not queue data), and an admin deciding
-  // whether to approve a project should be able to see what its backers will be offered.
-  // A failure must not take the review screen down with it - the verdict buttons work
-  // without this panel.
+  // Loaded here rather than carried on the queue row, since GET /admin/projects does not
+  // join the levels: they are per-project detail rather than queue data. An admin
+  // deciding on a project should see what its backers will be offered. A failure must not
+  // take the review screen down, as the verdict buttons work without this panel.
   const [levels, setLevels] = useState([]);
 
   useEffect(() => {
@@ -113,7 +109,7 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
         <div className="grid grid-cols-[1fr_280px] gap-6">
           {/* Left col */}
           <div>
-            {/* Gallery. A submission may have no images at all — falling straight to
+            {/* Gallery. A submission may have no images at all, and falling straight to
                 project.gallery[0] is what used to crash this whole screen. Show the
                 cover image, then the gallery, then a placeholder. */}
             <div className="rounded-xl overflow-hidden mb-3 relative bg-gray-100 h-[220px]">
@@ -133,12 +129,10 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
               ))}
             </div>
 
-            {/* Was "Project Goal" with two figures under it: PROJECTED FUNDING GOAL and
-                CAMPAIGN DURATION. Both went in N3 (2026-09-07) — there is no funding goal
-                any more, and the duration read start_date / end_date, which createProject
-                stopped writing on 2026-09-06, so it had been showing "Not set" on every
-                project filed since. The heading changed with them: "Goal" here meant the
-                project's aim, but beside a funding figure it read as the target. */}
+            {/* No funding figure and no campaign duration here: a project has no goal,
+                and it closes with its semester rather than on dates of its own. The
+                heading avoids "Goal" for the same reason, since beside a figure it reads
+                as a target rather than as the project's aim. */}
             <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
               <h3 className="text-[15px] font-bold text-gray-900 mb-2">About This Project</h3>
               <p className="text-[13px] text-gray-500 leading-relaxed">{project.description}</p>
@@ -150,10 +144,9 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
 
               <OnBehalfNote project={project} viewerId={viewerId} className="mb-4" />
 
-              {/* Hidden, not disabled. A greyed-out APPROVE says "no" without saying
-                  why, and the why is the whole content here — the note above is what
-                  the reader needs. The backend refuses this too (projectService
-                  .assertNotOwnReview): the UI is not a security boundary. */}
+              {/* Hidden rather than disabled. A greyed-out APPROVE says no without saying
+                  why, and the why is the whole point here: the note above is what the
+                  reader needs. The backend refuses it too. */}
               {isOwnFiling(project, viewerId) ? null : (
                 <>
                 <div className="mb-4">
@@ -173,12 +166,9 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
                     >
                       ✓ APPROVE PROJECT
                     </button>
-                    {/* Was "REQUEST CHANGES" while the list row called the identical
-                        action "REJECT" (2026-08-18: settled on REJECT). Both call
-                        rejectProject and both land on status = REJECTED; the schema is
-                        CHECK (status IN ('PENDING','APPROVED','REJECTED')) with no
-                        CHANGES_REQUESTED, so the softer wording described a state that
-                        does not exist. The note below says what actually happens. */}
+                    {/* REJECT rather than a softer "request changes": there is no such status,
+                        so this lands on REJECTED either way and the wording should say
+                        so. The note below spells out what happens next. */}
                     <button
                       onClick={() => onReject(project.id, feedback)}
                       className="bg-white border border-gray-300 text-gray-600 rounded-md px-5 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-gray-50 transition-colors flex items-center gap-2"
@@ -206,8 +196,8 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
                   <div className="text-[11px] text-gray-400">No team members listed.</div>
                 )}
                 {(project.team || []).map((m, idx) => {
-                  // team_members is free-form jsonb — a row may hold a bare string, or an
-                  // object with no name at all. Neither must take the screen down.
+                  // team_members is free-form jsonb: a row may hold a bare string, or an
+                  // object with no name at all. Neither should break the screen.
                   const name = (typeof m === "string" ? m : m?.name) || "Unnamed member";
                   return (
                     <div key={m?.id ?? idx} className="flex items-center gap-2.5">
@@ -241,10 +231,9 @@ function ProjectReview({ project, viewerId, onBack, onApprove, onReject }) {
   );
 }
 
-// ── Main Approvals Page ──
-// The two things an admin approves. Projects came first; creator requests are the other
-// half of the "Creator" checkbox on Register — approving one is now the ONLY way a user
-// gets the CREATOR role, since createProject stopped granting it automatically.
+// Main approvals page, covering what an admin approves. Creator requests are the other
+// half of the "Creator" checkbox on Register, and approving one is the only way a user
+// gets the CREATOR role.
 const QUEUES = [
   { id: "projects", label: "Project Submissions" },
   { id: "creators", label: "Creator Requests" },
@@ -253,19 +242,19 @@ const QUEUES = [
 
 export default function AdminApprovals() {
   const navigate = useNavigate();
-  // Which admin is reading. An admin may not approve or reject a project they filed on
-  // a creator's behalf, and this is the id that decision compares against.
+  // Which admin is reading. An admin may not approve or reject a project they filed on a
+  // creator's behalf, and this is the id that decision compares against.
   const { user } = useAuth();
   const viewerId = user?.id ?? null;
   const [activeNav, setActiveNav] = useState("approvals");
   const [queue, setQueue] = useState("projects");
-  // Bumped when a verdict is refused as already-given, to reload a stale queue.
+  // Bumped when a verdict is refused as already given, to reload a stale queue.
   const [queueVersion, setQueueVersion] = useState(0);
   const [projects, setProjects] = useState([]);
   const [creatorRequests, setCreatorRequests] = useState([]);
   const [coinRequests, setCoinRequests] = useState([]);
-  // The amount per request, keyed by request id. One input per ROW rather than one shared
-  // by the table: an admin may well issue two people two different amounts in one sitting.
+  // The amount per request, keyed by request id. One input per row rather than one shared
+  // by the table, since an admin may issue two people different amounts in one sitting.
   const [coinAmounts, setCoinAmounts] = useState({});
   const [loadError, setLoadError] = useState(null);
   const [actionError, setActionError] = useState(null);
@@ -273,11 +262,12 @@ export default function AdminApprovals() {
   const [search, setSearch] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // GET /api/admin/projects then filter to PENDING — there is no dedicated route for
-  // the approval queue. TODO: ask for a ?status=PENDING filter.
-  // Archived projects are excluded: that route returns them too, and a PENDING project
-  // that has since been archived would otherwise sit here waiting for a verdict the
-  // backend now refuses, so APPROVE would just throw a 400 and look broken.
+  // There is no dedicated queue route, so fetch every admin project and filter to
+  // PENDING. TODO: ask for a ?status=PENDING filter.
+  //
+  // Archived projects are excluded. That route returns them too, and a PENDING project
+  // since archived would sit here waiting for a verdict the backend refuses, so APPROVE
+  // would 400 and look broken.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -297,12 +287,12 @@ export default function AdminApprovals() {
       }
     })();
     return () => { cancelled = true; };
-    // queueVersion, not []: a verdict refused with 409 means somebody else already
-    // reviewed that project, so the row on screen is stale. Bumping the version refetches
-    // and the row disappears, instead of sitting there inviting a second identical click.
+    // Depends on queueVersion rather than []: a 409 means another admin already reviewed
+    // that project, so the row is stale. Bumping the version refetches and the row goes,
+    // instead of sitting there inviting the same click again.
   }, [queueVersion]);
 
-  // GET /api/admin/creator-requests already returns only PENDING rows.
+  // The endpoint returns PENDING rows only.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -318,9 +308,8 @@ export default function AdminApprovals() {
     return () => { cancelled = true; };
   }, []);
 
-  // GET /api/admin/coin-requests returns PENDING rows only. queueVersion, not []: the same
-  // reason as the project queue — a 409 means another admin has already given a verdict,
-  // so the row on screen is stale.
+  // PENDING rows only. Depends on queueVersion for the same reason as the project queue:
+  // a 409 means another admin has already given a verdict and the row is stale.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -350,8 +339,8 @@ export default function AdminApprovals() {
     (r.email || "").toLowerCase().includes(term)
   );
 
-  // Approving grants the CREATOR role inside a DB transaction on the backend; the row is
-  // kept in the list with its new status so the admin can see what they just did.
+  // Approving grants the CREATOR role in a transaction on the backend. The row stays in
+  // the list with its new status, so the admin can see what they just did.
   const handleCreatorDecision = async (id, decision) => {
     setActionError(null);
     try {
@@ -365,8 +354,8 @@ export default function AdminApprovals() {
     }
   };
 
-  // Approving credits the wallet and closes the request in ONE transaction on the backend.
-  // Here the row simply leaves the list, because this queue only ever holds PENDING rows.
+  // Approving credits the wallet and closes the request in one transaction on the
+  // backend. The row then leaves the list, since this queue holds PENDING rows only.
   const handleCoinDecision = async (id, decision) => {
     setActionError(null);
     try {
@@ -378,7 +367,7 @@ export default function AdminApprovals() {
       setCoinRequests(prev => prev.filter(r => r.id !== id));
     } catch (err) {
       setActionError(errorMessage(err, "Could not update this request"));
-      // Another admin got there first. The queue is stale, so reload it.
+      // Another admin got there first, so the queue is stale. Reload it.
       if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
@@ -391,14 +380,13 @@ export default function AdminApprovals() {
       setReviewTarget(null);
     } catch (err) {
       setActionError(errorMessage(err, "Could not approve this project"));
-      // Another admin got there first. The queue is stale, so reload it.
+      // Another admin got there first, so the queue is stale. Reload it.
       if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
 
-  // The feedback typed in the review screen is now stored: it goes to
-  // projects.review_note and the creator reads it on their My Projects card. This box
-  // existed long before the column did, and everything typed into it used to be dropped.
+  // The feedback typed in the review screen goes to projects.review_note, and the creator
+  // reads it on their My Projects card.
   const handleReject = async (id, feedback) => {
     setActionError(null);
     try {
@@ -407,7 +395,7 @@ export default function AdminApprovals() {
       setReviewTarget(null);
     } catch (err) {
       setActionError(errorMessage(err, "Could not reject this project"));
-      // Same as approve: a 409 means the verdict is already given, so the row is stale.
+      // As with approve, a 409 means the verdict is already given and the row is stale.
       if (errorCode(err) === "CONFLICT") setQueueVersion(v => v + 1);
     }
   };
@@ -659,9 +647,8 @@ export default function AdminApprovals() {
                           </div>
                         </div>
                       </td>
-                      {/* The note is the ONLY thing an admin has to decide on: the client
-                          confirmed on 2026-09-08 that she does not know these people in
-                          advance, so a name and an email say nothing. */}
+                      {/* The note is the only thing an admin has to decide on. Nobody knows
+                          these people in advance, so a name and an email say nothing. */}
                       <td className="px-5 py-3.5 max-w-[280px] text-[13px] text-gray-600 leading-relaxed">{r.note}</td>
                       <td className="px-5 py-3.5 text-[13px] text-gray-500 whitespace-nowrap">
                         {new Date(r.created_at).toLocaleDateString()}
@@ -759,10 +746,10 @@ export default function AdminApprovals() {
                         <span className="inline-flex items-center gap-1 whitespace-nowrap bg-red-50 text-red-600 text-[10px] font-bold px-2.5 py-1 rounded-full border border-red-200">● PENDING REVIEW</span>
                       )}
                     </td>
-                    {/* Actions. Both decisions are available straight from the row —
-                        APPROVE was here on its own, so rejecting meant opening REVIEW
-                        first and looked like a missing feature. REVIEW is still the way
-                        to read the submission before deciding. */}
+                    {/* Both decisions are available straight from the row. With APPROVE
+                        alone, rejecting means opening REVIEW first and reads as a
+                        missing feature. REVIEW is still the way to read a submission
+                        before deciding. */}
                     <td className="px-5 py-3.5">
                       <div className="flex gap-2">
                         <button
@@ -771,17 +758,16 @@ export default function AdminApprovals() {
                         >
                           REVIEW
                         </button>
-                        {/* Each button hides only once its own decision has been made, so
-                            a mis-click is recoverable: a rejected project can still be
-                            approved from here. Once the page reloads the queue only
-                            fetches PENDING, and there would be no way back. */}
-                        {/* Quick reject, deliberately with no note — for obvious spam.
-                            To tell the creator WHY, open REVIEW and use the feedback box
-                            there; that text is stored on the project now. */}
+                        {/* Each button hides once its own decision has been made. The queue
+                            only fetches PENDING, so once the page reloads the row is
+                            gone either way. */}
+                        {/* A quick reject with no note, for obvious spam. To tell the
+                            creator why, open REVIEW and use the feedback box, which is
+                            stored on the project. */}
                         {/* Both verdict buttons vanish on a project this admin filed
-                            themselves — the note in the Creator column says why. The
-                            service refuses it as well; this only saves the reader from
-                            learning the rule by bouncing off a 400. */}
+                            themselves, and the note in the Creator column says why. The
+                            service refuses it too; this only saves the reader from
+                            learning the rule by bouncing off an error. */}
                         {!isOwnFiling(p, viewerId) && p.status !== "Changes Requested" && (
                           <button
                             onClick={() => handleReject(p.id, "")}

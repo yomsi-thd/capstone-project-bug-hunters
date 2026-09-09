@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 
-// The guard reads one thing from AuthContext — the derived permission flags — so the
+// The guard reads one thing from AuthContext, the derived permission flags, so the
 // context is stubbed rather than driven through a real login. That keeps each case to
 // "these flags produce this outcome", which is exactly the rule being tested.
 const auth = { isLoggedIn: false, canCreate: false, canInvest: false, isAdmin: false };
@@ -92,7 +92,7 @@ describe("RequireAccess", () => {
 
   it("defaults to requiring only a session", () => {
     // The default `permission` is "isLoggedIn", which must not be looked up as a flag
-    // and found falsy — that would lock every signed-in user out of the plain guard.
+    // and found falsy, which would lock every signed-in user out of the plain guard.
     setAuth({ isLoggedIn: true });
     renderAt("/creator-dashboard", undefined);
 
@@ -100,9 +100,9 @@ describe("RequireAccess", () => {
   });
 
   it("gates each permission independently", () => {
-    // ⚠️ isAdmin and canCreate are set together here as a FIXTURE, not because an admin
-    // really holds both - since 2026-08-24 an admin has canCreate false. The point of the
-    // test is that the guard reads the one flag it was given and ignores the others.
+    // isAdmin and canCreate are set together as a fixture rather than because an admin
+    // holds both, which they do not. The point is that the guard reads the one flag it
+    // was given and ignores the rest.
     setAuth({ isLoggedIn: true, isAdmin: true, canCreate: true });
     const { unmount } = renderAt("/creator-dashboard", "isAdmin");
     expect(screen.getByTestId("page")).toBeInTheDocument();

@@ -4,16 +4,13 @@ import * as projectApi from "../../api/projectApi";
 import { errorMessage } from "../../api/apiError";
 
 /**
- * "Post Project Update", opened from the UPDATE button on a project card.
+ * "Post Project Update", opened from the UPDATE button on a project card. Posts to
+ * /api/projects/:id/updates, which the backend accepts only from the project's creator
+ * or an admin.
  *
- * POST /api/projects/:id/updates — the backend only accepts it from the project's own
- * creator (or an admin), so a backer opening this by other means gets a 400 back rather
- * than a silent no-op.
- *
- * `project` is required: an update with no project has nowhere to appear, so the caller
- * mounts this only when it has one (`{target && <PostUpdateModal project={target} …/>}`,
- * the same pattern as EditProject). Mounting per open is also what keeps the draft from
- * leaking between projects — closing unmounts the component, so the next open is empty.
+ * `project` is required, so the caller mounts this only when it has one. Mounting per
+ * open is also what stops a draft leaking between projects: closing unmounts the
+ * component, so the next open starts empty.
  */
 export default function PostUpdateModal({ project, onClose, onPosted }) {
   const [title, setTitle] = useState("");

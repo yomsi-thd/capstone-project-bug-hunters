@@ -5,14 +5,13 @@ import { AuthProvider } from "./context/AuthContext";
 import { RouteErrorBoundary } from "./components/ErrorBoundary";
 import RequireAccess from "./components/auth/RequireAccess";
 
-// Discover is the landing page at "/", so it is imported eagerly — lazy-loading the
-// first thing every visitor sees would only add a spinner to the very request that
-// decides how fast the app feels.
+// Discover is the landing page at "/", so it is imported eagerly. Lazy-loading the first
+// thing every visitor sees would only add a spinner to the request that decides how fast
+// the app feels.
 import Discover from "./pages/Discover";
 
-// Everything else is split out. One bundle held all 12 pages (529 kB, past Vite's own
-// warning threshold), which meant a signed-out visitor downloaded the whole admin area
-// and the 5-step create wizard to read one project page.
+// Everything else is code-split. In one bundle a signed-out visitor downloads the whole
+// admin area and the five-step create wizard just to read one project page.
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
@@ -28,9 +27,8 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const AdminUserManagement = lazy(() => import("./pages/AdminUserManagement"));
 const AdminApprovals = lazy(() => import("./pages/AdminApprovals"));
 
-// Shown while a route's chunk downloads. Deliberately plain: a skeleton of a page we do
-// not know the shape of yet would flash a layout that is about to be replaced. On a
-// local network this is usually invisible.
+// Shown while a route's chunk downloads. Plain on purpose: a skeleton for a page whose
+// shape we don't know yet would flash a layout that is about to be replaced.
 function RouteFallback() {
   return (
     <div style={{
@@ -50,8 +48,8 @@ function App() {
       <BrowserRouter>
         {/* Inside the router on purpose: RouteErrorBoundary keys itself on the pathname,
             so navigating away from a crashed page rebuilds the boundary and the app
-            recovers by itself. Outside the router it would hold the error state forever
-            and F5 would be the only way out — most of what it exists to prevent. */}
+            recovers by itself. Outside the router it would hold the error state for good
+            and a refresh would be the only way out. */}
         <RouteErrorBoundary>
         {/* Inside the boundary, not outside: a chunk that fails to download throws
             during render, and the boundary is what turns that into the error screen
@@ -69,9 +67,8 @@ function App() {
             state with a login call to action, which reads better than a redirect. */}
         <Route path="/investments" element={<BackerInvestments />} />
 
-        {/* ── Creators ──
-            Admins are no longer let in here (2026-08-24): they own no projects, so
-            both of these would be empty pages about somebody else's work. */}
+        {/* Creators. An admin is not let in here: they own no projects, so both of
+            these would be empty pages about somebody else's work. */}
         <Route path="/creator-dashboard" element={
           <RequireAccess permission="canCreate"><CreatorDashboard /></RequireAccess>
         } />
@@ -87,8 +84,8 @@ function App() {
         <Route path="/creator-my-projects/:id/edit" element={
           <RequireAccess permission="canCreate"><CreatorMyProjects /></RequireAccess>
         } />
-        {/* The one creator route an admin KEEPS, because filing a project on behalf of
-            a creator uses the same wizard. canOpenProjectWizard = creator OR admin. */}
+        {/* The one creator route an admin keeps, since filing a project on behalf of a
+            creator uses the same wizard. canOpenProjectWizard is creator or admin. */}
         <Route path="/create-project" element={
           <RequireAccess permission="canOpenProjectWizard"><CreateProject /></RequireAccess>
         } />
@@ -110,11 +107,10 @@ function App() {
           <RequireAccess><Account /></RequireAccess>
         } />
 
-        {/* This page used to live at /dashboard, which read as a fourth dashboard next
-            to the creator and admin ones; it was renamed to /account on 2026-08-16 to
-            match its own nav label. Nothing links to the old path any more — the
-            redirect is only so a bookmark from an earlier demo does not land on the
-            bare 404 page. Safe to delete once nobody is running an old build. */}
+        {/* This page used to live at /dashboard, which read as a fourth dashboard
+            beside the creator and admin ones. Nothing links to the old path any more;
+            the redirect is only so an old bookmark does not land on the 404 page, and
+            it can go once nobody is running an old build. */}
         <Route path="/dashboard" element={<Navigate to="/account" replace />} />
 
         <Route path="*" element={<NotFound />} />

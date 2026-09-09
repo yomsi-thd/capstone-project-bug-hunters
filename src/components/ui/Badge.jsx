@@ -1,19 +1,12 @@
 // The small pill label used across the app for roles, statuses and categories.
 //
-// Before 20/08 this was drawn inline in roughly 60 places — 57 with Tailwind classes and
-// 6 with inline styles. (CODE-GUIDE §8.3 said 101; that count matched
-// `text-[10|11]px font-bold`, which also catches section labels, table headers and avatar
-// circles. Corrected here after counting only elements that actually render a pill.)
+// `tone` names the meaning rather than the colour: callers say "danger", not "red", so
+// the palette lives here instead of in dozens of hex literals and changing what
+// "warning" looks like is one edit.
 //
-// `tone` names the MEANING, not the colour. Callers say "danger", not "red", so the
-// palette lives in this file instead of in sixty hex literals — and a future change to
-// what "warning" looks like is one edit.
-//
-// ⚠️ Every tone is a SOFT pill: tinted background, matching text, matching border. The one
-// exception in the old code was AdminUserManagement's ADMIN chip, drawn as solid brand red
-// on white text. It is folded into `brand` here, which is softer. Losing a little of its
-// shout is the cost of having one badge; admin still reads as the only non-grey role in
-// the table, which is what that chip was for.
+// Every tone is a soft pill, with a tinted background, matching text and matching
+// border. Admin is the only non-grey role in the table, which is all its old solid-red
+// chip was there to say.
 const TONES = {
   neutral: "bg-neutral-100 text-neutral-600 border-neutral-200",
   success: "bg-green-50 text-green-700 border-green-200",
@@ -28,9 +21,9 @@ const SIZES = {
 };
 
 export default function Badge({ tone = "neutral", size = "md", className = "", children }) {
-  // An unknown tone still renders a neutral pill rather than an unstyled one. Tones often
-  // come from server data (a project status, a role name), so "unknown" is a data case,
-  // not a typo — and a badge with no background reads as a broken render.
+  // An unknown tone renders a neutral pill rather than an unstyled one. Tones often come
+  // from server data, so unknown is a data case rather than a typo, and a badge with no
+  // background reads as a broken render.
   const toneClass = TONES[tone] ?? TONES.neutral;
   const sizeClass = SIZES[size] ?? SIZES.md;
 

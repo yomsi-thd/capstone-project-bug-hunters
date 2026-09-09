@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { MAX_CONTRIBUTION, validateContribution } from "./investmentRules";
 
 describe("MAX_CONTRIBUTION", () => {
-  // The number is the client's, from 2026-09-01: "500CC feels ok". It is pinned here
-  // because three places read it — this module, the modal's MAX button, and the sentence
-  // under the invest button — and the backend refuses anything above it.
+  // The client's number, pinned here because three places read it: this module, the
+  // modal's MAX button and the sentence under the invest button. The backend refuses
+  // anything above it.
   it("is 500", () => {
     expect(MAX_CONTRIBUTION).toBe(500);
   });

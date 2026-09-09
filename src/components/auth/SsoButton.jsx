@@ -1,17 +1,12 @@
-// The "SIGN IN / SIGN UP WITH RMIT SSO" button, shared by Login and Register.
+// The "SIGN IN / SIGN UP WITH RMIT SSO" button, shared by Login and Register, which
+// differ only in the word after WITH.
 //
-// It was the same markup in both files, differing only in the word after WITH. That was
-// already a duplicate before the Tailwind pass; converting it turned the duplicate into
-// two copies of a 320-character class string, which is the version that actually drifts.
+// The navy hover shadow is deliberate and should not become the brand red the primary
+// buttons use: this is RMIT's sign-in, not the app's own primary action.
 //
-// ⚠️ The navy hover shadow is deliberate and must not be swapped for the brand red one the
-// primary buttons use. This is RMIT's sign-in, not the app's own primary action, and a red
-// glow under a navy button reads as one button painted two ways.
-//
-// It does nothing yet: SSO is not integrated. It stays on screen because both designs show
-// it, and a button that visibly does nothing is a smaller problem than silently dropping a
-// sign-in route the university expects — but it is worth remembering that this is the one
-// control in the app that is still a placeholder.
+// SSO is not integrated yet, so the button does nothing. It stays because both designs
+// show it and the university expects that route, but it is the one placeholder control
+// left in the app.
 export default function SsoButton({ label }) {
   return (
     <button

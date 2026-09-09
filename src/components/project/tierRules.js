@@ -1,32 +1,30 @@
-// Validation for Support Levels, kept in a plain-function module next to videoUrl.js
-// and for the same two reasons: the rules can be tested without rendering the five-step
-// wizard, and CreateProject and EditProject share ONE implementation instead of each
-// checking a slightly different set.
+// Validation for Support Levels. Kept as plain functions in their own module so the
+// rules can be tested without rendering the five-step wizard, and so CreateProject and
+// EditProject share one implementation rather than each checking a slightly different
+// set.
 //
-// The backend runs the same rules in projectService — this copy exists so a creator
-// learns them from the form rather than from a rejected request, not because the server
-// side is optional. UI is not a security boundary.
+// The backend runs the same rules. This copy is here so a creator learns them from the
+// form instead of from a rejected request; it is not the security boundary.
 //
-// "Support Level" on screen, `tier` in the code and the database (`project_tiers`,
-// `tier_id`). The wording can still change; the column names should not.
+// "Support Level" on screen, `tier` in the code and in the columns.
 
 import { MAX_CONTRIBUTION } from "./investmentRules";
 
 export const MAX_TIERS = 5;
 
 /**
- * A level from either form (or the API) -> the one shape everything else here uses.
+ * A level from either form, or from the API, into the one shape the rules below use.
  *
- * Both forms hold the amount as a string, the API returns a number, and blank bullet
- * rows are normal while the creator is still typing — so all three are absorbed here.
+ * The forms hold the amount as a string, the API returns a number, and blank bullet rows
+ * are normal while the creator is still typing.
  */
 export function normaliseTier(tier = {}) {
   const raw = tier ?? {};
 
   return {
     name: String(raw.name ?? "").trim(),
-    // NaN rather than 0 for junk: 0 reads as a deliberate "free" level and would slip
-    // past a check written as `!amount`, while NaN fails every comparison below.
+    // Junk becomes NaN rather than 0, since 0 reads as a deliberate free level and
+    // would slip past a `!amount` check. NaN fails every comparison below.
     minAmount: Number(raw.minAmount ?? raw.min_amount ?? raw.amount),
     bullets: (Array.isArray(raw.bullets) ? raw.bullets : [])
       .map((line) => String(line ?? "").trim())
@@ -35,9 +33,8 @@ export function normaliseTier(tier = {}) {
 }
 
 /**
- * The whole list at once -> the first problem as a sentence, or null when it is fine.
- *
- * One message at a time, because that is what both forms display. An empty list is
+ * Checks the whole list and returns the first problem as a sentence, or null when there
+ * is none. One message at a time, because that is what both forms show. An empty list is
  * valid: support levels are optional.
  */
 export function validateTiers(tiers) {
@@ -58,17 +55,15 @@ export function validateTiers(tiers) {
       return "A level name must be 100 characters or fewer.";
     }
 
-    // Integer, not just positive: min_amount is an INTEGER column, so 25.5 would be
-    // rounded by Postgres into a number the creator never typed.
+    // Integer, not merely positive: min_amount is an INTEGER column, so Postgres would
+    // round 25.5 into a number the creator never typed.
     if (!Number.isInteger(tier.minAmount) || tier.minAmount <= 0) {
       return "A level needs a minimum above 0 CC — a whole number of Class Coins.";
     }
 
-    // A level above the contribution cap can never be chosen: one contribution per
-    // person, at most MAX_CONTRIBUTION CC. Creating one would put a control on the
-    // project page that responds and can never lead anywhere.
-    //
-    // ⚠️ Worded identically to TIER_ABOVE_CAP in backend/src/validation/messages.js.
+    // A level above the contribution cap could never be chosen, since a person gets one
+    // contribution of at most MAX_CONTRIBUTION CC. Allowing it would put a button on the
+    // project page that leads nowhere. Worded to match TIER_ABOVE_CAP on the backend.
     if (tier.minAmount > MAX_CONTRIBUTION) {
       return "A support level cannot ask for more than 500 CC.";
     }
@@ -88,10 +83,9 @@ export function validateTiers(tiers) {
 }
 
 /**
- * Is this amount enough for the selected level? True when nothing is selected —
- * "No level — just support" has no floor.
- *
- * The boundary matters: a level advertised as "250 CC or more" must accept exactly 250.
+ * Is the amount enough for the chosen level? True when no level is selected, since
+ * "just support" has no floor. The boundary is inclusive: a level advertised as
+ * "250 CC or more" has to accept exactly 250.
  */
 export function meetsMinimum(amount, tier) {
   if (!tier) return true;

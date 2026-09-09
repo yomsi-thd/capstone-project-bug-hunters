@@ -8,8 +8,8 @@ import {
   ROLE_BADGE,
 } from "../mock";
 import * as projectApi from "../api/projectApi";
-// Only reached when the signed-in account is an admin filing on somebody's behalf —
-// see the guarded effect below. A creator never calls an admin route from this page.
+// Only reached when the signed-in account is an admin filing on somebody's behalf; see
+// the guarded effect below. A creator never calls an admin route from this page.
 import * as adminApi from "../api/adminApi";
 import { parseAmount, toAdminUser } from "../api/mappers";
 import { useAuth } from "../context/AuthContext";
@@ -21,10 +21,9 @@ import { errorMessage } from "../api/apiError";
 const MAX_GALLERY_IMAGES = 6;
 
 // The dropdown offers "School of Engineering", but projects.category holds the bare
-// department ("ENGINEERING") — that is what TAG_COLORS and FILTER_TAGS key on and what
-// every existing row uses. Submitting the label verbatim produced a category that
-// matched no filter chip and no tag colour, so a freshly created project was invisible
-// to TECH / ART / SCIENCE and rendered with the fallback grey tag.
+// department ("ENGINEERING"), which is what TAG_COLORS and FILTER_TAGS key on. Storing
+// the label verbatim would give the project a category no filter chip matches, leaving
+// it out of TECH, ART and SCIENCE and rendered with the fallback grey tag.
 function toCategory(school) {
   return String(school || "").replace(/^School of\s+/i, "").trim().toUpperCase();
 }
@@ -39,11 +38,10 @@ function isObjectUrl(value) {
 }
 
 // Images are stored as base64 data URIs inside the project row, so an untouched phone
-// photo (2-5 MB, +33% from base64) both exceeded the server's body limit — a plain 413
-// before any controller ran — and would sit in `gallery` for every Discover request to
-// carry. Downscaling before encoding is what makes that storage choice survivable:
-// 1600px / quality 0.8 takes a 4 MB photo to roughly 200 KB with no visible loss at the
-// sizes this UI renders (a 240px card thumbnail, a full-width hero).
+// photo (2-5 MB, and a third larger again once encoded) blows past the server's body
+// limit and would then ride along in every Discover response. Downscaling first is what
+// makes that storage choice workable: 1600px at quality 0.8 takes a 4 MB photo to about
+// 200 KB, with no visible loss at the sizes this UI renders.
 const MAX_IMAGE_DIMENSION = 1600;
 const IMAGE_QUALITY = 0.8;
 
@@ -58,11 +56,11 @@ function readFileAsDataUrl(file) {
 }
 
 /**
- * Read an image file and return a downscaled JPEG data URI.
+ * Reads an image file and returns a downscaled JPEG data URI.
  *
- * Falls back to the original data URI whenever the browser cannot decode the file —
- * an SVG, an unusual format, a corrupt upload. Losing the image entirely would be a
- * worse outcome than sending a large one, and the server limit has headroom for it.
+ * Falls back to the original data URI whenever the browser cannot decode the file, such
+ * as an SVG or a corrupt upload. Sending a large image is a better outcome than losing
+ * it, and the server limit has room for one.
  */
 async function readImageAsCompressedDataUrl(file) {
   const original = await readFileAsDataUrl(file);
@@ -77,7 +75,7 @@ async function readImageAsCompressedDataUrl(file) {
 
     const scale = Math.min(1, MAX_IMAGE_DIMENSION / Math.max(img.width, img.height));
 
-    // Already small enough — re-encoding a modest PNG as JPEG can make it *bigger*.
+    // Already small enough, and re-encoding a modest PNG as JPEG can make it bigger.
     if (scale === 1 && original.length <= 400 * 1024) return original;
 
     const canvas = document.createElement("canvas");
@@ -87,7 +85,7 @@ async function readImageAsCompressedDataUrl(file) {
 
     const compressed = canvas.toDataURL("image/jpeg", IMAGE_QUALITY);
 
-    // toDataURL returns "data:," on a tainted or zero-sized canvas.
+    // toDataURL returns "data:," for a tainted or zero-sized canvas.
     return compressed.length > 32 && compressed.length < original.length ? compressed : original;
   } catch {
     return original;
@@ -103,11 +101,10 @@ function createFileItem(file, dataUrl = "") {
   };
 }
 
-// Reports the size that will actually be SUBMITTED, not the size of the file on disk.
-// Images are downscaled before encoding, so the Review & Submit screen was showing
-// "cover.png · 3.7 MB" for something that goes over the wire at ~100 KB — alarming right
-// at the moment someone is deciding whether to press submit.
-// base64 carries 3 bytes per 4 characters; the "data:...;base64," prefix is negligible.
+// The size that will actually be submitted, not the size of the file on disk. Images are
+// downscaled before encoding, so quoting the original would alarm the creator at exactly
+// the moment they are deciding whether to submit. base64 carries 3 bytes per 4
+// characters, and the "data:...;base64," prefix is negligible.
 function submittedSize(fileItem) {
   const dataUrl = fileItem.dataUrl;
   if (!dataUrl) return fileItem.file?.size ?? 0;
@@ -157,9 +154,8 @@ function restoreMedia(mediaDraft) {
         }
       : null,
     videoUrl: mediaDraft?.videoUrl || "",
-    // A draft saved before 2026-08-18 may still carry a videoFile key. It is ignored
-    // rather than restored: the upload control it came from is gone, and the file
-    // handle behind it did not survive the reload anyway.
+    // An old draft may still carry a videoFile key. It is ignored rather than restored:
+    // the upload control is gone, and the file handle never survived a reload anyway.
     galleryImages: (mediaDraft?.galleryImages || []).map(image => ({
       id: image.id,
       file: {
@@ -172,9 +168,9 @@ function restoreMedia(mediaDraft) {
   };
 }
 
-// `key` comes from draftStorageKey(user.id) and is null when nobody is signed in — in
-// which case there is no drawer to read from, and reading a shared one is what leaked
-// drafts between accounts in the first place.
+// `key` comes from draftStorageKey(user.id), and is null when nobody is signed in. There
+// is nothing to read in that case: a shared key would hand one person's half-written
+// project to whoever signs in next.
 function getStoredDraft(key) {
   if (typeof window === "undefined" || !key) return null;
 
@@ -186,8 +182,8 @@ function getStoredDraft(key) {
   }
 }
 
-// Is there anything in this draft worth telling the user about? A draft written by the
-// autosave effect on mount is structurally present but completely blank.
+// Is there anything in this draft worth mentioning? Autosave writes one on mount, so a
+// draft can be present and still completely blank.
 function draftHasContent(draft) {
   if (!draft) return false;
 
@@ -204,51 +200,47 @@ function saveDraftToStorage(key, draft) {
   try {
     window.localStorage.setItem(key, JSON.stringify(draft));
   } catch {
-    // Ignore storage errors so the form still works if storage is unavailable.
+    // Ignore storage errors so the form still works when storage is unavailable.
   }
 }
 
-// Called once a submit succeeds. The draft is a recovery aid for an UNFINISHED project;
-// once it has been sent it is a finished one, and leaving it behind meant opening
-// "New Project" again presented the project you just submitted, pre-filled and ready to
-// be submitted a second time.
-// Cancelling deliberately does NOT clear it — that is the case the draft exists for.
+// Called once a submit succeeds. A draft is a recovery aid for an unfinished project, so
+// leaving one behind would mean opening the wizard again and finding the project you just
+// submitted, filled in and ready to send twice.
+//
+// Cancelling does not clear it. That is the case the draft exists for.
 function clearDraftFromStorage(key) {
   if (typeof window === "undefined" || !key) return;
 
   try {
     window.localStorage.removeItem(key);
   } catch {
-    // Ignore storage errors — same reasoning as saveDraftToStorage.
+    // Ignore storage errors, as saveDraftToStorage does.
   }
 }
 
 /**
- * Shown after a successful submit, over a backdrop with no dismiss path back to the
- * form. That is deliberate: the previous inline "SUBMISSION RECEIVED" panel left the
- * SUBMIT button live in the footer underneath it, so a second click created a duplicate
- * project. Leaving is now the only thing you can do from here.
+ * Shown after a successful submit, with no way back to the form. That is deliberate: an
+ * inline success panel leaves the SUBMIT button live underneath it, and a second click
+ * then creates a duplicate project.
  *
- * Navigating on an explicit click rather than automatically, matching
- * RegisterSuccessModal — the page should not vanish out from under someone mid-read.
+ * It navigates on an explicit click rather than on a timer, like RegisterSuccessModal.
+ * The page should not disappear out from under someone mid-read.
  */
-// No `note` prop any more. Its only ever caller passed the apology "Your reward tiers
-// were not saved" - the last thing in the app that admitted to discarding user input.
-// Support levels are saved with the project now, so there is nothing left to apologise
-// for; the slot is gone rather than left empty for the next half-finished feature.
 // `adminFiling` flips this dialog for an admin who filed the project for somebody else.
-// ⚠️ The CTA has to change with it: /creator-my-projects is behind canCreate, which an
-// admin no longer holds, so the old button would have ended the whole on-behalf flow on
-// the "no access" screen.
-// ⚠️ The BUTTON reads `adminFiling`, not `onBehalf`, even though the two agree in
-// practice: the label and the destination must come from one value, or a missing owner
-// name would leave the button saying "MY PROJECTS" while it navigates to the admin
-// dashboard. `onBehalf` is only the owner's name for the sentence above it.
+// The CTA has to change with it: /creator-my-projects sits behind canCreate, which an
+// admin does not hold, so the creator's button would end the on-behalf flow on the "no
+// access" screen.
+//
+// The button reads `adminFiling` rather than `onBehalf`, even though the two agree in
+// practice. Label and destination must come from one value, or a missing owner name
+// would leave the button saying MY PROJECTS while navigating to the admin dashboard;
+// `onBehalf` is only the owner's name for the sentence above it.
 function SubmitSuccessModal({ title, onBehalf, adminFiling, onGoToProjects }) {
   return (
-    // closable={false} preserves the whole point of this dialog: there is deliberately no
-    // path back to the wizard, only the one CTA below. A dismissable backdrop would drop
-    // the submitter back onto a form whose project has already been submitted.
+    // closable={false} is the point of this dialog: the one CTA below is the only way
+    // out. A dismissable backdrop would drop the submitter back onto a form whose
+    // project has already been sent.
     <Modal maxWidth={460} closable={false} panelClassName="p-7 text-center">
         <div className="w-14 h-14 rounded-full bg-green-50 border border-green-200 flex items-center justify-center mx-auto mb-4">
           <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5">
@@ -307,15 +299,15 @@ function StepIndicator({ steps, current }) {
 }
 
 /**
- * "Project owner", shown ONLY to an admin.
+ * "Project owner", shown only to an admin.
  *
  * An admin owns nothing, so the wizard they open has to name the creator the project
- * will belong to. A creator filing their own project sees step 1 exactly as before —
- * not one extra field, not one extra line of explanation.
+ * will belong to. A creator filing their own project sees step 1 unchanged: no extra
+ * field, no extra explanation.
  *
- * The list is every ACTIVE account holding CREATOR. An empty list is answered with the
- * instruction rather than an empty dropdown: granting CREATOR is a separate, deliberate
- * action in User Management, and the service refuses any other target anyway.
+ * The list is every active account holding CREATOR. An empty list gets the instruction
+ * rather than an empty dropdown, since granting CREATOR is a separate action in User
+ * Management and the service refuses any other target anyway.
  */
 function OwnerPicker({ creators, loading, error, ownerId, setOwnerId }) {
   return (
@@ -383,10 +375,10 @@ function Step1({ data, setData, ownerPicker }) {
   );
 }
 
-// The three story fields behind ProjectDetail's "The Challenge" / "Our Solution" /
-// "How Support Would Be Used" sections. They live in step 2 because that step is called
-// "Story & Media" — until 2026-08-06 it only ever collected the media half.
-// All three are optional: a project that leaves them blank just shows its blurb.
+// The three story fields behind ProjectDetail's "The Challenge", "Our Solution" and
+// "How Support Would Be Used" sections. They sit in step 2, which is the story half of
+// "Story & Media". All three are optional: a project that leaves them blank shows only
+// its blurb.
 const STORY_FIELDS = [
   {
     key: "challenge",
@@ -402,10 +394,9 @@ const STORY_FIELDS = [
   },
   {
     key: "funding",
-    // Was "HOW YOUR FUNDING HELPS" until 2026-09-07. The client asked for headings that
-    // stop sounding like a fundraising appeal, and this wording is the one the team used
-    // when describing the section to her. ⚠️ The COLUMN is still funding_usage and the
-    // form field is still `funding` — a label changing is not a schema changing.
+    // Worded to avoid sounding like a fundraising appeal, at the client's request. The
+    // column is still funding_usage and the form field is still `funding`: renaming a
+    // label is not renaming a schema.
     label: "HOW SUPPORT WOULD BE USED",
     hint: "What will the Class Coins be used for?",
     placeholder: "Break down what the support enables — equipment, lab time, materials…",
@@ -585,12 +576,11 @@ function Step2({ media, setMedia, story, setStory }) {
           )}
         </div>
         <div>
-          {/* The "OR UPLOAD — MP4, MOV up to 50MB" control that used to sit under this
-              field is gone (2026-08-18). Images are stored base64 inside the project row
-              and a 50MB video would be ~67MB of JSON — far past even the raised 10mb body
-              limit — so a picked file was never sent anywhere. It offered the one route
-              through this required step that guaranteed the video was lost. It comes back
-              when uploads move to a real file store, alongside the images. */}
+          {/* A link, with no upload option beside it. Images are stored base64 inside
+              the project row, so a 50MB video would be far past the body limit and the
+              file would never reach the server: an upload control here would be the one
+              route through this required step that guaranteed the video was lost. It
+              comes back when uploads move to a real file store. */}
           <div className="text-[14px] font-bold text-gray-900 mb-1">Project Video</div>
           <p className="text-[12px] text-gray-400 mb-3">Paste a link to your pitch video on YouTube or Vimeo.</p>
           <label className="text-[11px] font-bold text-gray-400 tracking-widest block mb-1.5">Video URL</label>
@@ -683,14 +673,13 @@ function Step3({ team, setTeam }) {
   );
 }
 
-// Support Levels - "project_tiers" in the database, and NOT rewards.
+// Support Levels, "project_tiers" in the database. They are not rewards.
 //
-// A level is a minimum contribution plus the lines that say what choosing it SIGNALS.
-// The backer is the one making a statement ("I want to trial this"), the creator owes
-// nothing: Class Coins have no real-world value and creators never receive them, so
-// the platform must not imply anything is being bought. Every label and placeholder
-// below is written to push the creator into that voice, because no validation can read
-// intent and Kickstarter habits pull hard the other way.
+// A level is a minimum contribution plus the lines saying what choosing it signals. The
+// backer is the one making a statement, and the creator owes nothing back: Class Coins
+// have no real-world value and creators never receive them, so the platform must not
+// imply anything is being bought. Every label and placeholder below is worded to push
+// the creator into that voice, since no validation can read intent.
 function Step4({ tiers, setTiers }) {
   const [newTier, setNewTier] = useState({ name: "", amount: "", bullets: [""] });
   const [editingTierId, setEditingTierId] = useState(null);
@@ -707,9 +696,9 @@ function Step4({ tiers, setTiers }) {
       ? tiers.map(tier => (tier.id === editingTierId ? nextTier : tier))
       : [...tiers, nextTier];
 
-    // The SAME function the backend and EditProject use, so a level cannot pass here
-    // and be refused there. Validating the whole list rather than the one level is what
-    // catches the duplicate-minimum and the 5-level cases.
+    // The same function the backend and EditProject use, so a level cannot pass here and
+    // be refused there. It validates the whole list rather than one level, which is what
+    // catches duplicate minimums and the level limit.
     const problem = validateTiers(nextList);
     if (problem) { setTierError(problem); return; }
 
@@ -765,7 +754,7 @@ function Step4({ tiers, setTiers }) {
             {newTier.bullets.map((b, i) => (
               <div key={i} className="flex gap-2 mb-2 items-center">
                 <span className="text-brand text-sm">›</span>
-                {/* Placeholders in the backer's voice on purpose: they are the only
+                {/* Placeholders in the backer's voice, since they are the only
                     thing steering a creator away from typing "free t-shirt". */}
                 <input value={b} onChange={e => updateBullet(i, e.target.value)} placeholder={i === 0 ? "I want to trial this on my own campus" : "I am happy to be interviewed for 30 minutes"} className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-[13px] outline-none focus:border-brand transition-colors" />
                 {i > 0 && <button onClick={() => setNewTier({ ...newTier, bullets: newTier.bullets.filter((_, idx) => idx !== i) })} className="bg-transparent border-none cursor-pointer text-gray-300 hover:text-gray-500 text-base">×</button>}
@@ -830,8 +819,8 @@ function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
       <h2 className="text-[22px] font-extrabold text-gray-900 mb-1">Review & Submit</h2>
       <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Confirm everything is ready before sending your project for approval.</p>
 
-      {/* The last screen before data is written under somebody else's name, so it says
-          whose name that is rather than leaving it to be remembered from step 1. */}
+      {/* The last screen before data is written under somebody else's name, so it
+          says whose rather than leaving it to be remembered from step 1. */}
       {owner && (
         <div className="border border-blue-200 bg-blue-50 rounded-lg px-4 py-3 mb-4 text-[13px] text-blue-900 leading-relaxed">
           This project will belong to <strong>{owner.name}</strong> ({owner.email}).
@@ -848,8 +837,7 @@ function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
             </div>
             <button type="button" onClick={() => onEdit(1)} className="text-[12px] font-bold text-brand hover:underline">Edit</button>
           </div>
-          {/* One column since N3 (2026-09-07): "Funding goal" sat beside School until
-              the goal was removed from the product. */}
+          {/* One column, since there is no funding goal to sit beside School. */}
           <div className="text-[13px] text-gray-600">
             <div><span className="text-gray-400">School:</span> {basicData.school || "—"}</div>
           </div>
@@ -963,14 +951,14 @@ function Step5({ basicData, story, media, team, tiers, owner, onEdit }) {
 
 export default function CreateProject() {
   // The draft is scoped to the signed-in account, so one person's half-written project
-  // is never handed to whoever signs in next on the same machine. Plain derived value,
-  // not a ref: user.id cannot change while this page is mounted (the route sits behind
-  // RequireAccess, and signing out unmounts it).
+  // is never handed to whoever signs in next on the same machine. A derived value rather
+  // than a ref: user.id cannot change while this page is mounted, since the route sits
+  // behind RequireAccess and signing out unmounts it.
   const { user, canCreateForOthers } = useAuth();
   const draftKey = draftStorageKey(user?.id);
   const storedDraft = getStoredDraft(draftKey);
-  // Who the project will belong to. Only ever set by an admin — a creator owns what
-  // they create, and the service refuses a creator who sends creator_id at all.
+  // Who the project will belong to. Only an admin sets it: a creator owns what they
+  // create, and the service refuses a creator who sends creator_id at all.
   const [ownerId, setOwnerId] = useState(storedDraft?.ownerId ?? "");
   const [creators, setCreators] = useState([]);
   const [creatorsLoading, setCreatorsLoading] = useState(false);
@@ -984,11 +972,9 @@ export default function CreateProject() {
       : { challenge: "", solution: "", funding: "", bullets: [] }
   );
   const [team, setTeam] = useState(storedDraft?.team ?? MOCK_TEAM);
-  // Empty, not a seeded example. This used to default to CREATE_PROJECT_TIERS, so every
-  // new project started with a level the creator never wrote - invisible while tiers
-  // were dropped on submit, and written straight to the database the moment they were
-  // not. A draft saved before 2026-08-20 holds `privileges`; read both names, write one,
-  // so restoring an old draft does not render a level with no bullets.
+  // Empty rather than a seeded example, so no project starts with a level its creator
+  // never wrote. Older drafts store the lines under `privileges`, so read both names and
+  // write one; otherwise restoring an old draft renders a level with no bullets.
   const [tiers, setTiers] = useState(() =>
     (storedDraft?.tiers ?? []).map(tier => ({
       ...tier,
@@ -998,26 +984,23 @@ export default function CreateProject() {
   );
   const [message, setMessage] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
-  // In flight. Drives the button label and disabled state.
+  // Request in flight. Drives the button label and its disabled state.
   const [submitting, setSubmitting] = useState(false);
-  // The ACTUAL double-submit latch, and it has to be a ref rather than the state above.
-  // State updates are asynchronous: two clicks in the same tick both read the stale
-  // `submitting === false` from their closure and both fire a POST, and `disabled` does
-  // not help either because React has not re-rendered yet. Measured — a state-only guard
-  // still created two identical projects on a double click. A ref changes synchronously,
-  // so the second call sees the lock immediately.
+  // The real double-submit latch, and it has to be a ref rather than the state above.
+  // State updates are asynchronous, so two clicks in the same tick both read a stale
+  // `submitting === false` and both fire a POST; `disabled` doesn't help either, since
+  // React has not re-rendered yet. A ref changes synchronously, so the second call sees
+  // the lock immediately.
   const submitLockRef = useRef(false);
-  // "Draft restored" only when there is actually something to restore. The autosave
-  // effect writes on mount, so merely opening this page and leaving stores an EMPTY
-  // draft — and the old `Boolean(storedDraft)` then announced a restored draft over a
-  // blank form on the next visit. Very visible now that submitting sends you away and
-  // you come back to a cleared form.
+  // "Draft restored" only when there is something to restore. Autosave writes on mount,
+  // so opening this page and leaving stores an empty draft, and announcing that over a
+  // blank form on the next visit reads as a bug.
   const [hasRestoredDraft, setHasRestoredDraft] = useState(() => draftHasContent(storedDraft));
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Stop autosaving once the project is away, otherwise this effect would immediately
-    // write the draft back over the one handleSubmit just cleared.
+    // Stop autosaving once the project is away, or this effect writes the draft straight
+    // back over the one handleSubmit just cleared.
     if (isSubmitted) return;
 
     saveDraftToStorage(draftKey, {
@@ -1031,22 +1014,21 @@ export default function CreateProject() {
     });
   }, [draftKey, ownerId, basicData, story, media, step, team, tiers, isSubmitted]);
 
-  // Only an admin can call GET /admin/users, and only an admin needs this list, so the
-  // request never fires for a creator.
+  // Only an admin can call GET /admin/users, and only an admin needs the list, so this
+  // never fires for a creator.
   useEffect(() => {
     if (!canCreateForOthers) return;
 
     let cancelled = false;
     (async () => {
-      // Inside the async body, not in the effect body: a synchronous setState there
-      // costs an extra render pass for nothing (react-hooks/set-state-in-effect).
+      // Inside the async body rather than the effect body, where a synchronous setState
+      // would cost an extra render pass for nothing.
       setCreatorsLoading(true);
       try {
         const rows = await adminApi.getAllUsers();
         if (cancelled) return;
-        // Active CREATOR accounts only — exactly the two conditions the service checks
-        // before it will accept the id, so the dropdown cannot offer a choice the
-        // submit would then refuse.
+        // Active CREATOR accounts only, which are the two conditions the service checks
+        // before accepting the id. The dropdown cannot offer a choice submit refuses.
         setCreators(
           (rows || [])
             .map(toAdminUser)
@@ -1084,10 +1066,9 @@ export default function CreateProject() {
     };
   }, [media.coverImage, media.galleryImages]);
 
-  // The chosen creator as a whole record, for the lines that name them: step 5's
-  // confirmation and the success dialog. Null for a creator filing their own project,
-  // and null for an admin who has not chosen yet — both of which read as "no on-behalf
-  // banner", which is right in each case.
+  // The chosen creator as a whole record, for the lines that name them in step 5 and in
+  // the success dialog. Null both for a creator filing their own project and for an admin
+  // who has not chosen yet, and neither should show an on-behalf banner.
   const selectedOwner =
     canCreateForOthers && ownerId
       ? creators.find(c => String(c.id) === String(ownerId)) || null
@@ -1095,8 +1076,8 @@ export default function CreateProject() {
 
   const validateStep = targetStep => {
     if (targetStep === 1) {
-      // First, because it decides whose project this is — everything below describes
-      // that project. A creator never reaches this branch: the flag is admin-only.
+      // Checked first, because it decides whose project this is and everything below
+      // describes that project. A creator never reaches this branch.
       if (canCreateForOthers && !String(ownerId)) {
         return "Choose which creator this project will belong to.";
       }
@@ -1108,11 +1089,9 @@ export default function CreateProject() {
     if (targetStep === 2) {
       if (!media.coverImage) return "Upload a cover image before continuing.";
       if (!hasText(media.videoUrl)) return "Add a link to your project video before continuing.";
-      // The field was required but accepted any text, so "abc" got past this step and was
-      // stored as the project's video — the detail page then had to render it as
-      // "this does not look like a valid video link". isLinkable is the same check that
-      // page uses to decide whether the value is safe to put in an href, so the form and
-      // the page can never disagree about what counts as a link.
+      // isLinkable is the same check ProjectDetail uses before putting the value in an
+      // href, so the form and the page cannot disagree about what counts as a link.
+      // Without it, any text passed this step and was stored as the project's video.
       if (!isLinkable(media.videoUrl)) return "That video link does not look like a web address — it should start with https://";
       if (media.galleryImages.length === 0) return "Upload at least one prototype gallery image before continuing.";
     }
@@ -1122,8 +1101,8 @@ export default function CreateProject() {
     }
 
     if (targetStep === 4) {
-      // Same function as the level form itself and as the backend, so a project cannot
-      // pass this step and then be refused by the API.
+      // The same function the level form and the backend use, so a project cannot pass
+      // this step and then be refused by the API.
       const tierProblem = validateTiers(tiers);
       if (tierProblem) return tierProblem;
     }
@@ -1131,10 +1110,9 @@ export default function CreateProject() {
     return "";
   };
 
-  // These two used to clear isSubmitted, back when success was an inline panel you could
-  // navigate away from. Success is a modal now and it covers the page, so neither is
-  // reachable afterwards — and clearing the flag here would re-arm the SUBMIT button and
-  // restart the autosave, which is the duplicate-project bug all over again.
+  // Neither of these clears isSubmitted. The success modal covers the page, so they are
+  // unreachable after a submit, and clearing the flag would re-arm SUBMIT and restart
+  // autosave: the duplicate-project bug over again.
   const goToStep = targetStep => {
     if (targetStep < step) {
       setMessage("");
@@ -1166,19 +1144,17 @@ export default function CreateProject() {
   };
 
   const handlePrimaryFooterAction = () => {
-    // Same reasoning as goToStep/advanceStep: this cleared isSubmitted for the old inline
-    // success panel. The modal covers the footer, so "← BACK" cannot be clicked after a
-    // successful submit, and un-setting the flag there would re-arm SUBMIT.
+    // Same reasoning as goToStep and advanceStep: the modal covers the footer, so BACK
+    // cannot be clicked after a submit, and clearing the flag would re-arm SUBMIT.
     if (step === STEPS.length) {
       setMessage("");
       setStep(STEPS.length - 1);
       return;
     }
 
-    // `story` was missing here while the autosave effect above does include it. Since
-    // clicking SAVE DRAFT changes none of that effect's dependencies, the effect did not
-    // re-run afterwards — so this write was the last one to land and the saved draft came
-    // back from a reload with The Challenge / Our Solution / How Support Would Be Used blank.
+    // `story` has to be included here as well as in the autosave effect. Clicking SAVE
+    // DRAFT changes none of that effect's dependencies, so it does not re-run and this
+    // write is the last one to land.
     saveDraftToStorage(draftKey, {
       step,
       ownerId,
@@ -1193,9 +1169,9 @@ export default function CreateProject() {
   };
 
   const handleSubmit = async () => {
-    // Checked and taken synchronously, before any await, so concurrent clicks cannot
-    // both get through. Released only on failure — a success keeps it latched for the
-    // life of the component, so this form can create at most one project.
+    // Checked and taken synchronously, before any await, so two clicks cannot both get
+    // through. Released only on failure: a success keeps it latched for the life of the
+    // component, so this form creates at most one project.
     if (submitLockRef.current) return;
 
     const requiredStepError = [1, 2, 3, 4].map(validateStep).find(Boolean);
@@ -1208,30 +1184,27 @@ export default function CreateProject() {
     setSubmitting(true);
     setMessage("");
     try {
-      // The backend accepts: title, description, category, image_url,
-      // team_members, challenge, solution, funding_usage, gallery, solution_bullets
-      // and video_url.
+      // The backend accepts title, description, category, image_url, team_members,
+      // challenge, solution, funding_usage, gallery, solution_bullets and video_url.
       //
-      // It also decides the SEMESTER itself, from the day of the submit - it is not
-      // sent from here and cannot be chosen. Outside a teaching period the request
-      // comes back 409 with a message naming the date the next one opens, which lands
-      // in `setMessage` below like any other server error. The draft is autosaved per
-      // account, so nothing typed is lost while waiting for that date.
-      // The column is funding_usage; the form calls the field `funding`.
+      // It picks the semester itself from the day of the submit; it cannot be sent or
+      // chosen here. Outside a teaching period the request comes back 409 naming the
+      // date the next one opens, which lands in `setMessage` like any other server
+      // error, and the draft is autosaved so nothing typed is lost in the meantime.
       await projectApi.createProject({
         title: basicData.title.trim(),
         description: basicData.proposition.trim(),
         category: toCategory(basicData.school),
-        // Sent ONLY by an admin. The service refuses a creator who sends it and refuses
-        // an admin who does not — it is never an optional extra on either side.
+        // Sent only by an admin. The service refuses a creator who sends it and an
+        // admin who does not, so it is never optional on either side.
         ...(canCreateForOthers ? { creator_id: Number(ownerId) } : {}),
         image_url: media.coverImage?.dataUrl || media.coverImage?.preview || "",
         team_members: team.map(m => ({ name: m.name, role: m.role, rmitId: m.rmitId })),
         challenge: story.challenge.trim(),
         solution: story.solution.trim(),
         funding_usage: story.funding.trim(),
-        // Same data-URL treatment the cover image already gets, so the gallery survives
-        // the submit instead of being dropped with the video.
+        // The same data-URL treatment the cover image gets, so the gallery survives the
+        // submit.
         gallery: media.galleryImages
           .map(img => img.dataUrl || img.preview)
           .filter(Boolean),
@@ -1239,11 +1212,9 @@ export default function CreateProject() {
         solution_bullets: story.bullets
           .filter(b => b.title.trim() && b.desc.trim())
           .map(b => ({ title: b.title.trim(), desc: b.desc.trim() })),
-        // Support levels, saved for real since 2026-08-20 - this was the last place in
-        // the app that collected input and threw it away. The service inserts the
-        // project and its levels in ONE transaction, so a level that fails validation
-        // rolls the whole project back rather than leaving the creator believing they
-        // saved levels that do not exist.
+        // The service inserts the project and its levels in one transaction, so a level
+        // that fails validation rolls the whole project back rather than leaving the
+        // creator believing they saved levels that do not exist.
         tiers: tiers.map(tier => ({
           name: tier.name.trim(),
           min_amount: parseAmount(tier.amount, { integer: true }),
@@ -1251,16 +1222,16 @@ export default function CreateProject() {
         })),
       });
 
-      // Clear the saved draft BEFORE flipping isSubmitted, so there is no render in
-      // between where the autosave effect could put it back.
+      // Clear the draft before flipping isSubmitted, so there is no render in between
+      // where the autosave effect could write it back.
       clearDraftFromStorage(draftKey);
 
       setMessage("");
       setIsSubmitted(true);
     } catch (err) {
-      // Left on the form on purpose: the draft is intact and the error is usually
-      // retryable, so release the latch and put the SUBMIT button back rather than
-      // stranding the work. This is the ONLY place the latch is released.
+      // Stay on the form: the draft is intact and the error is usually retryable, so
+      // release the latch and put SUBMIT back rather than stranding the work. This is
+      // the only place the latch is released.
       submitLockRef.current = false;
       setMessage(errorMessage(err, "Could not submit the project"));
     } finally {
@@ -1269,10 +1240,9 @@ export default function CreateProject() {
   };
 
   const renderStep = () => {
-    // No isSubmitted branch here any more. It used to swap this area for an inline
-    // "SUBMISSION RECEIVED" panel while leaving the footer's SUBMIT button live
-    // underneath — which is exactly how a second click produced a duplicate project.
-    // Success is a modal now, and leaving for My Projects is the only way out of it.
+    // No isSubmitted branch here. An inline success panel would leave the footer's
+    // SUBMIT button live underneath it, which is how a second click produced a duplicate
+    // project. Success is a modal, and leaving is the only way out of it.
     switch (step) {
       case 1: return (
         <Step1
@@ -1332,9 +1302,8 @@ export default function CreateProject() {
               {step < STEPS.length ? (
                 <button onClick={advanceStep} className="bg-brand hover:bg-red-800 text-white border-none rounded-md px-7 py-2.5 text-[13px] font-bold cursor-pointer transition-colors w-full sm:w-auto">NEXT STEP →</button>
               ) : (
-                // Disabled while the request is open — the visible half of the
-                // double-submit guard, so nobody is left clicking a button that looks
-                // idle but is not.
+                // Disabled while the request is open. The visible half of the
+                // double-submit guard, so nobody clicks a button that looks idle.
                 <button
                   onClick={handleSubmit}
                   disabled={submitting || isSubmitted}

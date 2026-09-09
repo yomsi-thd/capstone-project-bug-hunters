@@ -1,20 +1,16 @@
-// The backend returns snake_case rows straight from Postgres, while the components
-// were built against the old mock shape. Every difference is absorbed here, so
-// ProjectCard / CommentList keep the same props as before. (FundingBar was the
-// third one until N3 deleted it on 2026-09-07 along with the goal it drew.)
+// Turns snake_case rows from Postgres into the shapes the components expect. Keeping
+// the translation here means a change to the API's row shape does not reach the pages.
 //
-// Note: current_amount is a Postgres `numeric`, and node-postgres returns those as
-// STRINGS ("5000.00"), not numbers. Every calculation must go through toNumber() first
-// or the result is wrong. goal_amount was the other one until N3 dropped it (2026-09-07).
+// Watch out for current_amount: it is a Postgres `numeric`, which node-postgres hands
+// back as a string ("5000.00"). Run it through toNumber() before any arithmetic.
 
 export function toNumber(value) {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
 }
 
-// TAG_COLORS is keyed by uppercase tags. Hiếu's existing rows use "Education" /
-// "Business" in mixed case, so normalise here; unknown tags fall back to <Tag>'s
-// default colour.
+// TAG_COLORS is keyed by uppercase tags, but the database holds mixed case
+// ("Education"), so normalise. Unknown tags fall back to <Tag>'s default colour.
 function toTag(category) {
   return (category || "UNCATEGORIZED").toUpperCase();
 }
@@ -22,17 +18,11 @@ function toTag(category) {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /**
- * "2026-10-25" -> "25 Oct 2026", by reading the string. Never through `new Date`.
+ * "2026-10-25" -> "25 Oct 2026", by reading the string rather than parsing a Date.
  *
- * ⚠️ THIS IS NOT A STYLE CHOICE. A semester's dates are Postgres `DATE` columns, so
- * they carry no time of day. `new Date("2026-10-25")` parses that as midnight UTC, and
- * `toLocaleDateString()` then prints it in the VIEWER's zone — 24 Oct for anybody west
- * of Greenwich. The API already goes to the trouble of sending these as plain strings
- * (TO_CHAR in semesterRepository) precisely so no Date is ever constructed from them;
- * building one here would put the bug back at the last possible moment.
- *
- * The team has paid for this family of bug once already: investment dates read a day
- * early on 78% of rows until the TIMESTAMPTZ migration of 2026-08-21.
+ * Semester dates are Postgres `DATE` columns with no time of day. `new Date("2026-10-25")`
+ * reads as midnight UTC, which then prints as 24 Oct for any viewer west of Greenwich.
+ * The API sends these as plain strings for that reason, so don't build a Date here.
  */
 export function formatSemesterDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? ""));
@@ -57,18 +47,15 @@ function formatDate(value) {
 }
 
 /**
- * The SECOND freeze axis, and deliberately not merged with the archive one above.
+ * The second way a project can be frozen, kept separate from archiving above.
  *
- * Archiving is something a person DOES, and it hides the project from Discover. A
- * semester ending is something the CALENDAR does, and the project stays visible under
- * its own term — that is exactly the client's rule of 2026-09-06. A project can be in
- * both states at once, so both are carried.
+ * Archiving is a person's decision and hides the project from Discover. A semester
+ * ending is the calendar's, and the project stays visible under its own term. A project
+ * can be in both states at once, so both flags are carried.
  *
- * ⚠️ `semesterClosed` is computed by Postgres (`COALESCE(end_date < CURRENT_DATE, false)`
- * in projectRepository) and simply passed through. Never re-derive it here from
- * `semesterEndDate`: that string is a DATE with no time of day, so `new Date(...)` reads
- * a day early for any viewer west of Greenwich — the trap formatSemesterDate exists to
- * avoid.
+ * Postgres computes `semesterClosed` (end_date < CURRENT_DATE). Don't re-derive it from
+ * `semesterEndDate` here: that is a date-only string, and a Date built from it reads a
+ * day early west of Greenwich. See formatSemesterDate.
  */
 function toSemesterFields(row) {
   return {
@@ -80,17 +67,15 @@ function toSemesterFields(row) {
   };
 }
 
-// Archive is a SECOND axis, independent of `status`. A project can be APPROVED and
-// archived at the same time, which is why nothing here touches the status field.
-// "Archived" is `archived_at IS NOT NULL` on the row — there is no PUBLISHED/ARCHIVED
-// column — so the boolean is derived once here and every page reads `archived`.
+// Archiving is independent of `status`: a project can be APPROVED and archived at once,
+// so nothing here touches status. There is no ARCHIVED column, only `archived_at`, so
+// the boolean is derived once here and every page reads `archived`.
 //
-// `archivedBy` stays the raw user id, not a name: CreatorMyProjects compares it to
-// user.id to decide whether the creator may restore (they may only undo their own
-// archive). `archivedByName` is the display string for the same person.
+// `archivedBy` stays a raw user id because CreatorMyProjects compares it to user.id
+// (a creator may only undo their own archive). `archivedByName` is for display.
 function toArchiveFields(row) {
   return {
-    // != null, not falsy — the value is a timestamp string, but be explicit.
+    // != null rather than a falsy check, since the value is a timestamp string.
     archived: row.archived_at != null,
     archivedAt: formatDate(row.archived_at),
     archivedBy: row.archived_by ?? null,
@@ -100,18 +85,17 @@ function toArchiveFields(row) {
 }
 
 /**
- * Who FILED the project, when that was not its owner.
+ * Who filed the project, when that was not its owner. Null for anything a creator made
+ * themselves.
  *
- * NULL for every project a creator made themselves, which is all of them before
- * 2026-08-24. Both admin surfaces need it, for different reasons: the id decides
- * whether APPROVE/REJECT are hidden (the admin who filed it may not review it), and
- * the name is what the OTHER admin reads before deciding.
+ * The id decides whether APPROVE/REJECT are hidden, since the admin who filed a project
+ * may not review it. The name is what the reviewing admin reads.
  */
 function toOnBehalfFields(row) {
   return {
     createdByAdminId: row.created_by_admin_id ?? null,
-    // Only GET /admin/projects joins the name; a row without the join still gets the
-    // id, so the "hide the buttons" rule never depends on a JOIN being present.
+    // Only GET /admin/projects joins the name. A row without the join still carries the
+    // id, so the "hide the buttons" rule never depends on the join being there.
     createdByAdminName: row.created_by_admin_name || null,
   };
 }
@@ -125,20 +109,19 @@ export function toCard(row) {
     title: row.title,
     desc: row.description,
     img: row.image_url || null,
-    // The two numbers a card carries since N3 (2026-09-07): the Class Coins the project
-    // has received, and how many separate people put them there. There is no goal any
-    // more, so there is no percentage and no bar.
+    // The two numbers on a card: Class Coins received, and how many people sent them.
+    // There is no funding goal, so no percentage and no progress bar.
     raised: toNumber(row.current_amount),
-    // `== null`, not falsy: a project nobody has backed yet must read 0. Only a row from
-    // before GET /projects carried the subquery reads as unknown.
+    // `== null` rather than falsy: a project nobody has backed reads 0, and only a row
+    // without the count at all reads as unknown.
     backers: row.backers_count == null ? null : toNumber(row.backers_count),
     large: false,
     status: row.status,
     ownerId: row.creator_id,
     createdAt: row.created_at,
-    // The teaching period this project was filed under. The card shows the semester's
-    // NAME, which the page resolves from the list it already loaded for the picker —
-    // GET /projects deliberately does not JOIN semesters for one short string.
+    // The teaching period the project was filed under. The card shows the semester name,
+    // which the page looks up in the list it already loaded for the picker, so
+    // GET /projects doesn't join semesters for one short string.
     semesterId: row.semester_id ?? null,
   };
 }
@@ -152,99 +135,87 @@ export function toDetail(row) {
     tag: toTag(row.category),
     title: row.title,
     status: row.status,
-    // The closing date shown on this page is the SEMESTER's, never the project's own
-    // superseded end_date. GET /projects/:id joins the name and date in, so the page
-    // no longer loads the whole semester list just to look one up.
+    // The closing date on this page is the semester's, not the project's own end_date.
+    // GET /projects/:id joins it in, so the page needn't load the semester list.
     ...toSemesterFields(row),
 
-    // GET /projects/:id joins users for the name only — it is a public route, so the
-    // creator's email is deliberately not exposed here (the admin routes return it).
-    // Still null for a project whose creator row was deleted.
+    // A public route, so the join returns the creator's name but not their email; the
+    // admin routes return that. Null when the creator's row was deleted.
     creator: row.creator_name
       ? {
           name: row.creator_name,
           // users.title, e.g. "Lead Researcher, RMIT Robotics Lab". Optional, so fall
-          // back to the generic label rather than leaving the line empty.
+          // back to a generic label rather than leaving the line empty.
           role: row.creator_title || "Project Creator",
         }
       : null,
 
     stats: {
-      // The whole funding measure since N3: a running total, with no target to reach and
-      // therefore no percentage. The closing date beside it is the SEMESTER's.
+      // A running total with no target to reach, so there is no percentage to show.
       raised: toNumber(row.current_amount),
       // Distinct wallets that invested, not the number of transactions.
       backers: row.backers_count == null ? null : toNumber(row.backers_count),
     },
 
-    // What the person READING the page already contributed, or null for a visitor who
-    // has not (or is signed out). Deliberately NOT inside `stats`: stats describes the
-    // project, this describes the reader — and it is what turns the invest button into
-    // "you have supported this" (N4, one contribution per person).
+    // What the reader themselves contributed, or null when they haven't or are signed
+    // out. Kept outside `stats` because stats describes the project and this describes
+    // the reader. It is what turns the invest button into "you have supported this".
     myContribution: row.my_contribution == null ? null : toNumber(row.my_contribution),
 
-    // projects.endorsed — only an admin can set it (PATCH /projects/:id/endorse).
+    // projects.endorsed. Only an admin can set it, via PATCH /projects/:id/endorse.
     endorsed: Boolean(row.endorsed),
 
     img: row.image_url || null,
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    // The pitch video, added to `projects` on 2026-08-18. A LINK, never a file — the
-    // wizard's file-upload branch was removed with it. Null for every project created
-    // before that date, so the page renders the section only when there is one.
+    // The pitch video, stored as a link and never as a file. Null on older projects, so
+    // the page renders that section only when there is one.
     videoUrl: row.video_url || null,
 
-    // `description` is the short blurb (also the Discover card text); the three story
-    // fields below are the long form, added to `projects` on 2026-08-06. They stay
-    // optional — projects created before that have none, and each section on
-    // ProjectDetail only renders when its own field has text.
+    // `description` is the short blurb, also used on the Discover card. The three story
+    // fields below are the long form and stay optional, so each section on ProjectDetail
+    // renders only when its own field has text.
     about: row.description,
     challenge: row.challenge || null,
     solution: row.solution || null,
-    // [{ title, desc }] listed under "Our Solution". Empty is fine — the prose above
-    // them stands on its own.
+    // [{ title, desc }] listed under "Our Solution". Empty is fine; the prose above
+    // stands on its own.
     solutionBullets: Array.isArray(row.solution_bullets) ? row.solution_bullets : [],
-    // The column is `funding_usage`; the UI has always called this one `funding`.
+    // Column is `funding_usage`; the UI calls it `funding`.
     funding: row.funding_usage || null,
 
     teamMembers: Array.isArray(row.team_members) ? row.team_members : [],
 
-    // Only the "VIEW ALL n COMMENTS" label; the rendered list comes from the separate
-    // comments request.
+    // Only feeds the "VIEW ALL n COMMENTS" label. The list itself is a separate request.
     totalComments: toNumber(row.comments_count),
 
-    // GET /projects/:id still returns archived projects on purpose — the page renders
-    // read-only with a banner rather than 404ing, so a backer's existing investment
-    // and the shared link both keep working.
+    // Archived projects still come back from GET /projects/:id. The page renders them
+    // read-only with a banner instead of 404ing, so existing investments and shared
+    // links keep working.
     ...toArchiveFields(row),
   };
 }
 
-// Class Coins, not dollars. CC has no real-world value, so a "$" prefix was actively
-// misleading — and it contradicted the Header badge, the invest modal and My Investments,
-// which all speak CC already.
-// Callers that parse the number back out must strip non-digits (/[^0-9.]/g), NOT just
-// "$" and "," — CreatorMyProjects and EditProject both do.
+// Class Coins, never dollars: CC has no real-world value, so a "$" would misrepresent
+// it. Callers parsing the number back out must strip /[^0-9.]/g, not just "$" and ",".
 function money(value) {
   return `${toNumber(value).toLocaleString("en-US")} CC`;
 }
 
 /**
- * A formatted amount string -> a number. The inverse of money().
+ * A formatted amount string -> a number. The inverse of money(), and kept beside it so
+ * the two cannot drift apart.
  *
- * It lives next to money() on purpose: the two have to agree, and in one file they
- * cannot drift. Before 20/08 this rule was hand-copied in SEVEN places in two variants.
+ * Strips /[^0-9.]/g rather than /[$,]/g, because the strings here are "1,050 CC": a
+ * dollar-and-comma strip would leave " CC" behind and Number() would return NaN.
  *
- * ⚠️ Strip with /[^0-9.]/g, NOT /[$,]/g. The strings in this app are "1,050 CC", not
- * "$1,050" — a $-and-comma strip leaves " CC" behind and Number() returns NaN. Class
- * Coins have no real-world value, so the app never prints a dollar sign.
- *
- * `integer: true` strips the dot rather than rounding: the invest field filters on every
- * keystroke, so "12.5" becomes "125" and the user sees at once that it takes no dot.
+ * `integer: true` drops the dot instead of rounding. The invest field filters on every
+ * keystroke, so "12.5" becomes "125" and the user sees straight away that it takes no
+ * decimals.
  *
  * @param {string|number} value
  * @param {{ integer?: boolean }} [options]
- * @returns {number} 0 when unreadable — never NaN, because every caller feeds this
- *   straight into arithmetic or into a controlled input.
+ * @returns {number} 0 when unreadable, never NaN: callers feed this straight into
+ *   arithmetic or into a controlled input.
  */
 export function parseAmount(value, { integer = false } = {}) {
   const cleaned = String(value ?? "").replace(integer ? /[^0-9]/g : /[^0-9.]/g, "");
@@ -252,16 +223,15 @@ export function parseAmount(value, { integer = false } = {}) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-// DEPT_STYLE / CAT_STYLE are keyed in Title Case ("Engineering"), while category in
-// the database is sometimes uppercase ("ENGINEERING") and sometimes not
-// ("Education") -> normalise.
+// DEPT_STYLE / CAT_STYLE are keyed in Title Case ("Engineering"), but the database
+// holds both "ENGINEERING" and "Education", so normalise.
 function toDept(category) {
   const c = (category || "General").toLowerCase();
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
 
-// The backend's projects.status is PENDING / APPROVED / REJECTED; Khôi's UI uses
-// different labels in the creator area and the admin area.
+// projects.status is PENDING / APPROVED / REJECTED. The creator and admin areas each
+// label those differently on screen.
 const CREATOR_STATUS = { APPROVED: "Active", PENDING: "Pending Review", REJECTED: "Rejected" };
 const ADMIN_STATUS = { APPROVED: "Active", PENDING: "Pending", REJECTED: "Rejected" };
 
@@ -281,31 +251,30 @@ export function toCreatorProject(row) {
     challenge: row.challenge || "",
     solution: row.solution || "",
     funding: row.funding_usage || "",
-    // Not editable in that modal, but it has to echo them back on save — the service
+    // Not editable in that modal, but it has to send them back on save: the service
     // overwrites these columns with whatever the request contains.
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
     solutionBullets: Array.isArray(row.solution_bullets) ? row.solution_bullets : [],
-    // Bound to an <input value=…> in EditProject, so "" and never null — the same
-    // reason the story fields above pass "" through.
+    // Bound to an <input value=...> in EditProject, so "" and never null, same as the
+    // story fields above.
     videoUrl: row.video_url || "",
 
-    // Why the board rejected it, written by the admin. Only ever set while the project
-    // is REJECTED — approve and resubmit both clear the column — so the card can show it
-    // without checking the status first.
+    // The admin's reason for rejecting. Approve and resubmit both clear the column, so
+    // it is only ever set while the project is REJECTED and the card can show it without
+    // checking the status.
     reviewNote: row.review_note || null,
 
-    // Added to GET /projects/my on 2026-08-18 so CreatorDashboard can total them from
-    // the list it already fetches. `== null` and not a falsy check: a project nobody
-    // has backed yet has 0 backers, and showing "—" for that would read as "unknown"
-    // rather than "none".
+    // Returned by GET /projects/my so CreatorDashboard can total them from the list it
+    // already has. `== null` rather than falsy: 0 backers means none, and rendering that
+    // as a dash would read as "unknown".
     backers: row.backers_count == null ? null : toNumber(row.backers_count),
     commentsCount: row.comments_count == null ? null : toNumber(row.comments_count),
 
-    // `status` above stays the moderation verdict. These describe visibility, and
-    // My Projects lists archived cards in their own tab rather than hiding them.
+    // `status` above is the moderation verdict; these describe visibility. My Projects
+    // lists archived cards in their own tab rather than hiding them.
     ...toArchiveFields(row),
-    // The other freeze axis. The card hides EDIT / UPDATE / RESUBMIT on a closed
-    // semester rather than offering buttons the API answers 409 to.
+    // The card hides EDIT / UPDATE / RESUBMIT once the semester closes, rather than
+    // offering buttons the API answers 409 to.
     ...toSemesterFields(row),
   };
 }
@@ -338,58 +307,49 @@ export function toApprovalProject(row) {
     submitted: formatDate(row.created_at),
     status: "Pending Review",
     img: row.image_url || null,
-    // ⚠️ NO goal and NO duration. Both went on 2026-09-07 (N3): there is no funding
-    // goal any more, and the "campaign duration" read start_date / end_date, which
-    // createProject stopped writing on 2026-09-06 — so that field had already been
-    // showing "Not set" on every project filed since.
+    // No goal and no duration: projects have no funding target, and the teaching period
+    // replaced the per-project campaign dates.
     description: row.description,
     team: Array.isArray(row.team_members) ? row.team_members : [],
-    // AdminApprovals' review screen reads project.gallery[0] and project.tiers.map().
-    // Both were missing here, so opening REVIEW threw
-    // "Cannot read properties of undefined (reading '0')" and — with no error boundary
-    // above it — blanked the whole app. Always hand back arrays.
+    // The review screen reads gallery[0] and tiers.map(), so both must be arrays here
+    // even when the row carries neither.
     gallery: Array.isArray(row.gallery) ? row.gallery : [],
-    // Kept as a safety net even though support levels now have their own endpoint.
-    // GET /admin/projects does not join them (they are per-project detail, not queue
-    // data), so this stays empty and the review screen loads them itself with
-    // getProjectTiers. Removing the field would make a page in Khôi's area depend on
-    // two changes landing together.
+    // GET /admin/projects does not join support levels, since they are per-project
+    // detail rather than queue data. The review screen loads them with getProjectTiers.
     tiers: [],
     ...toOnBehalfFields(row),
   };
 }
 
 /**
- * project_tiers row -> a support level as the UI reads it.
+ * project_tiers row -> a support level as the UI reads it. "Support Level" on screen,
+ * `tier` in the code and the columns.
  *
- * "Support Level" on screen, `tier` in the code and the column names. A level is a
- * MINIMUM contribution plus the lines saying what choosing it signals — the creator
- * owes nothing, so there is no quantity, delivery date or fulfilment state here.
+ * A level is a minimum contribution plus lines describing what choosing it signals. The
+ * creator owes nothing in return, so there is no quantity, delivery date or fulfilment
+ * state to track.
  */
 export function toTier(row) {
   return {
     id: row.id,
     projectId: row.project_id,
     name: row.name,
-    // min_amount is INTEGER and backers_count comes from COUNT(), but node-postgres has
-    // handed this codebase numeric columns as strings before (goal_amount, current_amount)
-    // and the bugs were silent — arithmetic that "worked" and produced wrong percentages.
-    // Coercing costs nothing and removes the whole class.
+    // Both are integers today, but node-postgres returns numeric columns as strings and
+    // that failure is silent. Coercing costs nothing.
     minAmount: toNumber(row.min_amount),
     bullets: Array.isArray(row.bullets) ? row.bullets : [],
-    // How many DISTINCT people chose this level. This is the number that makes support
-    // levels worth having: it says which level attracts people.
+    // Distinct people who chose this level, which is what says whether it attracts
+    // anyone.
     backersCount: toNumber(row.backers_count),
-    // A hidden level (somebody chose it, then the creator removed it) never reaches the
-    // public list, but the flag rides along for the creator's own screens.
+    // A level somebody chose and the creator then removed is hidden, not deleted. It
+    // never reaches the public list, but the creator's screens still see the flag.
     isActive: row.is_active !== false,
   };
 }
 
 /**
- * The one support level to show on a row that covers SEVERAL investments: the highest
- * the person ever chose. Null when they never chose one, which is the common case —
- * every transaction made before 2026-08-20 and every "just support" investment.
+ * The level to show on a row covering several investments: the highest the person ever
+ * chose. Null when they never chose one, which is the common case.
  */
 function toTopTier(row) {
   if (!row.top_tier_name) return null;
@@ -401,11 +361,10 @@ function toTopTier(row) {
 }
 
 /**
- * creator_requests row (joined to users) -> a row in the admin's Creator Requests queue.
+ * creator_requests row, joined to users -> a row in the admin's Creator Requests queue.
  *
- * This is the other half of the sign-up checkbox: ticking "Creator" on Register writes a
- * PENDING row here, and approving it is what actually grants the CREATOR role —
- * createProject stopped auto-granting it on 2026-08-06.
+ * The other half of the sign-up checkbox: ticking "Creator" on Register writes a PENDING
+ * row here, and approving it is what grants the CREATOR role.
  */
 export function toCreatorRequest(row) {
   return {
@@ -413,7 +372,7 @@ export function toCreatorRequest(row) {
     userId: row.user_id,
     name: row.full_name || `User #${row.user_id}`,
     email: row.email || "",
-    // The column exists so a future request could ask for something other than CREATOR.
+    // A column rather than a constant, so a request could later ask for another role.
     role: row.role || "CREATOR",
     status: row.status,
     requestedOn: formatDate(row.created_at),
@@ -421,12 +380,11 @@ export function toCreatorRequest(row) {
 }
 
 /**
- * The signed-in user's own row (GET /users/profile) -> the Account page.
+ * The signed-in user's own row -> the Account page.
  *
- * `name`, `email` and `title` are bound to controlled <input>s, so a missing column
- * becomes `""` and never `null` — `null` would make the input uncontrolled and React
- * would warn the first time the user typed. `toCreatorProject` does the same for the
- * story fields, and for the same reason.
+ * `name`, `email` and `title` bind to controlled inputs, so a missing column becomes ""
+ * and never null. Null would make the input uncontrolled and React warns the first time
+ * the user types.
  */
 export function toProfile(row) {
   if (!row) return null;
@@ -436,42 +394,33 @@ export function toProfile(row) {
     email: row.email ?? "",
     // Academic affiliation shown under the creator's name on a project page.
     title: row.title ?? "",
-    // users.created_at is a bare TIMESTAMP, so it reads back shifted by the DB's
-    // offset (BACKEND-REVIEW-FOR-HIEU-2 §4e). Only the date is rendered, which hides
-    // the error except for accounts created between midnight and 07:00.
+    // users.created_at is a bare TIMESTAMP, so it reads back shifted by the database's
+    // offset. Only the date is shown, which hides the error except for accounts created
+    // in the small hours.
     joinedOn: formatDate(row.created_at),
     isActive: row.is_active !== false,
   };
 }
 
-/**
- * User row -> table in AdminUserManagement.
- *
- * There used to be a `studentId` of `#${row.id}` and a `project` of "Unassigned" here.
- * Neither exists in the database — `users` has no student id, and nothing in this
- * listing links a user to a project — so both were invented values shown as fact. They
- * are gone, and the table now shows the email and the roles instead, which are real.
- */
+/** User row -> table in AdminUserManagement. */
 export function toAdminUser(row) {
   const roles = Array.isArray(row.roles) ? row.roles : [];
   return {
     id: row.id,
     name: row.full_name,
-    // The backend only has a boolean is_active — no "Pending" / "Suspended".
+    // The backend has only a boolean is_active, no "Pending" or "Suspended".
     status: row.is_active ? "Active" : "Inactive",
-    // Two shapes of the same fact, on purpose: `role` is the display string in the
-    // table, `roles` is what the edit checkboxes bind to and what
-    // PATCH /admin/users/:id/roles takes back.
+    // Two shapes of the same fact: `role` is the display string, `roles` is what the
+    // edit checkboxes bind to and what PATCH /admin/users/:id/roles takes back.
     role: roles.length
       ? roles.map(r => r.charAt(0) + r.slice(1).toLowerCase()).join(", ")
       : "—",
     roles,
     email: row.email,
     isActive: !!row.is_active,
-    // The wallet, so an admin can see who needs Class Coins before issuing them.
-    // ⚠️ `== null`, and null is KEPT rather than turned into 0: an account with no wallet
-    // row is a different fact from one whose wallet is empty, and the table says "—" for
-    // the first and "0 CC" for the second.
+    // The wallet, so an admin can see who needs Class Coins. Null is kept rather than
+    // turned into 0: no wallet row at all is a different fact from an empty wallet, and
+    // the table shows a dash for the first and "0 CC" for the second.
     balance: row.balance == null ? null : toNumber(row.balance),
   };
 }
@@ -479,9 +428,9 @@ export function toAdminUser(row) {
 /**
  * One row of GET /projects/my/backers -> a line in the creator dashboard's backer list.
  *
- * The row is already grouped per person by SQL, so this is only formatting. `amount` is
- * the string the list renders and `amountValue` the number it sorts/among-totals with —
- * the pages that had only the formatted string ended up parsing digits back out of it.
+ * SQL has already grouped the row per person, so this is only formatting. `amount` is
+ * the string the list renders, `amountValue` the number it sorts and totals with, so
+ * callers never have to parse the digits back out.
  */
 export function toBacker(row) {
   const projects = toNumber(row.project_count);
@@ -493,18 +442,13 @@ export function toBacker(row) {
     projects,
     projectsLabel: `${projects} ${projects === 1 ? "project" : "projects"}`,
     lastInvested: formatDate(row.last_invested_at),
-    // The highest support level this person ever chose across the creator's projects.
-    // The row is grouped per PERSON over every project they backed, so the chip means
-    // "their strongest signal to you", not "their level on one project" — the
-    // "N projects" line next to it keeps that from being misread.
+    // The highest level this person chose across all of the creator's projects, not on
+    // any one of them. The "N projects" line beside it keeps that from being misread.
     topTier: toTopTier(row),
   };
 }
 
-/**
- * "2 days ago" for CommentItem's `time`. The old mock hardcoded these strings, so the
- * component expects a phrase rather than a date.
- */
+/** "2 days ago" for CommentItem, which expects a phrase rather than a date. */
 export function timeAgo(value) {
   if (!value) return "";
   const then = new Date(value);
@@ -537,18 +481,17 @@ export function timeAgo(value) {
 }
 
 /**
- * Flat comment rows -> the nested shape CommentList/CommentItem render.
+ * Flat comment rows -> the nested shape CommentList and CommentItem render.
  *
- * The API returns every comment for a project in one flat, oldest-first list with a
- * `parent_id`; the UI draws exactly one level of nesting. Newest top-level comment goes
- * first (that is what a reader expects), while replies stay oldest-first so a
- * conversation reads downwards.
+ * The API returns every comment in one flat, oldest-first list carrying `parent_id`, and
+ * the UI draws exactly one level of nesting. Top-level comments end up newest first,
+ * while replies stay oldest first so a conversation reads downwards.
  */
 export function toCommentThread(rows = []) {
   const toNode = (row) => ({
     id: row.id,
     author: row.author_name || "Deleted user",
-    // CREATOR / BACKER / null — derived server-side from who owns and who backed the
+    // CREATOR, BACKER or null. The server derives it from who owns and who backed this
     // project, not from the author's account roles.
     role: row.author_role || null,
     time: timeAgo(row.created_at),
@@ -569,7 +512,7 @@ export function toCommentThread(rows = []) {
 
   rows.forEach((row) => {
     if (row.parent_id != null) {
-      // A reply whose parent is missing (deleted mid-request) would otherwise vanish.
+      // Optional chaining: a reply whose parent was deleted mid-request has no node.
       byId.get(row.parent_id)?.replies.push(toNode(row));
     }
   });
@@ -583,7 +526,7 @@ export function toProjectUpdate(row) {
     id: row.id,
     title: row.title,
     body: row.body,
-    // author_id is ON DELETE SET NULL, so the join can legitimately come back empty.
+    // author_id is ON DELETE SET NULL, so the join can come back empty.
     author: row.author_name || "Unknown creator",
     postedOn: formatDate(row.created_at),
   };
@@ -592,16 +535,14 @@ export function toProjectUpdate(row) {
 /**
  * One row of GET /classcoins/investments -> a card on My Investments.
  *
- * The row is one PROJECT, not one transaction: the query groups by project and sums the
- * amounts, so investing three times in the same project is a single card for 900 CC
- * rather than three cards for 300 that look like duplicates. It arrives already joined,
- * which is what removed the old "fetch each project separately" N+1 — and why there is
- * no "project is missing" branch here: a transaction whose project was permanently
- * deleted carries project_id = NULL and never survives the join.
+ * A row is one project rather than one transaction: the query groups by project and sums
+ * the amounts, so repeat investments read as a single card instead of near-duplicates.
+ * The project is already joined in, so there is no "project missing" branch to handle;
+ * a transaction whose project was deleted has project_id NULL and never survives the join.
  */
 export function toInvestment(row) {
   return {
-    // One card per project now, so the project id is the identity.
+    // One card per project, so the project id is the identity.
     id: row.project_id,
     projectId: row.project_id,
     title: row.title,
@@ -609,19 +550,16 @@ export function toInvestment(row) {
     desc: row.description ?? "",
     img: row.image_url || null,
     investedAmount: toNumber(row.invested_amount),
-    // The day they backed it. One contribution per project since N4, so there is no
-    // longer a first and a latest to tell apart — the column stays MAX(created_at)
-    // because the row is still a GROUP BY, and over one row that is the same date.
+    // The day they backed it. One contribution per project, so there is no first and
+    // latest to tell apart; MAX(created_at) over a single row is that same date.
     investmentDate: formatDate(row.last_invested_at),
-    // The PROJECT's running total, not this backer's share — theirs is investedAmount
-    // above. It replaced the funding-progress bar on the card in N3.
+    // The project's running total, not this backer's share. Theirs is investedAmount.
     projectTotal: toNumber(row.current_amount),
-    // The backer keeps the card either way — archiving a project must not erase
-    // somebody's spend history — so it is badged rather than dropped.
+    // Archiving a project must not erase somebody's spend history, so the card stays
+    // and is badged instead.
     archived: row.archived_at != null,
-    // The highest support level chosen for this project. Null for anything backed
-    // before support levels existed and for every "just support" investment, which is
-    // most of them — the card simply shows no chip.
+    // The highest level chosen for this project, null for a plain "just support"
+    // investment. The card then shows no chip.
     topTier: toTopTier(row),
   };
 }

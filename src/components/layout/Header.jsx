@@ -21,9 +21,8 @@ function CCBadge({ ccBalance }) {
 }
 
 export default function Header(props = {}) {
-  // Header is self-sufficient: it reads the signed-in user from AuthContext and
-  // manages its own menu/search state. Any prop passed in still overrides the
-  // internal default, so older call sites keep working unchanged.
+  // Self-sufficient: it reads the signed-in user from AuthContext and owns its menu and
+  // search state. A prop still overrides the internal default where one is passed.
   const auth = useAuth();
   const [menuOpenState, setMenuOpenState] = useState(false);
   const [searchOpenState, setSearchOpenState] = useState(false);
@@ -31,11 +30,9 @@ export default function Header(props = {}) {
 
   const pick = (value, fallback) => (value !== undefined ? value : fallback);
 
-  // The header owns its OWN breakpoints (it ignores any isMobile/isTablet/
-  // isDesktop passed in) and deliberately uses a tighter desktop threshold than
-  // pages (HEADER_DESKTOP_MIN = 1200 vs the page default 1024) — see useBreakpoint
-  // for the full reasoning. So on 1024–1199 widths (e.g. iPad Pro 12.9" portrait)
-  // it uses the hamburger layout while the page content still lays out as desktop.
+  // The header keeps its own breakpoints and uses a tighter desktop threshold than the
+  // pages do, so between 1024 and 1199px it collapses to the hamburger while the page
+  // below still lays out as desktop. See useBreakpoint for why.
   const { isMobile, isTablet, isDesktop } = useBreakpoint(BREAKPOINTS.HEADER_DESKTOP_MIN);
 
   const isLoggedIn = pick(props.isLoggedIn, auth.isLoggedIn);
@@ -44,21 +41,18 @@ export default function Header(props = {}) {
   const onLogout = pick(props.onLogout, auth.logout);
   const navLinks = pick(props.navLinks, getNavLinksForUser(auth.user));
 
-  // Role-derived visibility: only Creators start projects; only Backers/Admins
-  // hold a Class Coin balance.
+  // Only creators start projects, and only backers hold a Class Coin balance.
   const canCreate = pick(props.canCreate, auth.canCreate);
-  // An admin owns nothing, so their way into the wizard is worded differently: the
-  // project is filed under a creator they pick in step 1. The two gates are mutually
-  // exclusive (an ADMIN account may hold no other role since 2026-08-24), so nobody
-  // ever sees both buttons — don't add an `&& !canCreate` to "make sure".
+  // An admin owns nothing, so their route into the wizard is worded differently: the
+  // project is filed under a creator they pick in step 1. An admin account holds no
+  // other role, so the two gates are already exclusive and nobody sees both buttons.
   const canCreateForOthers = pick(props.canCreateForOthers, auth.canCreateForOthers);
   const showBalance = pick(props.showBalance, auth.canInvest);
-  // Search only belongs on pages with a project catalogue to search (Discover).
-  // Defaults to true for backward compatibility; pages without a searchable
-  // collection pass showSearch={false} to hide the box, toggle, and dropdown.
+  // Search belongs only on pages with a catalogue to search. Pages without one pass
+  // showSearch={false} to hide the box, the toggle and the dropdown.
   const showSearch = pick(props.showSearch, true);
-  // Dashboard pages (creator/admin) render a sidebar and pass this in so the
-  // header can toggle it on narrow screens. Public pages omit it and get no button.
+  // Dashboard pages render a sidebar and pass this in so the header can toggle it when
+  // narrow. Public pages omit it and get no button.
   const onToggleSidebar = props.onToggleSidebar;
 
   const search = pick(props.search, searchState);
@@ -81,8 +75,8 @@ export default function Header(props = {}) {
           search dropdown lives in-flow here so it PUSHES page content down
           instead of covering the results it just filtered. */}
       <div className="sticky top-0 z-100">
-      {/* ⚠️ h-14 is 56px and five sidebars offset themselves by exactly that with
-          `top-14`. Change one and the other five gain or lose a gap. */}
+      {/* h-14 is 56px, and every sidebar offsets itself by exactly that with
+          top-14. Change one and the rest gain or lose a gap. */}
       <nav className={`flex h-14 items-center border-b border-neutral-200 bg-white ${isMobile ? "gap-2 px-4" : "gap-4 px-10"}`}>
         {/* Sidebar toggle, dashboard pages only. Visibility is driven by Tailwind's
             `md:hidden` rather than this header's own isMobile/isDesktop, because it
@@ -146,7 +140,7 @@ export default function Header(props = {}) {
           >🔍</button>
         )}
 
-        {/* Desktop — Logged Out */}
+        {/* Desktop, logged out */}
         {isDesktop && !isLoggedIn && (
           <Link
             to="/login"
@@ -154,7 +148,7 @@ export default function Header(props = {}) {
           >LOGIN</Link>
         )}
 
-        {/* Desktop — Logged In */}
+        {/* Desktop, logged in */}
         {isDesktop && isLoggedIn && (
           <>
             {showBalance && <CCBadge ccBalance={ccBalance} />}
@@ -187,7 +181,7 @@ export default function Header(props = {}) {
           </>
         )}
 
-        {/* Tablet — Logged Out */}
+        {/* Tablet, logged out */}
         {isTablet && !isLoggedIn && (
           <Link
             to="/login"
@@ -195,7 +189,7 @@ export default function Header(props = {}) {
           >LOGIN</Link>
         )}
 
-        {/* Tablet — Logged In */}
+        {/* Tablet, logged in */}
         {isTablet && isLoggedIn && (
           <>
             {showBalance && (
@@ -231,8 +225,8 @@ export default function Header(props = {}) {
         )}
       </nav>
 
-      {/* Search dropdown (mobile/tablet) — in-flow inside the sticky header so it
-          pushes content down (never covers results) and rides with the nav. */}
+      {/* The mobile and tablet search dropdown, in flow inside the sticky header so
+          it pushes content down rather than covering the results it just filtered. */}
       {(isMobile || isTablet) && showSearch && searchOpen && (
         <div className="border-b border-neutral-200 bg-white px-4 py-2.5 shadow-[0_8px_16px_rgba(0,0,0,0.08)]">
           <div className="flex items-center gap-2 rounded-md bg-[#f5f5f3] px-3 py-2">
@@ -243,12 +237,12 @@ export default function Header(props = {}) {
       )}
       </div>
 
-      {/* Dropdown menu (mobile + tablet). Tablet only lists nav links — its
-          balance/create/login controls already sit on the bar, so those blocks
-          below are gated to mobile-only. Fixed overlay under the sticky nav so it
-          shows at the current scroll position instead of the top of the page. */}
-      {/* ⚠️ Fixed, and one z BELOW the nav — the bar has to stay on top of its own
-          menu. top-14 and the max-height both track the 56px bar. */}
+      {/* The dropdown menu, on mobile and tablet. Tablet lists nav links only, since
+          its balance, create and login controls already sit on the bar, so the blocks
+          below are mobile-only. A fixed overlay under the sticky nav, so it opens at the
+          current scroll position rather than the top of the page. */}
+      {/* Fixed, and one z below the nav: the bar has to stay on top of its own menu.
+          top-14 and the max-height both track the 56px bar. */}
       {!isDesktop && menuOpen && (
         <div className="fixed top-14 right-0 left-0 z-99 max-h-[calc(100vh-56px)] overflow-y-auto border-b border-neutral-200 bg-white px-4 pt-2 pb-4 shadow-[0_8px_16px_rgba(0,0,0,0.08)]">
           {navLinks.map(({ label, path }) => (

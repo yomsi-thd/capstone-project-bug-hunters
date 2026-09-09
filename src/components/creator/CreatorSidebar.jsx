@@ -8,16 +8,15 @@ const ROUTE_BY_ID = {
 
 /**
  * The creator area's left nav, shared by CreatorDashboard and CreatorMyProjects so the
- * two screens cannot drift apart. It is only the two links — the block above it used to
- * show a hardcoded "Project Creator / School of Design" avatar that came from nowhere
- * and did nothing, so it is gone; NEW PROJECT lives next to each page's title instead.
+ * two cannot drift apart. It is just the two links; starting a project is a header
+ * action, reachable from anywhere.
  *
- * Active state is derived from the URL, not from a prop: both pages are real routes, so
- * anything else would need the two to keep a duplicate copy of "where am I" in sync.
+ * Active state comes from the URL rather than a prop. Both destinations are real routes,
+ * so a prop would mean keeping a second copy of "where am I" in sync.
  *
- * Positioning matches the other dashboard shells: `fixed` under the 56px header on
- * mobile, `md:relative` from 768px where it becomes a permanent column. `md:top-0` is
- * load-bearing — leaving `top-14` on at md+ would push the whole column down 56px.
+ * Positioning matches the other dashboard shells: fixed under the 56px header on mobile,
+ * relative from 768px where it becomes a permanent column. `md:top-0` is load-bearing,
+ * since leaving top-14 on at md+ would push the whole column down by the header.
  */
 export default function CreatorSidebar({ open, onClose }) {
   const navigate = useNavigate();

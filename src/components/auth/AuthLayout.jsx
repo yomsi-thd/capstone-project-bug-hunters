@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import rmitBg from "../../assets/rmit.jpg";
 
-// Real RMIT campus photo (bundled from src/assets so it works offline too).
+// Bundled from src/assets rather than fetched, so it works offline.
 const BG_IMAGE = rmitBg;
 
 export default function AuthLayout({ children, isMobile }) {
   return (
-    // `padding` is derived from the breakpoint hook, so it stays inline.
+    // Derived from the breakpoint hook at runtime, so it stays inline.
     <div
       className="relative flex min-h-screen items-center justify-center overflow-hidden"
       style={{ padding: isMobile ? "24px 16px" : "40px" }}

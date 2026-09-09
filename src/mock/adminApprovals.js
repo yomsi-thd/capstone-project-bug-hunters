@@ -5,5 +5,4 @@ export const ADMIN_APPROVAL_DEPT_STYLE = {
   SCIENCE: "bg-green-700 text-white",
 };
 
-// ADMIN_APPROVAL_PROJECTS was removed when AdminApprovals was wired to
-// GET /api/admin/projects (filtered to PENDING).
+// The queue itself comes from GET /api/admin/projects, filtered to PENDING.

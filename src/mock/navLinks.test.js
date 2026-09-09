@@ -24,10 +24,9 @@ describe("getNavLinksForUser", () => {
   it("gives an admin Admin Dashboard and NOTHING of their own", () => {
     const l = labels({ roles: ["admin"] });
     expect(l).toContain("Admin Dashboard");
-    // Both of these were here before the 2026-08-24 role separation. An admin owns no
-    // projects and holds no Class Coins now, so each link pointed at an empty page —
-    // and /creator-my-projects is behind canCreate, which an admin no longer has, so
-    // My Projects would have landed on the "no access" screen.
+    // An admin owns no projects and holds no Class Coins, so both links would point at
+    // an empty page, and /creator-my-projects sits behind canCreate, so My Projects would
+    // land on the "no access" screen.
     expect(l).not.toContain("My Projects");
     expect(l).not.toContain("My Investments");
   });

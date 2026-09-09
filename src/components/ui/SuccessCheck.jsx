@@ -1,13 +1,10 @@
-// The brand-red circle with a white tick, shown at the top of a success dialog.
+// The brand-red circle with a white tick at the top of a success dialog, shared by the
+// investment and registration dialogs. A new backer sees both within one flow, so they
+// have to match.
 //
-// It was byte-identical in BackerInvestmentSuccessModal and RegisterSuccessModal — the
-// same 60px circle, the same 28px stroke-3 polyline. Two copies of a decoration is not a
-// crisis, but it is two places for the circle to stop matching, and the two dialogs sit
-// one flow apart: a backer sees one right after the other on their first visit.
-//
-// ⚠️ CreateProject's SubmitSuccessModal deliberately does NOT use this. Its tick is green
-// on a pale green disc, because that dialog reports something SENT FOR REVIEW rather than
-// something completed — brand red there would promise the project is live.
+// CreateProject's SubmitSuccessModal does not use this. Its tick is green, because that
+// dialog reports something sent for review rather than completed, and brand red there
+// would promise the project is already live.
 export default function SuccessCheck() {
   return (
     <div className="mx-auto mb-5 flex h-15 w-15 items-center justify-center rounded-full bg-brand">

@@ -29,9 +29,8 @@ function TabNav({ tabs, active, onChange }) {
           className={`lp-navlink relative -mb-0.5 flex cursor-pointer items-center gap-1.5 bg-none px-5 py-2.5 text-[14px] ${
             active === tab.id ? "is-active font-bold" : "font-normal"
           }`}
-          // ⚠️ --nav-base stays inline: .lp-navlink reads it for its resting colour, and it
-          // differs per host (Header passes #444, this passes #666). A context-set custom
-          // property is one of the three cases where inline is still correct.
+          // --nav-base stays inline. .lp-navlink reads it for its resting colour and it
+          // differs per host, so it is a custom property set per context.
           style={{ "--nav-base": "#666" }}
         >
           {tab.label}
@@ -79,7 +78,7 @@ export default function ProjectDetail() {
 
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
 
-  // Invest flow: closed -> "invest" modal -> "success" modal -> closed
+  // Invest flow: closed -> invest modal -> success modal -> closed.
   const [investStep, setInvestStep] = useState(null); // null | "invest" | "success"
   const [investedAmount, setInvestedAmount] = useState(0);
 
@@ -91,8 +90,8 @@ export default function ProjectDetail() {
   const [comments, setComments] = useState([]);
   const [commentError, setCommentError] = useState(null);
   // Bumped after a successful post to re-run the fetch below. Refetching rather than
-  // appending locally is deliberate: the author name and the CREATOR / BACKER badge are
-  // both derived server-side, so an optimistic row would render without them.
+  // appending locally, because the author name and the CREATOR/BACKER badge are derived
+  // server-side and an optimistic row would render without them.
   const [commentsVersion, setCommentsVersion] = useState(0);
 
   useEffect(() => {
@@ -108,8 +107,8 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id, commentsVersion]);
 
-  // Comments and replies share this handler; `parentId` is null for a new thread.
-  // Returns true so CommentList only clears its box when the post actually landed.
+  // Comments and replies share this handler, with `parentId` null for a new thread.
+  // Returns true so CommentList only clears its box once the post has landed.
   const handlePostComment = async (text, parentId = null) => {
     setCommentError(null);
     try {
@@ -122,9 +121,9 @@ export default function ProjectDetail() {
     }
   };
 
-  // Resolves true, or the message for the confirmation dialog to show. Refetches rather
-  // than dropping the row locally: `comments.parent_id` is ON DELETE CASCADE, so deleting a
-  // top-level comment also removes its replies and only the server knows what is left.
+  // Resolves true, or the message for the confirmation dialog to show. It refetches
+  // rather than dropping the row locally: parent_id is ON DELETE CASCADE, so deleting a
+  // top-level comment takes its replies too and only the server knows what remains.
   const handleDeleteComment = async (comment) => {
     try {
       await projectApi.deleteComment(id, comment.id);
@@ -135,9 +134,8 @@ export default function ProjectDetail() {
     }
   };
 
-  // Updates live on their own endpoint rather than inside the project row, so they load
-  // separately. A failure here must not take the whole page down — the project itself is
-  // still perfectly readable without them.
+  // Updates have their own endpoint, so they load separately. A failure here must not
+  // take the page down: the project reads perfectly well without them.
   const [updates, setUpdates] = useState([]);
 
   useEffect(() => {
@@ -150,7 +148,7 @@ export default function ProjectDetail() {
         if (!cancelled) setP(toDetail(row));
       } catch (err) {
         if (cancelled) return;
-        // 404 -> the project does not exist, fall through to "Project not found" below.
+        // 404 means it does not exist, so fall through to "Project not found" below.
         if (err.response?.status === 404) setP(null);
         else setLoadError(errorMessage(err, "Could not load this project"));
       } finally {
@@ -173,10 +171,9 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Support levels, on their own endpoint for the same reason the updates are: a
-  // failure here must not blank a page that reads perfectly well without them.
-  // `tiersVersion` is bumped after a successful investment — backersCount on each level
-  // only exists server-side, so the count is refetched rather than guessed at locally.
+  // Support levels, on their own endpoint for the same reason updates are. `tiersVersion`
+  // is bumped after a successful investment, since backersCount on each level only exists
+  // server-side and cannot be guessed at locally.
   const [tiers, setTiers] = useState([]);
   const [tiersVersion, setTiersVersion] = useState(0);
 
@@ -193,18 +190,18 @@ export default function ProjectDetail() {
     return () => { cancelled = true; };
   }, [id, tiersVersion]);
 
-  // `tierId` is the support level the backer picked, or null for "just support".
+  // `tierId` is the level the backer picked, or null for "just support".
   const handleConfirmInvestment = async (amount, tierId = null) => {
     setInvestError(null);
     try {
       await projectApi.investProject(id, amount, tierId);
       setInvestedAmount(amount);
       setInvestStep("success");
-      // Both the Header balance and the funding progress change after investing.
+      // Investing changes both the Header balance and the project's total.
       refreshBalance();
       const row = await projectApi.getProjectById(id);
       setP(toDetail(row));
-      // And so does the "N backers at this level" count, which is computed in SQL.
+      // So does the "N backers at this level" count, which is computed in SQL.
       setTiersVersion(v => v + 1);
     } catch (err) {
       setInvestStep(null);
@@ -237,9 +234,9 @@ export default function ProjectDetail() {
 
   if (!p) {
     return (
-      // A pending or rejected project 404s here for anyone but its creator and the
-      // admins — assertVisibleTo returns "not found" rather than "forbidden", because
-      // "this exists but is under review" already leaks that it exists.
+      // A pending or rejected project 404s for anyone but its creator and the admins.
+      // The backend answers "not found" rather than "forbidden", since saying it exists
+      // but is under review already leaks that it exists.
       <DeadEndPage
         icon="🔍"
         title="Project not found"
@@ -248,13 +245,12 @@ export default function ProjectDetail() {
     );
   }
 
-  // The signed-in user owns this project -> they edit it instead of investing.
-  // Compares the real id (projects.creator_id), not the username as the old mock did.
+  // The signed-in user owns this project, so they edit it rather than invest in it.
+  // Compared by id against projects.creator_id.
   const isOwner = isLoggedIn && p.ownerId != null && user?.id === p.ownerId;
-  // Deep-links to THIS project's edit form (route added 2026-08-27). It still lands on
-  // the My Projects page — /creator-my-projects/:id/edit renders that page and opens the
-  // dialog — so closing the form leaves the creator somewhere useful rather than on a
-  // dead-end screen.
+  // Deep-links to this project's edit form. The route renders the My Projects page with
+  // the dialog open, so closing the form leaves the creator somewhere useful rather than
+  // on a dead end.
   const goToEdit = () => navigate(`/creator-my-projects/${p.id}/edit`);
 
   const tabs = [
@@ -277,7 +273,7 @@ export default function ProjectDetail() {
 
       {/* Hero image */}
       <div className={`w-full overflow-hidden bg-neutral-900 ${isMobile ? "h-[220px]" : isTablet ? "h-[300px]" : "h-[380px]"}`}>
-        {/* image_url may be empty — projects created via the API do not require one. */}
+        {/* image_url may be empty: a project created through the API needs no image. */}
         {p.img && (
           <img
             src={p.img}
@@ -292,11 +288,11 @@ export default function ProjectDetail() {
 
         {/* An archived project stays readable rather than 404ing: the link may already
             be shared, and a backer who funded it still reaches this page from My
-            Investments. It just goes read-only. */}
-        {/* ⚠️ Two freeze axes, but only ONE banner. A project can be archived AND belong
-            to a finished semester; when it is, archive is the one worth saying, because
-            it is the stricter state (hidden from Discover) and the only one with an
-            action attached. Two amber blocks stacked read as a page that has gone wrong. */}
+            Investments. It simply goes read-only. */}
+        {/* Two freeze axes, but only one banner. A project can be archived and belong
+            to a finished semester at once, and archive is the one worth saying: it is
+            the stricter state, hidden from Discover, and the only one with an action
+            attached. Two amber blocks stacked read as a page that has gone wrong. */}
         {p.archived ? (
           <ArchivedBanner p={p} isOwner={isOwner} />
         ) : p.semesterClosed ? (
@@ -329,9 +325,9 @@ export default function ProjectDetail() {
             <div className="mb-7 flex items-center gap-2.5">
               <Avatar name={p.creator?.name} size={38} max={1} fallback="?" />
               <div>
-                {/* GET /projects/:id joins users for the name and title. Both fallbacks
-                    are only reachable when the creator's account was deleted, since
-                    projects.creator_id cascades — so in practice, never. */}
+                {/* The route joins users for the name and title. Both fallbacks are only
+                    reachable when the creator's account was deleted, and creator_id
+                    cascades, so in practice never. */}
                 <div className="text-[14px] font-bold text-neutral-900">
                   {p.creator?.name ?? `Creator #${p.ownerId ?? "?"}`}
                 </div>
@@ -354,15 +350,13 @@ export default function ProjectDetail() {
                   {p.about}
                 </p>
 
-                {/* The pitch video, directly under the opening blurb — the wizard has
-                    always required one, and until 2026-08-18 there was no column to put
-                    it in. Renders nothing for projects created before that. */}
+                {/* The pitch video, directly under the opening blurb. The wizard requires
+                    one, but older projects have none, and those render nothing here. */}
                 <ProjectVideo url={p.videoUrl} />
 
-                {/* Challenge / Solution / Funding come from their own columns on
-                    `projects` and are optional, so each section renders only when the
-                    creator actually filled it in. Projects created before 2026-08-06
-                    have none and show just the blurb above. */}
+                {/* Challenge, Solution and Funding each come from their own column and
+                    are optional, so a section renders only when the creator filled it
+                    in. A project with none shows just the blurb above. */}
                 {p.challenge && (
                   <>
                     <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
@@ -374,9 +368,9 @@ export default function ProjectDetail() {
                   </>
                 )}
 
-                {/* Gallery: the images uploaded in CreateProject step 2, stored as a
-                    jsonb array on the project. The first one sits between The Challenge
-                    and Our Solution, exactly as the original design had it. */}
+                {/* The gallery: images uploaded in step 2 of the wizard, stored as a
+                    jsonb array on the project. The first sits between The Challenge and
+                    Our Solution, as the design has it. */}
                 {p.gallery[0] && (
                   <div className="group mb-7 overflow-hidden rounded-[10px] bg-neutral-900">
                     <img
@@ -392,9 +386,8 @@ export default function ProjectDetail() {
                     <h2 className="mx-0 mt-0 mb-3 text-[18px] font-extrabold text-neutral-900">
                       Our Solution
                     </h2>
-                    {/* Plain prose, not the old mock's { intro, bullets } object — the
-                        column is a single TEXT field the creator writes freely.
-                        whiteSpace preserves their paragraph breaks. */}
+                    {/* Plain prose: the column is a single text field the creator writes
+                        freely, and whiteSpace preserves their paragraph breaks. */}
                     <p className={`mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 ${p.solutionBullets.length ? "mb-4" : "mb-7"}`}>
                       {p.solution}
                     </p>
@@ -448,13 +441,12 @@ export default function ProjectDetail() {
                     isLoggedIn={isLoggedIn}
                     onPost={handlePostComment}
                     onDelete={handleDeleteComment}
-                    // Only what the delete rule needs. Built inline rather than passing the
-                    // whole user so this page cannot start leaning on the session object
-                    // inside the thread.
+                    // Only what the delete rule needs, rather than the whole user, so
+                    // the thread cannot start leaning on the session object.
                     viewer={isLoggedIn ? { id: user?.id, isAdmin } : null}
                     error={commentError}
-                    // The backend rejects comments on an archived project, so the box is
-                    // closed here rather than letting the post fail. Reading stays open.
+                    // The backend rejects comments on an archived project, so close the
+                    // box rather than let the post fail. Reading stays open.
                     locked={p.archived || p.semesterClosed}
                     lockedMessage={
                       p.archived
@@ -496,7 +488,7 @@ export default function ProjectDetail() {
                       <h2 className="mx-0 mt-0 mb-1.5 text-[16px] font-extrabold text-neutral-900">
                         {u.title}
                       </h2>
-                      {/* Plain text from the API — keep the author's line breaks. */}
+                      {/* Plain text from the API, so keep the author's line breaks. */}
                       <p className="mx-0 mt-0 text-[14px] leading-[1.8] whitespace-pre-line text-neutral-600 mb-0">
                         {u.body}
                       </p>
@@ -532,10 +524,9 @@ export default function ProjectDetail() {
         />
       )}
 
-      {/* ⚠️ One modal CLOSES and the other OPENS — never nested, exactly like the
-          invest → success pair above. A dialog inside a dialog means Escape and a
-          click outside close the wrong one, and two .lp-overlay layers darken the
-          page twice. */}
+      {/* One modal closes as the other opens, never nested, like the invest and
+          success pair above. A dialog inside a dialog means Escape and a click outside
+          close the wrong one, and two overlays darken the page twice. */}
       {investStep === "request" && (
         <RequestCoinsModal
           onClose={closeModals}
@@ -547,10 +538,11 @@ export default function ProjectDetail() {
   );
 }
 
-// Shown at the top of an archived project. Deliberately amber, not the brand red used
-// for errors — being archived is a state, not something that went wrong.
+// Shown at the top of an archived project. Amber rather than the brand red used for
+// errors, because being archived is a state and not a failure.
+//
 // The owner gets a different second line: they are the only visitor who can act on it,
-// and where they act depends on who archived it (see CreatorMyProjects).
+// and where they act depends on who archived it. See CreatorMyProjects.
 function ArchivedBanner({ p, isOwner }) {
   return (
     <div className="mb-5 flex items-start gap-3 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
@@ -580,12 +572,12 @@ function ArchivedBanner({ p, isOwner }) {
   );
 }
 
-// Shown when the project's TEACHING PERIOD has ended. Same amber as the archive banner
-// and for the same reason: a state, not a failure. What it must not do is sound like an
-// apology — the project is complete, and it stays on Discover under its own semester.
+// Shown when the project's teaching period has ended. Same amber as the archive banner,
+// for the same reason. It should not read as an apology: the project is complete and
+// stays on Discover under its own semester.
 //
-// ⚠️ The date is rendered through formatSemesterDate from the 'YYYY-MM-DD' string.
-// Never `new Date(p.semesterEndDate)`: that prints the previous day west of Greenwich.
+// The date goes through formatSemesterDate from the "YYYY-MM-DD" string. Never
+// new Date(p.semesterEndDate), which prints the previous day west of Greenwich.
 function SemesterEndedBanner({ p }) {
   return (
     <div className="mb-5 flex items-start gap-3 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
@@ -607,18 +599,12 @@ function SemesterEndedBanner({ p }) {
 }
 
 /**
- * The line under a disabled INVEST button, saying WHY it is disabled.
+ * The line under a disabled INVEST button, saying why it is disabled. It appears only
+ * when the button is refusing.
  *
- * The button has always greyed out for anyone who cannot invest, and until 2026-08-24
- * the note beside it was the same "All or nothing funding model" in every case — so a
- * signed-out visitor, who is the most common reader of this page, met a dead control
- * with nothing pointing at the way in. A pure creator got the same silence, and so does
- * an admin. (That sentence itself went in N3; this note is now the only thing under the
- * button, and only when the button is refusing.)
- *
- * The two cases are different and need different answers: signed out is a door with a
- * key (sign in), while signed in without BACKER is a door that is not theirs — telling
- * them to sign in would send them round a loop they cannot finish.
+ * The two cases need different answers. Signed out is a door with a key, so point at
+ * sign-in. Signed in without BACKER is a door that isn't theirs, and telling them to
+ * sign in would send them round a loop they cannot finish.
  */
 function InvestBlockedNote({ isLoggedIn, from }) {
   if (!isLoggedIn) {
@@ -648,18 +634,16 @@ function InvestBlockedNote({ isLoggedIn, from }) {
 function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onInvest }) {
   const location = useLocation();
   return (
-    // ⚠️ `sticky` is a PROP, not a breakpoint utility. On mobile and tablet this card is
-    // injected into the flow above the tabs, and a sticky card there would follow the
-    // reader down the page and cover the content it is meant to sit beside.
+    // `sticky` is a prop rather than a breakpoint utility. On mobile and tablet this
+    // card sits in the flow above the tabs, where a sticky card would follow the reader
+    // down and cover the content it belongs beside.
     <div
       className={`rounded-[10px] border border-neutral-200 bg-white p-[22px] ${
         sticky ? "sticky top-[72px] mb-0" : "static mb-7"
       }`}
     >
-      {/* The whole funding measure since N3 (2026-09-07). There was a progress track, a
-          big "N% FUNDED" and "pledged of 15,000 CC goal" above this line; the client
-          asked for the goal, the percentage and the "fully funded" state to go, so what
-          is left is what a project actually has. */}
+      {/* The whole funding measure: a running total, with no goal, no percentage and
+          no "fully funded" state. What is left is what a project actually has. */}
       <div className="text-[28px] font-extrabold text-brand">
         {p.stats.raised.toLocaleString()} CC
       </div>
@@ -669,13 +653,11 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
 
       <div className="mb-[22px] flex gap-6">
         <div>
-          {/* A DATE, not a countdown (client decision, 2026-09-06). A project closes
-              when its SEMESTER closes — there is no per-project deadline any more —
-              and "12 days to go" was part of the funding-drive framing the client
-              asked us to drop.
-              ⚠️ Rendered through formatSemesterDate, which reads the "YYYY-MM-DD"
-              string. Never build a Date from it: that prints the previous day for any
-              viewer west of Greenwich. */}
+          {/* A date rather than a countdown. A project closes when its semester does,
+              so there is no per-project deadline, and "12 days to go" is funding framing.
+              Rendered through formatSemesterDate, which reads the "YYYY-MM-DD" string:
+              never build a Date from it, or it prints the previous day for any viewer
+              west of Greenwich. */}
           <div className="text-[20px] font-extrabold text-neutral-900">
             {p.semesterEndDate ? formatSemesterDate(p.semesterEndDate) : "—"}
           </div>
@@ -686,18 +668,17 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
           </div>
         </div>
         <div>
-          {/* backers_count on GET /projects/:id — DISTINCT wallets, not transactions.
-              "—" is for a row that predates the column, not for a real zero: the
-              mapper's check is `== null`, so nobody-yet renders as 0. */}
+          {/* backers_count counts distinct wallets rather than transactions. A dash is
+              for a row without the count at all, not for a real zero: the mapper checks
+              `== null`, so nobody-yet renders as 0. */}
           <div className="text-[20px] font-extrabold text-neutral-900">{p.stats.backers ?? "—"}</div>
           <div className="text-[12px] text-neutral-500">backers</div>
         </div>
       </div>
 
-      {/* Archived wins over both branches below. Even the owner gets no EDIT here: the
-          backend refuses to update an archived project (that refusal is what keeps
-          "restore needs no re-approval" honest), so offering the button would only
-          produce an error after the fact. Restoring happens in My Projects. */}
+      {/* Archived wins over both branches below, and even the owner gets no EDIT: the
+          backend refuses to update an archived project, and that refusal is what keeps
+          "restore needs no re-approval" honest. Restoring happens in My Projects. */}
       {p.archived ? (
         <div className="rounded-md border border-dashed border-[#d4d4d0] bg-[#f6f6f4] p-3.5 text-center">
           <div className="mb-1 text-[12px] font-bold tracking-[0.06em] text-[#8a8a85]">
@@ -760,9 +741,7 @@ function FundingSidebar({ p, isLoggedIn, canInvest, sticky, isOwner, onEdit, onI
             INVEST IN THIS PROJECT
           </button>
 
-          {/* The rule, where the person about to press the button meets it. It replaced
-              "All or nothing funding model.", which described a goal removed in N3 —
-              that slot was left deliberately empty until this sentence existed. */}
+          {/* The rule, where the person about to press the button meets it. */}
           {canInvest ? (
             <p className="mx-0 mt-2 mb-0 text-center text-[11px] text-neutral-400">
               One contribution per person, up to {MAX_CONTRIBUTION.toLocaleString()} CC.

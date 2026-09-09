@@ -9,7 +9,7 @@ const QUICK_AMOUNTS = [25, 50, 100];
 
 export default function BackerInvestmentModal({ project, levels = [], balance, onClose, onConfirm, onRequestCoins }) {
   const [amount, setAmount] = useState(0);
-  // null = "No level - just support", which is a real choice and the default.
+  // null means "just support", which is a real choice and the default.
   const [selectedTierId, setSelectedTierId] = useState(null);
 
   const selectedTier = levels.find(l => l.id === selectedTierId) || null;
@@ -17,25 +17,22 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
 
   const handleQuickAmount = (val) => setAmount(val);
 
-  // ⚠️ min(balance, cap), never balance alone. This is the only control in the app that
-  // types a number into a money field for somebody, and filling in one the API will
-  // refuse is exactly the kind of lying button this codebase keeps deleting.
-  // ⚠️ The most this button may offer, and the number it must ALSO advertise. It read
-  // "MAX (4,500 CC)" off the balance alone until 2026-09-07 while filling in 500 — a
-  // button whose label and behaviour disagree is worse than no button.
+  // min(balance, cap), never the balance alone. This is the only control that types an
+  // amount in for the user, so it must not fill in one the API would refuse. The label
+  // shows this same number: a button whose text and behaviour disagree is worse than no
+  // button.
   const maxAllowed = Math.min(balance, MAX_CONTRIBUTION);
   const handleMax = () => setAmount(maxAllowed);
 
   const handleInputChange = (e) => {
-    // parseAmount returns 0 for an empty or unreadable field, which is exactly what the
-    // old `raw === "" ? 0 : parseInt(raw, 10)` produced — so the caps are all that is left.
+    // parseAmount returns 0 for an empty or unreadable field, so only the caps below
+    // are left to apply.
     setAmount(Math.min(parseAmount(e.target.value, { integer: true }), balance, MAX_CONTRIBUTION));
   };
 
-  // Picking a level fills the minimum in for you. Typing MORE afterwards is fine;
-  // typing less disables CONFIRM and says why, but deliberately does NOT clear the
-  // selection - silently undoing somebody's choice is the surest way to leave them
-  // with no idea what just happened.
+  // Picking a level fills its minimum in. Typing more afterwards is fine; typing less
+  // disables CONFIRM and explains why, but does not clear the selection. Undoing
+  // somebody's choice for them is worse than telling them it doesn't fit.
   const handleSelectTier = (tier) => {
     if (tier === null) {
       setSelectedTierId(null);
@@ -45,17 +42,14 @@ export default function BackerInvestmentModal({ project, levels = [], balance, o
     if (amount < tier.minAmount) setAmount(Math.min(tier.minAmount, balance));
   };
 
-  // One source for the amount rules, shared with anything else that has to judge one.
+  // One source for the amount rules, shared with anything else that judges an amount.
   const amountError = validateContribution(amount, balance);
 
-  // ⚠️ An empty wallet gets its OWN SCREEN, not a control panel with everything disabled.
-  // Before A7 this modal still built the whole thing and switched each part off, so
-  // somebody who had just registered went Discover → INVEST and hit a mute dead end: no
-  // reason given, no way out.
+  // An empty wallet gets its own screen rather than a form with every control disabled,
+  // which gave a new account no reason and no way forward.
   //
-  // ⚠️ Placed AFTER the hooks above, never before them. An early return above a hook
-  // changes how many hooks run between renders, and React throws "Rendered fewer hooks
-  // than expected" the moment the balance goes from 0 to anything else.
+  // This early return has to stay below the hooks. Returning above one changes how many
+  // hooks run between renders, and React throws as soon as the balance stops being 0.
   if (balance <= 0) {
     return (
       <Modal onClose={onClose} maxWidth={440} panelClassName="p-7">

@@ -18,21 +18,13 @@ const DEPT_STYLE = {
   Business: "bg-yellow-800 text-white",
 };
 
-// The moderation verdict, said out loud on every card.
+// The moderation verdict, said out loud on every card, including REJECTED: a card that
+// shows nothing for a status reads as one that failed to load.
 //
-// `toCreatorProject` renames APPROVED to "Active" — that is the funding-campaign framing.
-// What a creator actually needs on this page is the admin's decision, so the badge says
-// APPROVED instead. "Active Funding" in the stats above keeps the old wording, since
-// there it really is describing a running campaign.
-//
-// REJECTED previously rendered NOTHING: the card body branched on Active / Draft /
-// Pending Review and a rejected project matched none of them, so it sat in the list as a
-// blank card indistinguishable from a loading one — which is why it looked like rejected
-// projects had silently disappeared. They never left; they just stopped saying anything.
-// `tone` here is the Badge vocabulary, so the colours live in one place. The LABEL still
-// belongs to this file: toCreatorProject renames APPROVED to "Active" for the funding
-// framing, but a creator looking at this card needs the board's verdict, so the badge says
-// APPROVED while the "ACTIVE FUNDING" stat keeps the other wording.
+// `tone` uses the Badge vocabulary so the colours live in one place, but the label
+// belongs here. toCreatorProject renames APPROVED to "Active" for the funding framing,
+// while a creator reading this card wants the board's verdict, so the badge says
+// APPROVED and the "ACTIVE FUNDING" stat above keeps the other wording.
 const STATUS_BADGE = {
   Active: { label: "APPROVED", tone: "success" },
   "Pending Review": { label: "PENDING REVIEW", tone: "warning" },
@@ -40,11 +32,11 @@ const STATUS_BADGE = {
   Draft: { label: "DRAFT", tone: "neutral" },
 };
 
-// ⚠️ Kept separate from AdminUserManagement's StatusDot even though both say "status".
-// That one is a USER's status; this is a PROJECT's. Same shape, different fact.
+// Kept separate from AdminUserManagement's StatusDot. That one is a user's status and
+// this is a project's: the same shape, a different fact.
 function StatusBadge({ status }) {
-  // An unmapped status still gets a badge rather than silently rendering nothing —
-  // that silence is the bug this exists to fix.
+  // An unmapped status still gets a badge. Rendering nothing is the failure this is
+  // here to avoid.
   const badge = STATUS_BADGE[status] || {
     label: String(status || "UNKNOWN").toUpperCase(),
     tone: "neutral",
@@ -57,9 +49,9 @@ function StatusBadge({ status }) {
   );
 }
 
-// The selected chip is derived from state rather than stored, so it cannot point at a
-// chip that no longer exists — restoring the last archived project removes the ARCHIVED
-// chip, and a stored "archived" would then show an empty list with nothing selected.
+// The selected chip is derived rather than stored, so it cannot point at one that no
+// longer exists: restoring the last archived project removes the ARCHIVED chip, and a
+// stored value would leave an empty list with nothing selected.
 function activeTabFor(tab, archivedCount) {
   if (tab === "archived" && archivedCount === 0) return "all";
   return tab;
@@ -78,24 +70,20 @@ function StatCard({ label, value, icon }) {
 }
 
 /**
- * One card shape for every project, whatever its status.
+ * One card shape for every project, whatever its status. Only the middle of the card
+ * differs by status, so that is the only part that branches; the image column, header row
+ * and action bar are shared and cannot drift apart.
  *
- * There used to be two near-identical components: the Active card used a 240px image
- * column and the Pending/Draft one used 200px, so a pending project sat in the same
- * list with a visibly smaller image. Only the middle of the card actually differs by
- * status, so that is the only part that branches now — the image column, the header
- * row and the action bar are shared and cannot drift apart again.
- *
- * `sm:min-h-*` matters: on desktop the image is `h-auto` and stretches to the row, so
- * without a floor the shorter pending body would pull the image up again.
+ * `sm:min-h-*` matters. On desktop the image is h-auto and stretches to the row, so
+ * without a floor a shorter pending body would pull it up again.
  */
 function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRestore, onResubmit, canRestore, restoring, resubmitting }) {
-  // An archived project keeps its verdict ("Active", "Pending Review"), so the funding
-  // block below must not read as a live campaign — the archived branch takes over.
+  // An archived project keeps its verdict, so the funding block below must not read as
+  // a live campaign. The archived branch takes over.
   const isArchived = Boolean(project.archived);
-  // The other freeze axis. A finished semester takes away EDIT / UPDATE / RESUBMIT
-  // exactly like archiving does — the backend refuses all three — but it does NOT hide
-  // the project from Discover, so the card must not borrow the archive wording.
+  // A finished semester takes away EDIT, UPDATE and RESUBMIT the way archiving does,
+  // since the backend refuses all three. It does not hide the project from Discover
+  // though, so the card must not borrow the archive wording.
   const semesterEnded = Boolean(project.semesterClosed);
   const isActive = !isArchived && project.status === "Active";
   const isRejected = !isArchived && project.status === "Rejected";
@@ -107,8 +95,8 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
           {project.img ? (
             <img src={project.img} alt={project.title} className="w-full h-full object-cover" />
           ) : (
-            // image_url is optional on the API, and a bare <img src={null}> renders the
-            // browser's broken-image icon.
+            // image_url is optional, and <img src={null}> renders the browser's
+            // broken-image icon.
             <div className="w-full h-full flex items-center justify-center text-[11px] text-gray-400">
               No cover image
             </div>
@@ -120,9 +108,9 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-sm shrink-0 ${DEPT_STYLE[project.dept] || "bg-gray-200 text-gray-600"}`}>
               {project.dept.toUpperCase()}
             </span>
-            {/* The verdict badge is ALWAYS here — that is the whole point. Archived is a
-                separate axis, so an archived project shows both: what the admin decided,
-                and the fact that it is currently put away. */}
+            {/* The verdict badge is always here. Archived is a separate axis, so an
+                archived project shows both: what the admin decided, and the fact that it
+                is currently put away. */}
             <div className="flex items-center gap-2 shrink-0">
               <StatusBadge status={project.status} />
               {isArchived && (
@@ -145,9 +133,9 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                 </>
               ) : (
                 <>
-                  {/* A creator cannot undo an admin's archive — the reason is the only
-                      thing that tells them what happened, which is why the backend
-                      requires it in that case. */}
+                  {/* A creator cannot undo an admin's archive, so the reason is the only
+                      thing telling them what happened, which is why the backend requires
+                      it in that case. */}
                   Archived by <strong>{project.archivedByName || "an administrator"}</strong>
                   {project.archivedAt && ` on ${project.archivedAt}`}. Only an administrator can
                   restore it.
@@ -159,8 +147,7 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
             </div>
           ) : isActive ? (
             <>
-              {/* A progress bar and a GOAL figure stood here until N3 (2026-09-07).
-                  There is no target any more, so this is the running total on its own. */}
+              {/* No target, so this is the running total on its own. */}
               <div className="flex gap-8 mb-4">
                 <div>
                   <div className="text-[10px] font-bold text-gray-400 tracking-widest mb-0.5">TOTAL SUPPORT</div>
@@ -180,9 +167,9 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                   Your project is currently being reviewed by the RMIT {project.dept} Department board. You will receive an update within 3-5 business days.
                 </div>
               )}
-              {/* Rejected had no branch at all, so the card body was empty. It now states
-                  the verdict, quotes the reviewer's note when there is one, and points at
-                  the way forward — edit, then RESUBMIT below. */}
+              {/* A rejected project states the verdict, quotes the reviewer's note when
+                  there is one, and points at the way forward: edit, then RESUBMIT
+                  below. Without a branch here the card body would simply be empty. */}
               {project.status === "Rejected" && (
                 <div className="bg-red-50 border border-red-100 rounded-lg px-3.5 py-3 text-[12px] text-red-800 leading-relaxed mb-3">
                   This project was not approved by the RMIT {project.dept} Department board, so it
@@ -192,8 +179,8 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                       "{project.reviewNote}"
                     </div>
                   ) : (
-                    // The reviewer can reject in one click from the queue without typing
-                    // anything, so an empty note is a normal state, not a missing value.
+                    // The queue allows a one-click reject, so an empty note is normal
+                    // rather than a missing value.
                     <div className="mt-2 text-red-600">The board did not leave a note.</div>
                   )}
                   <div className="mt-2">
@@ -205,14 +192,13 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
             </>
           )}
 
-          {/* EDIT and UPDATE are gone while archived: the backend rejects both on an
-              archived project, and that refusal is exactly what keeps restoring safe
-              (nothing can change between archive and restore, so no re-approval).
-              Offering the buttons would only produce an error after the fact. */}
-          {/* Said once, above the buttons, because the buttons it explains are the ones
-              that are missing. A creator who worked on this project last term would
-              otherwise just find the card oddly bare. Suppressed while archived: that
-              banner already explains a stricter state. */}
+          {/* EDIT and UPDATE are gone while archived. The backend rejects both, and
+              that refusal is what keeps restoring safe: nothing can change between
+              archive and restore, so no re-approval is needed. */}
+          {/* Said once, above the buttons, because what it explains is the buttons
+              that are missing: otherwise a creator returning to last term's project just
+              finds the card oddly bare. Suppressed while archived, where that banner
+              already explains a stricter state. */}
           {!isArchived && semesterEnded && (
             <div className="mt-3 rounded-md border border-[#f0d9a0] bg-[#fff8e6] px-3 py-2.5 text-[12px] leading-normal text-[#7a5200]">
               <strong>{project.semesterName || "That semester"} has ended.</strong>{" "}
@@ -267,13 +253,12 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                 >
                   ✎ EDIT PROJECT
                 </button>
-                {/* No UPDATE on a rejected project. A project update is a public post on
-                    the project page, and a rejected project is not on Discover and has no
-                    backers — so it would be written for nobody, and would then surface
-                    with a misleading timestamp if the project were later approved. The
-                    backend refuses it too, so the button would only ever produce an error.
-                    RESUBMIT takes its place: without it a rejected project is a dead end,
-                    since the approval queue lists only PENDING. */}
+                {/* No UPDATE on a rejected project. An update is a public post, and a
+                    rejected project is not on Discover and has no backers, so it would be
+                    written for nobody and would surface with a misleading timestamp if
+                    the project were later approved. RESUBMIT takes its place: without it
+                    a rejected project is a dead end, since the queue lists only
+                    PENDING. */}
                 {isRejected ? (
                   <button
                     onClick={() => onResubmit(project)}
@@ -296,8 +281,8 @@ function ProjectRowCard({ project, onEdit, onUpdate, onDetails, onArchive, onRes
                 >
                   PROJECT DETAILS
                 </button>
-                {/* Replaces nothing — a creator previously had no way to take their own
-                    project down at all, short of asking an admin to delete it. */}
+                {/* A creator's own way to take a project down, short of asking an admin
+                    to delete it. */}
                 <button
                   onClick={() => onArchive(project)}
                   className="bg-white border border-gray-300 text-gray-500 rounded-md px-4 py-2 text-[12px] font-semibold cursor-pointer hover:bg-gray-50 hover:text-gray-700 transition-colors ml-auto"
@@ -318,19 +303,17 @@ export default function CreatorMyProjects() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [editTarget, setEditTarget] = useState(null);
-  // The project whose update form is open — null means the modal is closed. It is the
-  // project itself rather than a boolean so the form knows what it is posting about.
+  // The project whose update form is open, or null when closed. The project itself
+  // rather than a boolean, so the form knows what it is posting about.
   const [updateTarget, setUpdateTarget] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Title of the project an update was just posted to. The modal closes on success, so
-  // without this there is no sign anything happened — the update lives on the project
-  // page, not on this one.
+  // Title of the project an update was just posted to. The modal closes on success, and
+  // the update itself appears on the project page rather than this one, so without this
+  // there is no sign anything happened.
   const [postedFor, setPostedFor] = useState(null);
-  // "all" | "Active" | "Pending Review" | "Rejected" | "archived".
-  // The first four filter the live list by the admin's verdict; "archived" is the
-  // separate visibility axis and swaps the list out entirely, which is why it shares this
-  // one control rather than sitting in a second row — a project is in exactly one of
-  // these buckets at a time from this page's point of view.
+  // "all" | "Active" | "Pending Review" | "Rejected" | "archived". The first four filter
+  // the live list by verdict, while "archived" swaps the list out entirely. They share
+  // one control because a project is in exactly one of these buckets at a time.
   const [tab, setTab] = useState("all");
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiveReason, setArchiveReason] = useState("");
@@ -340,17 +323,17 @@ export default function CreatorMyProjects() {
   const [actionError, setActionError] = useState(null);
   const navigate = useNavigate();
   const { user } = useAuth();
-  // Set only on /creator-my-projects/:id/edit — the deep link used by "EDIT THIS PROJECT"
-  // on ProjectDetail and on the Discover hero. Undefined on the plain list route.
+  // Set only on /creator-my-projects/:id/edit, the deep link behind "EDIT THIS PROJECT"
+  // on ProjectDetail and the Discover hero. Undefined on the plain list route.
   const { id: editIdParam } = useParams();
 
 
-  // GET /api/projects/my — the signed-in creator's own projects, archived included.
-  // Refetched after archive/restore rather than patched locally: archived_by_name comes
-  // from a join that the mutation response does not carry.
-  // Nothing here sets state before the first `await`: `loading` already starts true, so
-  // the effect below never triggers a synchronous cascading render
-  // (react-hooks/set-state-in-effect). Keep it that way if you edit this.
+  // The signed-in creator's own projects, archived ones included. Refetched after
+  // archive and restore rather than patched locally, because archived_by_name comes from
+  // a join the mutation response does not carry.
+  //
+  // Nothing here sets state before the first await: `loading` already starts true, so the
+  // effect below never causes a synchronous cascading render. Keep it that way.
   const loadProjects = useCallback(async () => {
     try {
       const rows = await projectApi.getMyProjects();
@@ -363,34 +346,31 @@ export default function CreatorMyProjects() {
     }
   }, []);
 
-  // Wrapped in an async IIFE, matching every other fetch effect in the codebase:
-  // calling loadProjects() bare here trips react-hooks/set-state-in-effect, which reads
-  // the call graph and sees the setStates inside it.
+  // Wrapped in an async IIFE like every other fetch effect here. Calling loadProjects()
+  // bare trips react-hooks/set-state-in-effect, which follows the call graph into it.
   useEffect(() => { (async () => { await loadProjects(); })(); }, [loadProjects]);
 
 
   const liveProjects = projects.filter(p => !p.archived);
   const archivedProjects = projects.filter(p => p.archived);
-  // Derived, not stored: restoring the LAST archived project hides the Archived chip, and
-  // a stored tab would leave you stranded on an empty list with no way back. Falling back
-  // here fixes that without an effect that fights the user's own clicks.
+  // Derived rather than stored. Restoring the last archived project hides the Archived
+  // chip, and a stored tab would strand the creator on an empty list. Falling back here
+  // avoids an effect that fights their own clicks.
   const activeTab = activeTabFor(tab, archivedProjects.length);
 
-  // The project whose edit form is open. DERIVED rather than synced with an effect: the
-  // deep link /creator-my-projects/:id/edit is already a piece of state living in the URL,
-  // and copying it into React state with a useEffect both trips
-  // react-hooks/set-state-in-effect and reopens the dialog the moment it is closed, since
-  // the id is still in the URL for one render.
+  // The project whose edit form is open, derived rather than synced with an effect. The
+  // deep link is already state living in the URL, and copying it into React state both
+  // trips react-hooks/set-state-in-effect and reopens the dialog the moment it closes,
+  // since the id is still in the URL for one render.
   //
-  // ⚠️ An id matching nothing deliberately opens NOTHING and leaves the creator on the
-  // list. GET /projects/my returns only their own projects, so "no match" covers a stale
-  // link, a typo and somebody else's project alike — and the list is the honest answer to
-  // all three. Do not make it an error state; this page cannot tell those cases apart.
+  // An id matching nothing opens nothing and leaves the creator on the list. GET
+  // /projects/my returns only their own projects, so no match covers a stale link, a typo
+  // and somebody else's project alike, and this page cannot tell those apart.
   const urlEditProject = editIdParam
     ? projects.find(p => String(p.id) === editIdParam) ?? null
     : null;
-  // The row button wins if both are somehow set — but the open dialog covers the list, so
-  // in practice only one of them can be chosen at a time.
+  // The row button wins if both are somehow set, though an open dialog covers the list,
+  // so only one can be chosen in practice.
   const openEditProject = editTarget ?? urlEditProject;
 
   const shown =
@@ -400,8 +380,8 @@ export default function CreatorMyProjects() {
         ? liveProjects
         : liveProjects.filter(p => p.status === activeTab);
 
-  // Only the statuses that actually exist get a chip. A creator with nothing rejected
-  // should not be looking at a permanent "REJECTED (0)".
+  // Only statuses that actually occur get a chip, so a creator with nothing rejected
+  // isn't looking at a permanent "REJECTED (0)".
   const filterChips = [
     { id: "all", label: "ALL", count: liveProjects.length },
     ...["Active", "Pending Review", "Rejected", "Draft"]
@@ -416,9 +396,9 @@ export default function CreatorMyProjects() {
       : []),
   ];
 
-  // A creator may only undo an archive they performed themselves. If an admin archived
-  // the project, archived_by is the admin's id and the backend refuses the restore — so
-  // the button is not offered either.
+  // A creator may only undo an archive they performed themselves. When an admin archived
+  // the project, archived_by is the admin's id and the backend refuses the restore, so
+  // the button is not offered.
   const canRestore = (p) => p.archivedBy != null && p.archivedBy === user?.id;
 
   const handleArchive = async () => {
@@ -439,8 +419,8 @@ export default function CreatorMyProjects() {
   };
 
   // Back into the approval queue after a revision. The backend clears review_note and
-  // sets the status to PENDING, so the card re-renders as "Pending Review" — that visible
-  // change is the confirmation, no toast needed.
+  // sets the status to PENDING, so the card re-renders as "Pending Review"; that change
+  // is the confirmation.
   const handleResubmit = async (project) => {
     setResubmittingId(project.id);
     setLoadError(null);
@@ -471,15 +451,15 @@ export default function CreatorMyProjects() {
     }
   };
 
-  // Stats describe what you are actually running, so archived projects are excluded —
-  // an archived project raises nothing and is not "active funding".
+  // Stats describe what is actually running, so archived projects are excluded: one
+  // receives nothing and is not active funding.
   const totalProjects = liveProjects.length;
   const activeProjects = liveProjects.filter(p => p.status === "Active").length;
   const totalRaised = liveProjects.reduce((sum, p) => {
     if (p.status === "Active") {
-      // toCreatorProject formats this as "10,625 CC"; parseAmount knows to strip the
-      // unit as well as the separator, and returns 0 rather than NaN on a bad row —
-      // one NaN here would turn the whole total into NaN.
+      // toCreatorProject formats this as "10,625 CC". parseAmount strips the unit as
+      // well as the separator and returns 0 rather than NaN on a bad row, since one NaN
+      // would poison the whole total.
       return sum + parseAmount(p.raised);
     }
     return sum;
@@ -487,11 +467,9 @@ export default function CreatorMyProjects() {
 
   const projectContent = (
     <div className="max-w-5xl mx-auto p-4 sm:p-8">
-      {/* Getting back to the dashboard is the sidebar's job now. NEW PROJECT used to sit
-          beside this title; it went on 2026-08-28, when CREATE FOR A CREATOR moved onto
-          the nav bar and START A PROJECT was already there for creators on every page.
-          NEW UPDATE never survived at all: an update belongs to one project, and every
-          card carries its own UPDATE button. */}
+      {/* Getting back to the dashboard is the sidebar's job, and starting a project is
+          the nav bar's. There is no NEW UPDATE button either: an update belongs to one
+          project, and every card carries its own. */}
       <div className="mb-6">
         <h1 className="text-[22px] sm:text-[26px] font-extrabold text-gray-900 m-0">My Projects</h1>
         <p className="text-[13px] text-gray-400 mt-1">Manage your ongoing research and creative initiatives.</p>
@@ -512,14 +490,14 @@ export default function CreatorMyProjects() {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
         <StatCard label="TOTAL PROJECTS" value={totalProjects} icon="📁" />
-        {/* ⚠️ Was "ACTIVE FUNDING", which had always been the wrong label: the value is
-            a COUNT of projects, not an amount. N3 (2026-09-07) only made that visible. */}
+        {/* The value is a count of projects rather than an amount, so the label has to
+            say so. */}
         <StatCard label="ACTIVE PROJECTS" value={activeProjects} icon="📈" />
         <StatCard label="TOTAL SUPPORT" value={`${totalRaised.toLocaleString()} CC`} icon="💳" />
       </div>
 
-      {/* Filter by the admin's verdict, plus the archive bin. Only rendered once there is
-          more than one bucket to choose between — a lone "ALL (3)" chip is just noise. */}
+      {/* Filter by the admin's verdict, plus the archive bin. Only rendered once there
+          is more than one bucket to choose between: a lone "ALL (3)" chip is noise. */}
       {filterChips.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {filterChips.map(chip => (
@@ -586,8 +564,8 @@ export default function CreatorMyProjects() {
           project={openEditProject}
           onClose={() => {
             setEditTarget(null);
-            // Drop the deep link so a refresh does not reopen the form, and so the back
-            // button goes where the creator came from rather than back into the dialog.
+            // Drop the deep link so a refresh doesn't reopen the form and Back goes
+            // where the creator came from rather than into the dialog again.
             if (editIdParam) navigate("/creator-my-projects", { replace: true });
           }}
         />
@@ -600,9 +578,9 @@ export default function CreatorMyProjects() {
         />
       )}
 
-      {/* Archive confirmation. Mounted only when there is a target, the same pattern as
-          EditProject and PostUpdateModal — that is also what resets the reason box
-          between projects, so it needs no effect. */}
+      {/* Archive confirmation, mounted only when there is a target, like EditProject
+          and PostUpdateModal. That is also what resets the reason box between projects,
+          so it needs no effect. */}
       {archiveTarget && (
         <Modal
           onClose={() => { setArchiveTarget(null); setActionError(null); }}

@@ -8,24 +8,23 @@ import EmptyState from "../components/ui/EmptyState";
 import Badge from "../components/ui/Badge";
 import useBreakpoint from "../hooks/useBreakpoint";
 import { useAuth } from "../context/AuthContext";
-// FILTERS / FILTER_TAGS are UI config, not data — they still come from the mock.
+// FILTERS and FILTER_TAGS are UI config rather than data, so they stay in src/mock.
 import { FILTERS, FILTER_TAGS } from "../mock";
 import * as projectApi from "../api/projectApi";
 import * as semesterApi from "../api/semesterApi";
 import { toCard, formatSemesterDate } from "../api/mappers";
 import { errorMessage } from "../api/apiError";
 
-// `semesterClosed` suppresses the invest CTA rather than disabling it. That CTA is a
-// <span> inside the wrapping <Link>: clicking it goes to the detail page, where the real
-// button now refuses. Inviting somebody through a door that is shut is worse than not
-// inviting them.
+// `semesterClosed` hides the invest CTA rather than disabling it. The CTA is a <span>
+// inside the wrapping <Link>, so clicking it lands on the detail page where the real
+// button refuses. Better not to invite someone through a door that is shut.
 function HeroCard({ project, style, showDesc, showSupport, canInvest, semesterClosed, isOwner, onEdit }) {
   return (
-    // `style` is the grid placement the caller computes, so it stays inline.
+    // Grid placement is computed by the caller at runtime, so it stays inline.
     <Link to={`/project/${project.id}`} className="text-inherit no-underline" style={style}>
-      {/* `group` replaces a pair of handlers that reached into the DOM with
-          querySelector("img") to scale the photo on hover. group-hover states the same
-          thing declaratively, and cannot go looking for an element that is not there. */}
+      {/* `group` lets the photo scale on hover without a pair of handlers reaching
+          into the DOM for the image, which can go looking for an element that isn't
+          there. */}
       <div className="group relative h-full cursor-pointer overflow-hidden rounded-[10px] transition-[transform,box-shadow,filter] duration-250 ease-out hover:-translate-y-[3px] hover:brightness-105 hover:shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
         <img
           src={project.img}
@@ -59,11 +58,11 @@ function HeroCard({ project, style, showDesc, showSupport, canInvest, semesterCl
             </p>
           )}
 
-          {/* Owner's CTA: a real edit button that intercepts the click and
-              routes to project management — the image/card still navigates to
-              the detail page via the wrapping Link. Everyone else sees the
-              invest CTA, which is decoration only (the Link carries the click
-              to the detail page, where the investment modal lives). */}
+          {/* The owner's CTA is a real button: it intercepts the click and routes
+              to project management, while the card itself still navigates to the
+              detail page through the wrapping Link. Everyone else sees the invest
+              CTA, which is decoration: the Link carries the click to the detail
+              page, where the modal lives. */}
           {showDesc && isOwner ? (
             <span
               role="button"
@@ -81,9 +80,8 @@ function HeroCard({ project, style, showDesc, showSupport, canInvest, semesterCl
             </span>
           ) : null}
 
-          {/* Was a funding bar until N3 (2026-09-07). Same slot, same prop name, but the
-              numbers are now the total and the head count — there is no goal to be a
-              percentage of. Kept white here because the hero sits on the image. */}
+          {/* The total and the head count, with no goal to be a percentage of. White
+              here because the hero sits on the image. */}
           {showSupport && (
             <div className="mt-1 flex items-baseline gap-1.5">
               <span className="text-[13px] font-bold text-white">
@@ -104,9 +102,9 @@ function HeroCard({ project, style, showDesc, showSupport, canInvest, semesterCl
 
 const PROJECTS_PREVIEW_COUNT = 6;
 
-// Sort options for the All Projects grid. "Newest" first because it is the order the
-// API already returns and therefore the one the page had before this control existed —
-// adding a sort should not silently reorder anyone's first visit.
+// Sort options for the All Projects grid. Newest comes first because that is the order
+// the API already returns, so adding this control does not silently reorder anyone's
+// first visit.
 //
 // Each `compare` sorts a copy of the filtered list; none of them mutate state.
 const SORTS = [
@@ -122,25 +120,20 @@ const SORTS = [
   },
 ];
 
-// ⚠️ "Ending soon" was REMOVED on 2026-09-06 and "Most funded" on 2026-09-07 (N3),
-// both deliberately. A project's closing date is its semester's now, and this grid shows
-// one semester at a time — so every card on screen closes on the same day and that sort
-// could never reorder anything. A control that responds and changes nothing is the exact
-// thing the 2026-08-18 pass went through the app deleting. "Most funded" ranked by
-// percentage of a goal, and there is no goal any more; "Most supported" ranks by the
-// total instead.
+// There is no "ending soon" sort: a project closes with its semester and the grid shows
+// one semester at a time, so every card on screen closes on the same day and that sort
+// could never reorder anything. There is no "most funded" either, since ranking by
+// percentage needs a goal; "Most supported" ranks by the total instead.
 //
-// ⚠️ The DEFAULT stays SORTS[0] = Newest. Ranking by support is visible in the "Most
-// Supported" row above the grid and in this control; making it the default order too
-// would repeat that row as the grid's first four cards, and would bury a project filed
-// late in the semester for the rest of it. See §3.1 of the N3 design.
+// The default stays Newest. Support ranking is already visible in the Most Supported row
+// above the grid, so making it the default would repeat that row as the grid's first
+// four cards and bury anything filed late in the semester.
 
-// Shared notice block for the loading / error / empty states.
+// Shared notice block for the loading, error and empty states.
 function StatusBlock({ title, detail, actionLabel, onAction }) {
   return (
-    // ⚠️ Deliberately NOT ui/EmptyState. This is a bordered CARD and it also carries the
-    // loading and error states, not just "there is nothing here" — folding it in would
-    // lose the card and blur three different situations into one look.
+    // Not ui/EmptyState. This is a bordered card and it carries the loading and error
+    // states too, so folding it in would blur three situations into one look.
     <div className="mb-8 rounded-[10px] border border-neutral-100 bg-white px-6 py-10 text-center">
       <h2 className="m-0 text-[17px] font-extrabold text-neutral-900">{title}</h2>
       {detail && (
@@ -165,10 +158,10 @@ export default function Discover() {
   const { canInvest, user } = useAuth();
   const navigate = useNavigate();
 
-  // Ownership compares the real user id against projects.creator_id.
-  // (The old mock compared user.username — the backend has no username column.)
+  // Ownership compares the user id against projects.creator_id; there is no username
+  // column to compare instead.
   const ownsProject = p => !!user && user.id != null && p?.ownerId === user.id;
-  // Takes the project so the hero CTA deep-links to that project's edit form.
+  // Takes the project, so the hero CTA deep-links to that project's edit form.
   const goToEdit = proj => navigate(`/creator-my-projects/${proj.id}/edit`);
 
   const [projects, setProjects] = useState([]);
@@ -177,12 +170,11 @@ export default function Discover() {
   const [reloadKey, setReloadKey] = useState(0);
 
   // Every semester, for the picker. Loaded in parallel with the catalogue: the API
-  // defaults to the browsable semester when no id is sent, so the first page of results
-  // never waits on this request.
+  // defaults to the browsable semester when no id is sent, so results never wait on it.
   const [semesters, setSemesters] = useState([]);
-  // null = "whichever the API opens on". Only a user's choice ever sets it, which is
-  // what keeps the initial load to ONE projects request instead of a second one the
-  // moment the semester list lands.
+  // null means "whichever the API opens on". Only the visitor's own choice sets it,
+  // which keeps the first load to one projects request rather than a second as soon as
+  // the semester list arrives.
   const [semesterId, setSemesterId] = useState(null);
 
   const [activeFilter, setActiveFilter] = useState("ALL");
@@ -202,9 +194,9 @@ export default function Discover() {
       try {
         const rows = await projectApi.getAllProjects(semesterId);
         if (cancelled) return;
-        // GET /projects now returns APPROVED rows only (findAllApprovedProjects), so
-        // there is no client-side status filter here any more. Filtering in the browser
-        // only hid the drafts visually — the rows were still sent to every visitor.
+        // GET /projects returns APPROVED rows only, so there is no status filter here.
+        // Filtering in the browser would only hide drafts visually while still sending
+        // them to every visitor.
         setProjects(rows.map(toCard));
       } catch (err) {
         if (!cancelled) {
@@ -219,9 +211,9 @@ export default function Discover() {
     return () => { cancelled = true; };
   }, [reloadKey, semesterId]);
 
-  // The semester list is its own effect so a failure here cannot blank the catalogue —
-  // the same reason ProjectDetail loads its updates separately. Without it the page
-  // simply has no picker, which is a page that still works.
+  // The semester list has its own effect so a failure here cannot blank the catalogue,
+  // the same reason ProjectDetail loads its updates separately. Losing it leaves the
+  // page without a picker, which still works.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -236,8 +228,8 @@ export default function Discover() {
   }, []);
 
   // Which semester the page is showing. `semesterId` is null until the visitor picks
-  // one, and the API's own default is the browsable semester — so the label comes from
-  // whichever row carries is_browsable, not from a guess.
+  // one and the API defaults to the browsable semester, so the label comes from whichever
+  // row carries is_browsable rather than from a guess.
   const browsableSemester = semesters.find(s => s.is_browsable) ?? null;
   const selectedSemester =
     semesterId == null
@@ -245,23 +237,21 @@ export default function Discover() {
       : semesters.find(s => String(s.id) === String(semesterId)) ?? null;
 
   // Every project on screen belongs to the selected semester, so one flag covers the
-  // whole page. ⚠️ `is_open` is false for a FUTURE semester too — that term simply has
-  // no projects yet, so it never shows here, but do not read this as "has ended".
+  // page. Note that is_open is false for a future semester as well, so this means "not
+  // currently open" rather than "has ended".
   const browsingClosedSemester = selectedSemester ? !selectedSemester.is_open : false;
 
-  // The backend has no notion of hero/trending, so derive both from the data:
-  // Hero = the 3 newest projects, Most Supported = the 4 with the highest CC total.
-  // The two groups may overlap — as in the old mock, hero/trending projects also
-  // appear again in the "All Projects" grid below.
+  // The backend has no notion of hero or trending, so both are derived here: hero is the
+  // 3 newest, Most Supported the 4 with the highest CC total. The groups may overlap, and
+  // their projects appear again in the All Projects grid below.
   const hero = [...projects]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 3);
   const trending = [...projects].sort((a, b) => b.raised - a.raised).slice(0, 4);
 
-  // Search and filters run over the whole catalogue, so a query reaches every
-  // project (hero + trending + fresh), not just the ones shown in this grid.
-  // Sorting is applied last, to a copy — `projects` stays in the API's order, which
-  // is what `hero` above still derives from.
+  // Search and filters run over the whole catalogue, so a query reaches every project
+  // rather than only the ones in this grid. Sorting is applied last and to a copy, so
+  // `projects` stays in the API's order, which is what `hero` above derives from.
   const activeSort = SORTS.find(s => s.id === sortId) ?? SORTS[0];
   const filteredProjects = projects
     .filter(p => {
@@ -275,25 +265,23 @@ export default function Discover() {
     })
     .sort(activeSort.compare);
 
-  // Once expanded, stay expanded across filter/search changes — "show me
-  // everything" is the user's standing intent, not a per-tag setting.
-  // Only a remount (refresh, or arriving from another page) collapses it.
+  // Once expanded it stays expanded across filter and search changes: "show me
+  // everything" is a standing intent rather than a per-tag setting. Only a remount
+  // collapses it.
   const visibleProjects = showAll ? filteredProjects : filteredProjects.slice(0, PROJECTS_PREVIEW_COUNT);
 
-  // Matches the `!search` check above, so " " counts as searching either way.
+  // Matches the `!search` check above, so a lone space counts the same in both.
   const isSearching = search !== "";
 
-  // Entering search mode moves the results to the top of the page; scroll there
-  // once so a user who searched from mid/bottom of the page sees the feedback.
-  // Guarded on the isSearching transition, so it fires when a query begins (not
-  // on every keystroke) and never when clearing the box back to browse mode.
+  // Entering search mode moves the results to the top, so scroll there once for someone
+  // who searched from further down the page. Guarded on the isSearching transition, so it
+  // fires when a query begins rather than on every keystroke, and never when clearing the
+  // box back to browse mode.
   useEffect(() => {
     if (!isSearching) return;
-    // Scroll to the top so the results header is visible. We animate manually
-    // with rAF instead of `behavior:"smooth"` — native smooth scroll is
-    // unreliable right after hiding Hero/Trending (the layout shift drops the
-    // animation and strands the page mid-list). This always lands at the top,
-    // and respects reduced-motion by jumping instead.
+    // Animated with rAF rather than behavior:"smooth", which is unreliable right after
+    // hiding the hero and trending rows: the layout shift drops the animation and strands
+    // the page mid-list. This always lands at the top, and jumps under reduced-motion.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       window.scrollTo(0, 0);
       return;
@@ -331,20 +319,19 @@ export default function Discover() {
         isDesktop={isDesktop}
       />
 
-      {/* overflowAnchor:none — hiding Hero/Trending on search must not trigger
-          the browser's scroll-anchoring, which would fight our scroll-to-top. */}
-      {/* ⚠️ overflow-anchor:none is load-bearing, not decoration: entering search mode
-          hides the hero and trending blocks, and without it the browser's scroll anchoring
-          fights the manual smooth-scroll-to-top that gives the query its feedback.
-          `pad` is a runtime value from the breakpoint hook. */}
+      {/* overflow-anchor:none, so hiding the hero and trending rows on search does
+          not trigger the browser's scroll anchoring against our scroll-to-top. */}
+      {/* overflow-anchor:none is load-bearing rather than decoration. Entering search
+          mode hides the hero and trending blocks, and without it the browser's scroll
+          anchoring fights the scroll-to-top that gives the query its feedback. `pad` is a
+          runtime value from the breakpoint hook. */}
       <div className="mx-auto max-w-[1100px] [overflow-anchor:none]" style={{ padding: pad }}>
 
-        {/* The semester picker scopes the WHOLE page - hero, trending and the grid - so
-            it sits above all three rather than beside the tag chips.
-            ⚠️ It is also outside every loading / error / empty branch on purpose: a
-            semester with no projects would otherwise hide the only control that gets
-            the visitor back to the current one, which is a dead end reached in one
-            click. */}
+        {/* The semester picker scopes the whole page, hero and trending and grid
+            alike, so it sits above all three rather than beside the tag chips.
+            It also sits outside every loading, error and empty branch: a semester with
+            no projects would otherwise hide the only control that gets the visitor back
+            to the current one, which is a dead end reached in one click. */}
         {semesters.length > 0 && (
           <div className="mb-5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <label className="flex items-center gap-1.5">
@@ -364,10 +351,10 @@ export default function Discover() {
 
             {selectedSemester && (
               <span className="text-[12px] text-neutral-500">
-                {/* Both dates are rendered from their "YYYY-MM-DD" strings. A range,
-                    not "closes in N days": the countdown was part of the funding
-                    framing the client asked us to drop, and a range needs no tense -
-                    so a future semester is not described as though it had ended. */}
+                {/* Both dates are rendered from their "YYYY-MM-DD" strings. A range
+                    rather than "closes in N days": a countdown is funding framing, and a
+                    range needs no tense, so a future semester is not described as though
+                    it had ended. */}
                 {formatSemesterDate(selectedSemester.start_date)} – {formatSemesterDate(selectedSemester.end_date)}
               </span>
             )}
@@ -400,8 +387,8 @@ export default function Discover() {
           />
         )}
 
-        {/* Hero + Trending are browse-only. Hide them while searching so the
-            results grid rises to the top and the query's feedback is visible. */}
+        {/* The hero and trending rows are browse-only. Hiding them while searching
+            lifts the results grid to the top, where the query's feedback is visible. */}
         {!isSearching && hero.length > 0 && (
         <>
         {/* ── Hero Grid ── */}
@@ -428,7 +415,7 @@ export default function Discover() {
               height: isMobile ? "260px" : isTablet ? "320px" : `${SMALL_H * 2 + GAP}px`,
             }}
           />
-          {/* Only render when the project exists — the DB may hold fewer than 3 approved projects. */}
+          {/* Only render when the project exists: there may be fewer than three approved. */}
           {!isMobile && hero[1] && (
             <HeroCard
               project={hero[1]}
@@ -446,10 +433,9 @@ export default function Discover() {
         </div>
 
         {/* ── Most Supported ── */}
-        {/* Was "Trending Projects", ranked by percentage of a funding goal, until N3
-            (2026-09-07). It is the platform's only ranking, and it is what the team
-            promised the client it would become: the most supported projects of the
-            semester on screen, by total Class Coins. */}
+        {/* The platform's only ranking: the most supported projects of the semester,
+            by total Class Coins. Ranking by percentage of a goal is not possible, and
+            was not what the client asked for. */}
         <div className={isMobile ? "mb-8" : "mb-12"}>
           <div className="mb-4 flex items-end justify-between">
             <div>
@@ -476,7 +462,7 @@ export default function Discover() {
         )}
 
         {/* ── All Projects ── */}
-        {/* Hidden while loading / on error / when empty — the StatusBlock above already says so. */}
+        {/* Hidden while loading, on error and when empty: StatusBlock above says so. */}
         {!loading && !loadError && projects.length > 0 && (
         <div id="all" className={isMobile ? "mb-8" : "mb-12"}>
           <div className={`mb-4 flex justify-between ${isMobile ? "flex-col items-start gap-3" : "flex-row items-center gap-0"}`}>
@@ -514,9 +500,9 @@ export default function Discover() {
               )}
 
               {/* Sort sits with the tag chips because it does the same job: it changes
-                  which projects you see first. A native <select> rather than another
-                  row of chips — three more buttons here would crowd the four tags on
-                  mobile, and the current value has to stay readable at a glance. */}
+                  which projects you see first. A native select rather than another row
+                  of chips, since three more buttons would crowd the four tags on mobile
+                  and the current value has to stay readable at a glance. */}
               <label className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold tracking-[0.06em] text-neutral-500">
                   SORT
@@ -533,17 +519,15 @@ export default function Discover() {
             </div>
           </div>
 
-          {/* Entrance animation plays on tag switch, but never while searching —
-              live results should settle, not fade in on every keystroke.
-              The key remounts the whole grid so the stagger replays for every
-              card at once; without it, cards shared by two tags keep their DOM
-              node and sit still while only the new ones animate. Search state is
-              in the key so that clearing the box back to empty also remounts:
-              otherwise the restored cards would animate alone while the ones
-              already on screen stayed put — the same uneven effect, just moved.
-              Sort is in the key for a different reason: changing it mounts and
-              unmounts nothing, so without the remount the cards would silently
-              swap places with no sign the control did anything. */}
+          {/* The entrance animation plays on a tag switch but never while searching:
+              live results should settle rather than fade in on every keystroke.
+              The key remounts the whole grid so the stagger replays for every card at
+              once. Without it, cards shared by two tags keep their DOM node and sit
+              still while only the new ones animate. Search state is in the key so that
+              clearing the box also remounts, or the restored cards would animate alone.
+              Sort is in the key for a different reason: changing it mounts and unmounts
+              nothing, so without a remount the cards would swap places with no sign the
+              control did anything. */}
           <div
             key={`${activeFilter}|${sortId}|${semesterId ?? "default"}|${isSearching ? "search" : "browse"}`}
             className={`grid gap-3.5 ${isSearching ? "" : "lp-stagger"}`}

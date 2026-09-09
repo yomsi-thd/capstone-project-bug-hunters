@@ -10,10 +10,10 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // Three dialogs pass closable={false}: two success screens whose only way out is their
-  // call to action, EditProject because it holds unsaved edits, and AdminUserManagement
-  // while it is writing a role change. A keyboard shortcut that ignored that would reopen
-  // exactly the hole the prop exists to close.
+  // Several dialogs pass closable={false}: the success screens whose only way out is
+  // their call to action, EditProject because it holds unsaved edits, and
+  // AdminUserManagement while it writes a role change. A keyboard shortcut that ignored
+  // that would reopen the hole the prop exists to close.
   it("ignores Escape while locked", () => {
     const onClose = vi.fn();
     render(
@@ -32,7 +32,7 @@ describe("Modal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // The listener is global, so it has to come off when the dialog unmounts — otherwise
+  // The listener is global, so it has to come off when the dialog unmounts, or
   // every dialog opened in a session leaves one behind and a later Escape calls a stale
   // onClose.
   it("removes its listener when unmounted", () => {

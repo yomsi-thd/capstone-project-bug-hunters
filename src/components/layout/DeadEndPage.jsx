@@ -3,19 +3,14 @@ import Header from "./Header";
 import Footer from "./Footer";
 import useBreakpoint from "../../hooks/useBreakpoint";
 
-// The full-page "you have hit a wall" screen, shared by the two dead ends the app has:
-// NotFound (wrong address) and RequireAccess's NotAuthorized (signed in, wrong role).
+// The full-page dead-end screen, shared by the two the app has: NotFound for a wrong
+// address, and RequireAccess's NotAuthorized for a signed-in user with the wrong role.
+// They differ only in an icon and two sentences, so they share one component.
 //
-// They were two hand-written copies differing only in an emoji and two sentences, and
-// NotFound's own comment said the layout "deliberately matches the no access screen" —
-// which is a duplicate maintained by hand and a promise to keep matching. This is that
-// promise, expressed once.
-//
-// ⚠️ NOT used by ErrorBoundary, and that is the point of the distinction: this component
-// renders Header and Footer and calls useBreakpoint. On these two screens nothing has
-// crashed — the address was wrong or the role was — so the app around them still works.
-// ErrorBoundary's fallback deliberately depends on none of that, because the crash it is
-// catching may have come FROM the header or from AuthContext.
+// ErrorBoundary does not use this. This screen renders Header and Footer and calls
+// useBreakpoint, which is safe because nothing has crashed: only the address or the role
+// was wrong. ErrorBoundary's fallback depends on none of that, since the crash it is
+// catching may have come from the header or from AuthContext itself.
 export default function DeadEndPage({ icon, title, detail }) {
   const { isMobile } = useBreakpoint();
 

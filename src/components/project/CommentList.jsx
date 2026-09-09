@@ -5,9 +5,9 @@ import { canDeleteComment, repliesLostBy } from "./commentPermissions";
 
 const PREVIEW_COUNT = 3;
 
-// Confirmation for a delete, and the only warning anybody gets that a cascade is about to
-// take other people's replies with it. Top level rather than nested in CommentList, per the
-// repo's rule about defining components during render.
+// Confirms a delete, and the only warning anyone gets before a cascade takes other
+// people's replies with it. Top level rather than nested, since a component defined
+// during render remounts on every render.
 function DeleteCommentDialog({ comment, busy, error, onCancel, onConfirm }) {
   const lost = repliesLostBy(comment);
 
@@ -65,10 +65,9 @@ function DeleteCommentDialog({ comment, busy, error, onCancel, onConfirm }) {
 }
 
 /**
- * `onPost(text, parentId)` posts a comment and resolves true on success, so this
- * component only clears its box when the request actually landed. The parent owns the
- * data — it reloads the thread, which is what fills in the author name and the
- * CREATOR / BACKER badge the server derives.
+ * `onPost(text, parentId)` posts a comment and resolves true on success, so the box only
+ * clears when the request actually landed. The parent owns the data and reloads the
+ * thread, which is what fills in the author name and the badge the server derives.
  */
 export default function CommentList({
   comments = [],
@@ -76,23 +75,22 @@ export default function CommentList({
   isLoggedIn = false,
   onPost,
   error = null,
-  // Closes the thread to new posts for a reason OTHER than being signed out — today
-  // that is an archived project, whose comments the backend rejects. It is a separate
-  // prop rather than `isLoggedIn={isLoggedIn && !archived}` because the two states need
-  // different explanations: telling a signed-in reader to "sign in" would be a lie.
-  // Existing comments stay readable either way.
+  // Closes the thread to new posts for a reason other than being signed out, today an
+  // archived project. Separate from isLoggedIn because the two states need different
+  // explanations: telling a signed-in reader to sign in would be a lie. Existing
+  // comments stay readable either way.
   locked = false,
   lockedMessage = "This discussion is closed.",
-  // `{ id, isAdmin }`, or null when signed out. Only used to decide which comments show a
-  // Delete button; posting is still gated by isLoggedIn above.
+  // { id, isAdmin }, or null when signed out. Decides which comments show a Delete
+  // button; posting is still gated by isLoggedIn above.
   viewer = null,
-  // `onDelete(comment)` deletes it and resolves `true` on success, or the message to show
-  // on failure. The parent reloads the thread rather than removing the row locally — the
-  // cascade means the client cannot predict what is left.
+  // `onDelete(comment)` resolves true on success, or the message to show on failure.
+  // The parent reloads the thread rather than removing the row locally, since the
+  // cascade means the client cannot predict what survives.
   onDelete,
 }) {
   // One flag for every "can this person post" check below, so the box, the button and
-  // the reply forms can never disagree about it.
+  // the reply forms cannot disagree.
   const canPost = isLoggedIn && !locked;
   const [text, setText] = useState("");
   const [expanded, setExpanded] = useState(false);
@@ -100,15 +98,15 @@ export default function CommentList({
   // id of the comment currently being replied to, or null.
   const [replyTo, setReplyTo] = useState(null);
   const [replyText, setReplyText] = useState("");
-  // The comment awaiting confirmation, or null. Holding the object rather than an id is
-  // what lets the dialog show the text and count the replies without searching the thread.
+  // The comment awaiting confirmation, or null. Holding the object rather than an id
+  // lets the dialog show the text and count the replies without searching the thread.
   const [pendingDelete, setPendingDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
 
-  // Deleting is deliberately NOT gated on `canPost`. That flag closes an archived
-  // project's thread to new posts, but abusive text does not become acceptable because a
-  // project was archived, and the backend allows the delete either way.
+  // Deleting is not gated on `canPost`. That flag closes an archived project to new
+  // posts, but abusive text doesn't become acceptable because a project was archived,
+  // and the backend allows the delete either way.
   const allowDelete = (comment) => Boolean(onDelete) && canDeleteComment(viewer, comment);
 
   const askDelete = (comment) => {
@@ -122,9 +120,9 @@ export default function CommentList({
     setDeleteError(null);
     const result = await onDelete?.(pendingDelete);
     setDeleting(false);
-    // The failure message has to appear IN the dialog, so it comes back through the return
-    // value rather than through the `error` prop, which renders under the post box where a
-    // reader looking at a modal would never see it.
+    // The failure message has to appear in the dialog, so it comes back as a return
+    // value rather than through the `error` prop, which renders under the post box where
+    // someone looking at a modal would never see it.
     if (result === true) setPendingDelete(null);
     else setDeleteError(typeof result === "string" ? result : "Could not delete that comment. Please try again.");
   };
@@ -212,7 +210,7 @@ export default function CommentList({
               />
             ))}
 
-            {/* Replies are one level deep only — a reply has no Reply button of its
+            {/* Replies are one level deep, so a reply has no Reply button of its
                 own, matching what CommentItem can render. */}
             {canPost && (
               replyTo === comment.id ? (
@@ -275,7 +273,7 @@ export default function CommentList({
         </div>
       )}
 
-      {/* Mounted only while a delete is pending, same pattern as PostUpdateModal — that is
+      {/* Mounted only while a delete is pending, like PostUpdateModal. That is
           also what resets the dialog's error between two comments without an effect. */}
       {pendingDelete && (
         <DeleteCommentDialog

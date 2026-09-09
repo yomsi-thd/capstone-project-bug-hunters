@@ -1,21 +1,16 @@
-// UI configuration for project tags — NOT data.
+// UI configuration for project tags, not data. Discover reads real projects from
+// GET /api/projects; what lives here is the tag vocabulary the UI styles and filters by,
+// which the backend does not define.
 //
-// This file used to be `home.js` and held the mock project catalogue
-// (HERO_PROJECTS / TRENDING / FRESH / ALL_PROJECTS). Those are gone: Discover now
-// reads real projects from GET /api/projects and derives its hero and trending
-// sections from the data. What is left is the tag vocabulary the UI styles and
-// filters by, which the backend does not define, so it stays here.
-//
-// The backend's `category` column is free text. src/api/mappers.js uppercases it,
-// so every key below must be uppercase to match. A category with no entry in
-// TAG_COLORS falls back to <Tag>'s default colour rather than breaking.
+// The `category` column is free text and mappers.js uppercases it, so every key below
+// has to be uppercase to match. A category with no entry falls back to <Tag>'s default
+// colour rather than breaking.
 
 export const FILTERS = ["ALL", "TECH", "ART", "SCIENCE"];
 
-// Which tags each filter chip matches. A tag may sit under more than one
-// filter — ENGINEERING is both applied tech and science, the same way
-// MICROELECTRONICS and FASHION TECH already straddle two chips.
-// BUSINESS is deliberately absent: no chip fits it.
+// Which tags each filter chip matches. A tag may sit under more than one chip:
+// ENGINEERING is both applied tech and science, as are MICROELECTRONICS and FASHION
+// TECH. BUSINESS is absent on purpose, since no chip fits it.
 export const FILTER_TAGS = {
   TECH: ["COMPUTER SCIENCE", "TECHNOLOGY", "MICROELECTRONICS", "FASHION TECH", "ENGINEERING", "MANUFACTURING"],
   ART: ["DESIGN", "FASHION TECH", "ARCHITECTURE"],

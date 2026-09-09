@@ -39,12 +39,11 @@ function SummaryRow({ label, children }) {
   );
 }
 
-// A block-level message above a form. Deliberately NOT built on ui/Badge: a badge is an
-// inline label on something else, this is a paragraph the user has to read, and the two
-// only look related because both carry a tone.
+// A block-level message above a form. Not built on ui/Badge: a badge is an inline label
+// on something else, while this is a paragraph the user has to read.
 //
 // role is "alert" for errors so a screen reader interrupts, and "status" otherwise so it
-// does not — a saved-successfully message should not cut across what is being read.
+// doesn't; a "saved" message should not cut across whatever is being read.
 const NOTICE_TONES = {
   success: "bg-green-50 border-green-200 text-green-800",
   error: "bg-red-50 border-red-200 text-red-800",
@@ -82,8 +81,8 @@ export default function Account() {
   const { isMobile, isTablet, isDesktop } = useBreakpoint();
   const { user, roles, canInvest, balance, isMockSession, updateUser } = useAuth();
 
-  // The waiting coin request, or null. Only asked for when this person could actually
-  // file one — a pure creator has no wallet, so the question is meaningless for them.
+  // The waiting coin request, or null. Only asked for when this person could file one:
+  // a pure creator has no wallet, so the question means nothing for them.
   const [coinRequest, setCoinRequest] = useState(null);
   const [askingForCoins, setAskingForCoins] = useState(false);
 
@@ -97,9 +96,8 @@ export default function Account() {
         const pending = await classCoinApi.getMyCoinRequest();
         if (!cancelled) setCoinRequest(pending);
       } catch {
-        // Deliberately silent. Not knowing whether a request is waiting costs at most an
-        // offer to ask again, which the backend then refuses with a 409 and a sentence. A
-        // red banner on the profile page over a secondary question would be worse.
+        // Silent on purpose. Not knowing whether a request is waiting costs at most an
+        // offer to ask again, which the backend refuses with a 409 and a sentence.
       }
     })();
 
@@ -110,22 +108,22 @@ export default function Account() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
 
-  // Profile form
+  // Profile form.
   const [form, setForm] = useState({ name: "", email: "", title: "" });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Password form — deliberately separate state, so a failed password change
-  // never clears or blocks the profile fields the user is halfway through editing.
+  // Password form. Separate state, so a failed password change never clears or blocks
+  // profile fields the user is halfway through editing.
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
   const [pwErrors, setPwErrors] = useState({});
   const [pwSaving, setPwSaving] = useState(false);
   const [pwSaved, setPwSaved] = useState(false);
 
   // A mock session has no access token, so every call here would 401. Everything the
-  // summary needs is already on the context, so read it from there and skip the call
-  // rather than showing an error the user cannot act on.
+  // summary needs is already on the context, so read it from there instead of showing an
+  // error the user cannot act on.
   const readOnly = isMockSession;
   const mockProfile = useMemo(() => ({
     name: user?.name ?? "",
@@ -135,8 +133,8 @@ export default function Account() {
   }), [user?.name, user?.username]);
 
   useEffect(() => {
-    // Nothing to fetch on a mock session, and nothing to wait for either — see
-    // `isLoading` below, which is derived rather than switched off in here.
+    // Nothing to fetch on a mock session, and nothing to wait for. See `isLoading`
+    // below, which is derived rather than switched off in here.
     if (readOnly) return;
     let cancelled = false;
     (async () => {
@@ -157,7 +155,7 @@ export default function Account() {
     return () => { cancelled = true; };
   }, [readOnly]);
 
-  // What the summary shows and what the (disabled) inputs hold on a mock session.
+  // What the summary shows, and what the disabled inputs hold on a mock session.
   const isLoading = !readOnly && loading;
   const shown = readOnly ? mockProfile : profile;
   const values = readOnly ? mockProfile : form;
@@ -168,8 +166,7 @@ export default function Account() {
     e.preventDefault();
     setSaved(false);
 
-    // Client-side first, then the server's own message — the order the rest of
-    // the app uses (Register, Login).
+    // Client-side first, then the server's own message, as Register and Login do.
     const next = {};
     if (!form.name.trim()) next.name = "Full name is required";
     if (!form.email.trim()) next.email = "Email is required";
@@ -182,17 +179,17 @@ export default function Account() {
       const row = await userApi.updateProfile({
         fullName: form.name.trim(),
         email: form.email.trim(),
-        // Sent as null rather than "" so the column is cleared instead of holding
-        // an empty string that the project page would render as a blank line.
+        // null rather than "", so the column is cleared instead of holding an empty
+        // string the project page would render as a blank line.
         title: form.title.trim() || null,
       });
       const p = toProfile(row);
-      // The API answers with the updated row but without created_at, so keep the
-      // join date already on screen instead of blanking it.
+      // The API answers with the updated row but no created_at, so keep the join date
+      // already on screen rather than blanking it.
       setProfile(prev => ({ ...p, joinedOn: p.joinedOn || prev?.joinedOn || "" }));
       setForm({ name: p.name, email: p.email, title: p.title });
-      // The Header reads name/username off the context, and the session is restored
-      // from localStorage rather than refetched — without this the old name survives
+      // The Header reads the name off the context, and the session is restored from
+      // localStorage rather than refetched, so without this the old name would survive
       // until the next sign-in.
       updateUser({ name: p.name, username: p.email });
       setSaved(true);
@@ -244,8 +241,7 @@ export default function Account() {
         isDesktop={isDesktop}
       />
 
-      {/* `pad` is computed from the breakpoint hook, so it stays inline — a runtime value
-          is one of the three cases where that is still correct. */}
+      {/* `pad` is computed from the breakpoint hook at runtime, so it stays inline. */}
       <div className="lp-stagger mx-auto max-w-[760px]" style={{ padding: pad }}>
         <h1 className={`mx-0 mt-0 mb-1.5 font-extrabold text-neutral-900 ${isMobile ? "text-[24px]" : "text-[30px]"}`}>
           My Account
@@ -284,17 +280,17 @@ export default function Account() {
                     {roles.length ? roles.map(r => <RoleBadge key={r} role={r} />) : "—"}
                   </span>
                 </SummaryRow>
-                {/* A pure creator has no wallet and no balance badge in the nav bar —
-                    showing a balance here would contradict that. */}
+                {/* A pure creator has no wallet and no balance badge in the nav bar, so
+                    showing a balance here would contradict it. */}
                 {canInvest && (
                   <SummaryRow label="CLASS COINS">{balance.toLocaleString()} CC</SummaryRow>
                 )}
                 {shown.joinedOn && <SummaryRow label="MEMBER SINCE">{shown.joinedOn}</SummaryRow>}
               </div>
 
-              {/* An empty wallet: A7. Somebody outside RMIT gets no automatic grant at
-                  registration, so without this there is no way for them to ask and no way
-                  for an admin to learn they exist. */}
+              {/* An empty wallet. Somebody outside RMIT gets no automatic grant at
+                  registration, so without this they have no way to ask and an admin has
+                  no way to learn they exist. */}
               {canInvest && balance === 0 && (
                 <div className="mt-4 rounded-lg border border-[#f0d9a0] bg-[#fff8e6] px-4 py-3.5">
                   {coinRequest ? (

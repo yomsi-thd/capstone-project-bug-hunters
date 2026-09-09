@@ -15,22 +15,20 @@ import {
 import * as classCoinApi from "../api/classCoinApi";
 import { errorMessage } from "../api/apiError";
 
-// What each role actually unlocks, so an admin granting one can see the consequence
-// before ticking the box. Kept next to the modal rather than in mock/ because it is
-// prose about this screen, not configuration anything else reads.
+// What each role unlocks, so an admin can see the consequence before ticking the box.
+// Kept beside the modal rather than in mock/, since it is prose about this screen rather
+// than configuration anything else reads.
 const ROLE_HINTS = {
-  // Rewritten 2026-08-24 with the role separation. The old line ("a superuser — this
-  // also grants everything CREATOR does") became untrue the moment canCreate stopped
-  // including admin, and a hint that lies is worse than no hint on the one screen where
-  // roles are handed out.
+  // An admin is not a superuser: ADMIN grants none of what CREATOR does. Keep this line
+  // in step with canCreate, since a wrong hint on the screen where roles are handed out
+  // is worse than no hint.
   ADMIN:   "Reviews and approves projects, manages every account. Owns nothing: no Class Coins, no projects of their own. Can create a project on behalf of a creator.",
   CREATOR: "Starts projects and posts updates on them.",
   BACKER:  "Holds a Class Coin balance and can invest in projects.",
 };
 
-// users.is_active is a boolean, so these are the only two states that exist. The page
-// used to offer "Pending" and "Suspended" as well — neither the schema nor any endpoint
-// can express them.
+// users.is_active is a boolean, so these are the only two states that exist. Anything
+// like "Pending" or "Suspended" would be a state the schema cannot express.
 function StatusDot({ status }) {
   const colors = { Active: "text-green-600", Inactive: "text-gray-500" };
   const dots = { Active: "bg-green-500", Inactive: "bg-gray-400" };
@@ -42,31 +40,29 @@ function StatusDot({ status }) {
   );
 }
 
-// ── Manage Access Modal ──
+// Manage Access modal.
 //
-// Roles and the active flag are the ONLY things an admin can change about somebody
-// else. PUT /users/profile edits your OWN row and there is no admin equivalent, so the
-// name and the email are shown read-only here rather than as inputs that would collect
-// what you typed and then discard it — which is exactly what this modal used to do.
+// Roles and the active flag are the only things an admin can change about somebody else.
+// PUT /users/profile edits your own row and has no admin equivalent, so name and email
+// are read-only here rather than inputs that would collect what you typed and drop it.
 //
-// Roles are checkboxes, not a dropdown: a user holds a SET of roles (the student
-// persona is CREATOR + BACKER), and a single-choice control cannot express that.
+// Roles are checkboxes rather than a dropdown, because a user holds a set of them: the
+// student persona is CREATOR + BACKER, which a single-choice control cannot express.
 function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave }) {
   const [roles, setRoles] = useState(user.roles);
 
-  // The backend refuses to let an admin drop their own ADMIN role, because doing so
-  // locks the whole team out of the admin area with no route left to undo it. The
-  // checkbox is disabled for the same reason — bouncing off a 400 after the click
-  // would teach the same rule far later.
+  // The backend refuses to let an admin drop their own ADMIN role, since that could lock
+  // the team out of the admin area with no way back. Disabling the checkbox teaches the
+  // same rule before the click rather than after a 400.
   const isSelf = user.id === currentUserId;
 
-  // An admin account holds ADMIN and NOTHING else (2026-08-24): it owns no projects
-  // and no Class Coins, so ADMIN+CREATOR and ADMIN+BACKER describe an account the rest
-  // of the app has no shape for. adminService.updateUserRoles refuses those too.
+  // An admin account holds ADMIN and nothing else: it owns no projects and no Class
+  // Coins, so ADMIN+CREATOR and ADMIN+BACKER describe an account the rest of the app has
+  // no shape for. adminService.updateUserRoles refuses them too.
   //
-  // Ticking resolves the conflict instead of blocking the click: ADMIN clears the other
-  // two, and either of the other two clears ADMIN. A checkbox that silently does
-  // nothing is the worst of the three options.
+  // Ticking resolves the conflict rather than blocking the click: ADMIN clears the other
+  // two, and either of them clears ADMIN. A checkbox that silently does nothing would be
+  // worse than either.
   const toggle = (role) => {
     if (isSelf && role === "ADMIN") return;
     setRoles(prev => {
@@ -76,9 +72,9 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
     });
   };
 
-  // ⚠️ The two rules meet on your OWN account: ADMIN cannot be removed (self-lockout)
-  // and cannot be combined (the rule above), so every box is locked and there is no
-  // valid set left to move to. Saying so beats three dead checkboxes.
+  // The two rules meet on your own account: ADMIN cannot be removed and cannot be
+  // combined, so every box is locked with no valid set to move to. Say so rather than
+  // show three dead checkboxes.
   const selfLocked = isSelf && roles.includes("ADMIN");
 
   const changed =
@@ -86,9 +82,8 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
     roles.some(r => !user.roles.includes(r));
 
   return (
-    // closable={!saving} keeps hieu's guard: the dialog cannot be dismissed while the
-    // role change is being written, so nobody closes it mid-request and is left unsure
-    // whether it went through.
+    // closable={!saving} so the dialog cannot be dismissed while the role change is
+    // being written, leaving nobody unsure whether it went through.
     <Modal onClose={onClose} closable={!saving} maxWidth={480}>
         {/* Header */}
         <div className="flex justify-between items-center px-7 py-5 border-b border-gray-100">
@@ -97,7 +92,7 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
         </div>
 
         <div className="px-7 py-5 flex flex-col gap-5">
-          {/* Identity — read-only on purpose, see the note above the component. */}
+          {/* Identity, read-only on purpose. See the note above the component. */}
           <div>
             <div className="flex items-center gap-2 mb-3">
               <span className="text-brand text-sm">🪪</span>
@@ -127,8 +122,8 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
             <div className="flex flex-col gap-2">
               {ROLES.map(role => {
                 const checked = roles.includes(role);
-                // Own-account ADMIN is locked as before; the other two lock as well
-                // once ADMIN is on, because there is no combination to move to.
+                // Own-account ADMIN stays locked, and the other two lock once ADMIN is
+                // on, because there is no valid combination to move to.
                 const locked = (isSelf && role === "ADMIN") || (selfLocked && role !== "ADMIN");
                 return (
                   <label
@@ -150,9 +145,8 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
                       <span className="block text-[13px] font-bold text-gray-900">{role}</span>
                       <span className="block text-[11px] text-gray-500 leading-relaxed">
                         {ROLE_HINTS[role]}
-                        {/* A sentence, not an em-dash tail: ROLE_HINTS.ADMIN now ends
-                            in a full stop, so the old " — …" clause read as a fragment
-                            glued onto it. */}
+                        {/* Its own sentence: ROLE_HINTS.ADMIN ends in a full stop, so a
+                            trailing clause would read as a fragment glued onto it. */}
                         {isSelf && role === "ADMIN" && " You cannot remove your own admin access."}
                       </span>
                     </span>
@@ -161,11 +155,10 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
               })}
             </div>
 
-            {/* Ticking ADMIN silently unticks the other two, so say so. A control that
-                changes two OTHER controls without a word is the same problem as a
-                disabled button with no reason — it just fails in the opposite
-                direction. Not shown on your own account: `selfLocked` below explains
-                that case, and two notes at once would compete. */}
+            {/* Ticking ADMIN unticks the other two, so say so. A control that changes
+                two other controls without a word is as unhelpful as a disabled button
+                with no reason. Not shown on your own account, where `selfLocked` below
+                explains the case and two notes would compete. */}
             {!selfLocked && roles.includes("ADMIN") && (
               <p className="text-[12px] text-gray-600 bg-gray-50 border border-gray-200 rounded-md px-3 py-2 mt-3">
                 An admin account holds ADMIN alone — CREATOR and BACKER were cleared.
@@ -211,7 +204,7 @@ function ManageAccessModal({ user, currentUserId, saving, error, onClose, onSave
   );
 }
 
-// ── Main Page ──
+// Main page.
 export default function AdminUserManagement() {
   const navigate = useNavigate();
   const { user: signedInUser } = useAuth();
@@ -222,13 +215,13 @@ export default function AdminUserManagement() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("ALL");
   const [editTarget, setEditTarget] = useState(null);
-  // Errors from the role save belong inside the modal, next to the checkboxes that
-  // caused them — the page-level banner sits behind the overlay.
+  // Errors from the role save belong in the modal, beside the checkboxes that caused
+  // them. The page-level banner sits behind the overlay.
   const [savingRoles, setSavingRoles] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Issuing Class Coins. `selected` holds user ids; an ADMIN can never be in it because
-  // their row renders no checkbox at all.
+  // Issuing Class Coins. `selected` holds user ids, and an admin can never be among them
+  // because their row renders no checkbox.
   const [selected, setSelected] = useState([]);
   const [grantAmount, setGrantAmount] = useState(String(DEFAULT_GRANT));
   const [granting, setGranting] = useState(false);
@@ -243,8 +236,8 @@ export default function AdminUserManagement() {
     setGrantError(null);
     try {
       const result = await classCoinApi.grantCoins(selected, Number(grantAmount));
-      // Refetch rather than patching the rows: the balance on screen has to be the one
-      // the server holds, and this page is nowhere near a hot path.
+      // Refetch rather than patch the rows. The balance on screen has to be the server's,
+      // and this page is nowhere near a hot path.
       const rows = await adminApi.getAllUsers();
       setUsers((rows || []).map(toAdminUser));
       setSelected([]);
@@ -258,7 +251,7 @@ export default function AdminUserManagement() {
     }
   };
 
-  // GET /api/admin/users
+  // The user list.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -309,19 +302,18 @@ export default function AdminUserManagement() {
     return matchesSearch && matchesRole;
   });
 
-  // PATCH /admin/users/:id/roles REPLACES the whole set, so the modal hands back every
-  // role the user should end up with, not a delta. This is the only way to grant a role
-  // by hand — creator_requests only covers people who ticked the box at sign-up.
+  // PATCH /admin/users/:id/roles replaces the whole set, so the modal hands back every
+  // role the user should end up with rather than a delta. It is the only way to grant a
+  // role by hand; creator_requests covers only people who ticked the box at sign-up.
   const handleSaveRoles = async (roles) => {
     setSavingRoles(true);
     setSaveError(null);
     try {
       const res = await adminApi.updateUserRoles(editTarget.id, roles);
-      // Trust the server's answer over the checkboxes — it uppercases and de-duplicates
-      // the set, and it is the one that decides what was actually stored. It replies
-      // { message, user }; is_active is not part of that update, so it is carried over.
-      // Only the role fields are taken from it: the reply is built around the update,
-      // so spreading it wholesale could blank a name or email it never carried.
+      // Trust the server's answer over the checkboxes: it uppercases and de-duplicates
+      // the set and decides what was actually stored. Only the role fields are taken from
+      // it, since the reply is built around the update and spreading it wholesale could
+      // blank a name or email it never carried. is_active is carried over.
       const saved = toAdminUser({
         id: editTarget.id,
         roles: res?.user?.roles ?? roles,
@@ -396,8 +388,7 @@ export default function AdminUserManagement() {
               <p className="text-[14px] text-gray-400 max-w-lg">Grant and revoke access for everyone on RMIT Launchpad, and deactivate accounts that should no longer sign in.</p>
             </div>
             {/* There is no ADD NEW USER button: sign-up needs a password, so it goes
-                through POST /auth/register on the Register page and cannot happen from
-                here. The button used to open a full five-field form and then refuse. */}
+                through the Register page and cannot happen from here. */}
           </div>
 
           {(loadError || actionError) && (
@@ -425,9 +416,8 @@ export default function AdminUserManagement() {
                 className="bg-transparent border-none outline-none text-[13px] text-gray-700 w-full placeholder-gray-300"
               />
             </div>
-            {/* The "Filter by Project Group" select that used to sit here is gone with
-                the column it filtered — nothing links a user to a project. This one
-                filters for real. */}
+            {/* Nothing in the database links a user to a project, so there is no group
+                filter here. This one filters for real. */}
             <select
               value={roleFilter}
               onChange={e => setRoleFilter(e.target.value)}
@@ -501,8 +491,8 @@ export default function AdminUserManagement() {
                   {filtered.length > 0 ? filtered.map((u, i) => (
                     <tr key={u.id} className={`hover:bg-gray-50 transition-colors ${i < filtered.length - 1 ? "border-b border-gray-100" : ""}`}>
                       <td className="px-5 py-3.5 w-10">
-                        {/* ⚠️ An ADMIN row renders NO checkbox rather than a disabled one.
-                            An admin owns nothing, so they are never a valid target, and a
+                        {/* An admin row renders no checkbox rather than a disabled one. An
+                            admin owns nothing and is never a valid target, and a
                             greyed-out box invites somebody to try and then refuses. */}
                         {!u.roles.includes("ADMIN") && (
                           <input
@@ -521,7 +511,7 @@ export default function AdminUserManagement() {
                           <Avatar name={u.name} size={36} fontSize={12} />
                           <div className="min-w-0">
                             <div className="text-[13px] font-bold text-gray-900">{u.name}</div>
-                            {/* The email, not an invented "ID: #12" — it is also the
+                            {/* The email rather than an invented id: it is also the
                                 address this person signs in with. */}
                             <div className="text-[11px] text-gray-400 truncate">{u.email}</div>
                           </div>
@@ -535,9 +525,9 @@ export default function AdminUserManagement() {
 
                       {/* Balance */}
                       <td className="px-5 py-3.5">
-                        {/* ⚠️ "—" is for an account with NO WALLET; a real 0 renders as
-                            "0 CC". They look similar and mean different things — one has
-                            spent or never received, the other has no wallet row at all. */}
+                        {/* A dash is for an account with no wallet; a real 0 renders as
+                            "0 CC". They look alike and mean different things: one has
+                            spent or never received, the other has no wallet at all. */}
                         <span className="text-[13px] font-bold text-gray-900 whitespace-nowrap">
                           {u.balance == null ? "—" : `${u.balance.toLocaleString()} CC`}
                         </span>
@@ -557,7 +547,7 @@ export default function AdminUserManagement() {
                       </td>
 
                       {/* Actions */}
-                      {/* No REMOVE button: DELETE /users/profile only deletes YOURSELF,
+                      {/* No REMOVE button. DELETE /users/profile only deletes yourself,
                           and deleting a user cascades away their projects, comments and
                           funding history. Deactivating is the reversible equivalent and
                           already sits in the Status column. */}
@@ -579,8 +569,7 @@ export default function AdminUserManagement() {
               </table>
             </div>
 
-            {/* The PREVIOUS / 1 2 3 / NEXT control that used to sit here was inert —
-                every page of the list is already on screen. The count stays. */}
+            {/* No pager: the whole list is already on screen. The count stays. */}
             <div className="px-5 py-3.5 border-t border-gray-100">
               <span className="text-[12px] text-gray-400">
                 Showing {filtered.length} of {users.length} {users.length === 1 ? "account" : "accounts"}
@@ -591,8 +580,8 @@ export default function AdminUserManagement() {
       </div>
       </div>
 
-      {/* Manage Access Modal — mounted per open, so the checkboxes reset to the user
-          being edited without needing an effect to sync them. */}
+      {/* The Manage Access modal, mounted per open, so the checkboxes reset to the
+          user being edited without an effect to sync them. */}
       {editTarget && (
         <ManageAccessModal
           user={editTarget}

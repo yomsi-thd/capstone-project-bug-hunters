@@ -1,14 +1,11 @@
 import DeadEndPage from "../components/layout/DeadEndPage";
 
 /**
- * Catch-all route.
+ * Catch-all route. The screen itself is DeadEndPage, shared with RequireAccess's "no
+ * access" state so the two cannot drift apart.
  *
- * It used to be a bare `<h1>404 - Page Not Found</h1>` — black text on white with no nav
- * bar and no way back, which reads as a broken build rather than a wrong address.
- *
- * The whole screen is DeadEndPage now, shared with RequireAccess's "no access" state.
- * The two used to be hand-written copies with a comment promising they would keep
- * matching; sharing the component is that promise made structural.
+ * It matters that this looks like a page rather than a bare heading on white: without a
+ * nav bar and a way back, a wrong address reads as a broken build.
  */
 export default function NotFound() {
   return (

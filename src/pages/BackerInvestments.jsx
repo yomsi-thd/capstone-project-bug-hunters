@@ -29,19 +29,17 @@ function InvestmentCard({ investment, isMobile }) {
             {investment.title}
           </h3>
           <div className="flex shrink-0 items-center gap-1.5">
-            {/* The project was archived after this investment. The card stays — nobody's
-                spend history disappears because a creator or admin tidied up — but it is
-                marked so the funding bar below is not read as a live campaign. */}
+            {/* The project was archived after this investment. The card stays, since
+                nobody's spend history should disappear because a creator or admin tidied
+                up, but it is marked so the figures are not read as a live campaign. */}
             {investment.archived && (
               <span className="rounded border border-[#f0d9a0] bg-[#fff8e6] px-[7px] py-[3px] text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-[#7a5200]">
                 ARCHIVED
               </span>
             )}
-            {/* The support level this backer chose. Null for anything backed before
-                2026-08-20 and for every "just support" contribution, so most cards show
-                nothing here. Since N4 a card covers exactly one contribution, so this is
-                simply the level they picked — there is no "highest of several" left to
-                explain. */}
+            {/* The support level this backer chose, null for a "just support"
+                contribution, which is most of them. A card covers exactly one
+                contribution, so this is simply the level they picked. */}
             {investment.topTier && (
               <span className="rounded border border-[#f3ccd4] bg-[#fff2f4] px-[7px] py-[3px] text-[10px] font-bold tracking-[0.06em] whitespace-nowrap text-[#7a1020]">
                 {investment.topTier.name.toUpperCase()}
@@ -70,9 +68,8 @@ function InvestmentCard({ investment, isMobile }) {
           </div>
 
           <div>
-            {/* One contribution per project since N4, so there is no "latest" to
-                distinguish from a first — the label no longer switches, and the two
-                lines that reported a repeat are gone. */}
+            {/* One contribution per project, so there is no latest to distinguish from
+                a first and the label never switches. */}
             <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
               CONTRIBUTION DATE
             </div>
@@ -85,10 +82,9 @@ function InvestmentCard({ investment, isMobile }) {
             <div className="mb-1 text-[11px] font-bold tracking-[0.05em] text-neutral-400">
               TOTAL SUPPORT
             </div>
-            {/* ⚠️ The PROJECT's running total, not this backer's share — theirs is the
-                "You invested" column to the left. It replaced a funding-progress bar in
-                N3 (2026-09-07): there is no goal to be a percentage of any more, and
-                leaving the column empty would have read as a failed load. */}
+            {/* The project's running total rather than this backer's share, which is
+                the "You invested" column to the left. There is no goal to be a
+                percentage of, and an empty column would read as a failed load. */}
             <div className="text-[15px] font-bold text-neutral-900">
               {investment.projectTotal.toLocaleString()} CC
             </div>
@@ -132,8 +128,8 @@ function EmptyLoggedOut({ isMobile }) {
 }
 
 export default function BackerInvestments() {
-  // canInvest gates the empty state's wording, not the page itself — the route stays
-  // open to everyone, and a pure creator can legitimately land here from a stale link.
+  // canInvest gates the empty state's wording rather than the page. The route stays open,
+  // and a pure creator can land here from a stale link.
   const { isLoggedIn, canInvest, canCreate } = useAuth();
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -147,10 +143,8 @@ export default function BackerInvestments() {
 
   const pad = isMobile ? "24px 16px" : isTablet ? "28px 24px" : "32px 40px";
 
-  // One request. This used to read the whole ClassCoin transaction history and then call
-  // GET /projects/:id once per row — an N+1 that also produced one card per TRANSACTION,
-  // so backing the same project three times looked like three duplicate cards.
-  // GET /classcoins/investments groups by project and joins it server-side (2026-08-18).
+  // One request. GET /classcoins/investments groups by project and joins it server-side,
+  // so there is no per-row follow-up and no duplicate card for a repeat investment.
   useEffect(() => {
     if (!isLoggedIn) return;
     let cancelled = false;
@@ -173,7 +167,7 @@ export default function BackerInvestments() {
     return () => { cancelled = true; };
   }, [isLoggedIn]);
 
-  // Local filter over the user's own investments (title / tag / description).
+  // Local filter over the user's own investments, by title, tag and description.
   const q = query.trim().toLowerCase();
   const filtered = q
     ? investments.filter(inv =>
@@ -217,7 +211,7 @@ export default function BackerInvestments() {
             />
           ) : investments.length > 0 ? (
             <>
-              {/* Local filter — sits right above the list it filters. */}
+              {/* Local filter, sitting right above the list it filters. */}
               <div className={`mb-6 flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3.5 py-2.5 ${isMobile ? "max-w-full" : "max-w-[380px]"}`}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" strokeWidth="2.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                 <input
@@ -267,9 +261,9 @@ export default function BackerInvestments() {
                 title="This page is for backers"
                 detail="Your account does not hold a Class Coin balance, so it cannot invest in projects."
               >
-                {/* The CTA is gated on canCreate, not on "not canInvest": an account with
-                    no roles at all reaches this branch too, and sending them to a page
-                    the route guard rejects would just swap one dead end for another. */}
+                {/* The CTA is gated on canCreate rather than on "not canInvest": an
+                    account with no roles reaches this branch too, and sending them to a
+                    page the guard rejects swaps one dead end for another. */}
                 {canCreate && (
                   <Link
                     to="/creator-my-projects"

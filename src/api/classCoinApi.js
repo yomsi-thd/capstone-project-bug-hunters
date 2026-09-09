@@ -7,20 +7,18 @@ export const getBalance = async () => {
   return response.data;
 };
 
-// My Investments: one row per project, already joined to it. Replaced the page's old
-// "read every transaction, then GET /projects/:id for each" loop on 2026-08-18.
+// My Investments: one row per project, already joined, so the page needs no follow-up
+// request per investment.
 export const getMyInvestments = async () => {
   const response = await api.get("/classcoins/investments");
 
-  // The API answers list endpoints with { items, total, limit, offset }. The envelope
-  // is unwrapped HERE so pages and mappers keep the plain array they were built
-  // against - eleven lines in this folder instead of a change in every page.
+  // List endpoints answer { items, total, limit, offset }. Unwrapped here so pages and
+  // mappers keep the plain array they were written against.
   return response.data.items;
 };
 
-// Grant Class Coins to one or many accounts. Bulk and single are the same call — granting
-// to one person is a list of one — and the server runs the whole list in ONE transaction,
-// so "half of them got it" is not a state this can produce.
+// Grants to one or many accounts; a single grant is a list of one. The server runs the
+// whole list in one transaction, so it cannot half-succeed.
 export const grantCoins = async (userIds, amount) => {
   const response = await api.post("/classcoins/grant", { user_ids: userIds, amount });
   return response.data;
@@ -31,15 +29,15 @@ export const getTransactions = async () => {
 
   return response.data.items;
 };
-// A7 — somebody outside RMIT asking for Class Coins. `note` is required; the length rule
-// lives in components/classcoin/coinRequestRules.js and the backend enforces it too (422).
+// Asks an admin for Class Coins. `note` is required; its length rule lives in
+// components/classcoin/coinRequestRules.js, and the backend enforces it too.
 export const requestCoins = async (note) => {
   const response = await api.post("/classcoins/requests", { note });
   return response.data;
 };
 
-// The signed-in user's waiting request, or null when there is none. 200 with a null body
-// is the ordinary answer here — do not read it as an error.
+// The signed-in user's waiting request, or null when there is none. A null body is the
+// normal answer here, not an error.
 export const getMyCoinRequest = async () => {
   const response = await api.get("/classcoins/requests/me");
   return response.data;

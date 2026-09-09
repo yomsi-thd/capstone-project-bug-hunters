@@ -1,5 +1,5 @@
-// UI configuration for the admin dashboard — NOT data.
-// ADMIN_PROJECTS was removed when AdminDashboard was wired to GET /api/admin/projects.
+// UI configuration for the admin dashboard. The page reads its projects from
+// GET /api/admin/projects.
 
 export const ADMIN_STATUS_STYLE = {
   Active:  { text: "text-green-600",  dot: "bg-green-500" },

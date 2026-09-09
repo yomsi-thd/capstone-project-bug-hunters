@@ -6,17 +6,17 @@ import { toNumber } from "../api/mappers";
 import { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, SESSION_EXPIRED_EVENT } from "../api/axios";
 import { serverMessage } from "../api/apiError";
 
-// Fallback accounts, used ONLY when the backend cannot be reached at all.
-// They exist so the UI is still browsable when the API is down — see login().
-// A non-admin may hold two roles; the four below cover the app's cases.
+// Fallback accounts, used only when the backend cannot be reached at all, so the UI
+// stays browsable while the API is down. See login().
+//
+// A non-admin may hold two roles, and the four below cover every case the app has:
 //   student1  = Backer + Creator  -> sees everything a member can own
 //   lecturer1 = Backer            -> a plain member
 //   creator1  = Creator           -> no balance, cannot invest
 //   admin1    = Admin             -> owns nothing at all
-// ⚠️ An ADMIN holds ONLY admin since the role separation of 2026-08-24, and admin does
-// NOT imply creator or backer: `canCreate` is creator-only and `canInvest` is
-// backer-only. An admin reaches the project wizard through `canCreateForOthers`, filing
-// on a creator's behalf. See the derived permissions below.
+//
+// Admin implies neither creator nor backer. An admin reaches the project wizard through
+// canCreateForOthers, filing on a creator's behalf. See the permissions below.
 const ACCOUNTS = {
   student1: {
     password: "student1@",
@@ -76,16 +76,15 @@ export function AuthProvider({ children }) {
     }
   }, [user]);
 
-  // The axios interceptor fires this when a 401 could not be recovered by refreshing
-  // (refresh token expired after 7 days, or revoked). Drop the user so the UI stops
-  // pretending to be signed in.
+  // The axios interceptor fires this when a 401 could not be recovered by refreshing,
+  // so drop the user rather than let the UI keep acting signed in.
   useEffect(() => {
     const onExpired = () => setUser(null);
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
     return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
   }, []);
 
-  // Sign in with a mock account — only used when the backend is unreachable.
+  // Signs in with a mock account. Only reached when the backend is unreachable.
   const loginWithMock = useCallback((identifier, password) => {
     const key = (identifier || "").trim().toLowerCase();
     const account = ACCOUNTS[key];
@@ -105,12 +104,11 @@ export function AuthProvider({ children }) {
   }, []);
 
   /**
-   * Call the backend first; only fall back to a mock account when the backend is
-   * NOT reachable at all.
+   * Calls the backend, and falls back to a mock account only when the backend cannot be
+   * reached at all.
    *
-   * Important: when the backend answers with an error (401 wrong password, 500 server
-   * error) do NOT fall back — surface that error instead. Falling back on a 401 would
-   * let a wrong password still sign in via a mock account, which is very hard to spot.
+   * An error answer (401, 500) is surfaced rather than fallen back on. Falling back on a
+   * 401 would let a wrong password sign in as a mock user, which is very hard to spot.
    *
    * Returns { ok: true, user } or { ok: false, error }.
    */
@@ -119,31 +117,24 @@ export function AuthProvider({ children }) {
 
     let data;
     try {
-      // The backend only looks users up by email (userRepository.findByEmail), so the
-      // identifier goes straight into the email field. Signing in with an RMIT ID will
-      // 401 until the backend adds an rmit_id column.
+      // The backend looks users up by email only, so the identifier goes into the email
+      // field. An RMIT ID will 401 until there is a column to match it against.
       data = await authApi.login(id, password);
     } catch (err) {
       if (err?.response) {
         return {
           ok: false,
-          // serverMessage, NOT errorMessage: this one must fall through to the sentence
-          // below rather than to axios's own `err.message`, which for a 401 reads
-          // "Request failed with status code 401" — worse than the line it would
-          // replace, and shown on the screen a person meets first.
+          // serverMessage rather than errorMessage, so this falls through to the
+          // sentence below instead of axios's "Request failed with status code 401".
           error: serverMessage(err) || "Invalid email or password",
         };
       }
-      // No response => backend down / wrong port / CORS.
+      // No response means the backend is down, on the wrong port, or blocked by CORS.
       //
-      // In DEV that means the mock accounts, so the UI stays browsable with no
-      // backend running. In a PRODUCTION build it must NOT: on Render the free
-      // web service sleeps after 15 minutes and takes ~50s to wake, and a
-      // request that dies mid-wake reaches axios as a network error, exactly
-      // like a wrong port does. Falling back there turns "the server is still
-      // starting" into "Invalid username or password" for a password that is
-      // completely correct — the same disguised failure as the 5173/5174 trap,
-      // except nobody can see the port. Say what actually happened instead.
+      // In dev, fall back to the mock accounts so the UI stays browsable with nothing
+      // running. In production, don't: the free Render service sleeps after 15 minutes
+      // and takes about 50s to wake, and a request that dies mid-wake looks exactly like
+      // this. Falling back there would report "invalid password" for a correct one.
       if (!import.meta.env.DEV) {
         return {
           ok: false,
@@ -160,11 +151,11 @@ export function AuthProvider({ children }) {
       /* ignore storage errors (private mode, etc.) */
     }
 
-    // The backend stores roles uppercase ("BACKER"); the whole UI gates on lowercase.
+    // The backend stores roles uppercase ("BACKER"), the UI gates on lowercase.
     const roles = (data.user?.roles ?? []).map((r) => String(r).toLowerCase());
 
-    // The balance lives on its own endpoint. A user with no wallet gets a 404 — treat
-    // that as 0 rather than failing the whole sign-in.
+    // The balance has its own endpoint, and a user with no wallet gets a 404. Treat
+    // that as 0 rather than failing the sign-in.
     let balance = 0;
     try {
       const wallet = await classCoinApi.getBalance();
@@ -185,8 +176,8 @@ export function AuthProvider({ children }) {
     return { ok: true, user: userObj };
   }, [loginWithMock]);
 
-  // Re-read the balance after investing so the Header updates immediately.
-  // A mock session has no access token, so this guard also skips mock sessions.
+  // Re-reads the balance after investing so the Header updates at once. A mock session
+  // has no access token, so the guard skips it too.
   const refreshBalance = useCallback(async () => {
     if (!localStorage.getItem(ACCESS_TOKEN_KEY)) return;
     try {
@@ -197,10 +188,9 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // Merge a patch into the signed-in user. The Account page calls this after saving
-  // the profile so the Header shows the new name straight away — without it the old
-  // name survives until the next sign-in, because the session is restored from
-  // localStorage rather than refetched. The effect above persists the result.
+  // Merges a patch into the signed-in user. Account calls it after saving the profile
+  // so the Header picks up the new name; the session is restored from localStorage
+  // rather than refetched, so otherwise the old name lasts until the next sign-in.
   const updateUser = useCallback((patch) => {
     setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
@@ -225,28 +215,25 @@ export function AuthProvider({ children }) {
       isCreator,
       isAdmin,
       isBacker,
-      // ── Permissions ────────────────────────────────────────────────────────
-      // Admin is NOT a superuser any more (2026-08-24, the lecturer's rule): an
-      // admin account holds ADMIN alone, owns no projects and no Class Coins.
-      // Everything else in the app reads these flags rather than `roles`, which is
-      // what makes this the one file to change if the team reverses the decision.
+      // Permissions. An admin is not a superuser: the account holds ADMIN alone and
+      // owns no projects and no Class Coins. Every page reads these flags rather than
+      // `roles`, so this is the only file to change if that rule is ever reversed.
 
-      // Owns and manages projects of their own. No "|| isAdmin".
+      // Owns and manages projects of their own. Deliberately not "|| isAdmin".
       canCreate: isCreator,
-      // Backers only. A pure creator still cannot invest, and now neither can an
-      // admin. The backend enforces it too — authorize("BACKER") on POST
-      // /projects/:id/invest — because this flag was never a security boundary.
+      // Backers only, so a pure creator and an admin both cannot invest. The backend
+      // enforces the same rule; this flag is for the UI, not for security.
       canInvest: isBacker,
-      // MAY OPEN THE WIZARD FOR SOMEBODY ELSE. Splits the two ideas the old
-      // canCreate ran together: owning projects vs. being allowed to file one.
+      // May open the wizard for somebody else. Separates owning projects from being
+      // allowed to file one.
       canCreateForOthers: isAdmin,
-      // The union, purely so RequireAccess can name ONE flag
-      // (it takes a permission string, not a list) and the /create-project route
-      // guard keeps agreeing with the buttons that lead to it.
+      // The union of the two, because RequireAccess takes one permission name rather
+      // than a list. Keeps the /create-project guard agreeing with the buttons that
+      // lead to it.
       canOpenProjectWizard: isCreator || isAdmin,
       balance: user?.balance ?? 0,
-      // True when running on a mock account because the backend was unreachable —
-      // the Header shows a marker so this is not mistaken for real data.
+      // True on a mock account. The Header shows a marker so it isn't mistaken for
+      // real data.
       isMockSession: user?.source === "mock",
       login,
       logout,

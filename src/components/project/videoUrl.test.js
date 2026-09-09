@@ -10,7 +10,7 @@ describe("toEmbedUrl", () => {
   it("handles the short youtu.be form and the share link's extra query", () => {
     expect(toEmbedUrl("https://youtu.be/dQw4w9WgXcQ"))
       .toBe("https://www.youtube.com/embed/dQw4w9WgXcQ");
-    // The "Copy link" button on YouTube appends ?si=… — it must not end up in the id.
+    // YouTube's Copy link button appends ?si=..., which must not end up in the id.
     expect(toEmbedUrl("https://youtu.be/dQw4w9WgXcQ?si=AbC123"))
       .toBe("https://www.youtube.com/embed/dQw4w9WgXcQ");
     expect(toEmbedUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=42s"))
@@ -45,7 +45,7 @@ describe("toEmbedUrl", () => {
 
 // Both project forms call this before saving, so the check that lets a value INTO the
 // database is the same one the page uses to decide whether it is safe to render as a
-// link — the two cannot drift into disagreeing about what a link is.
+// link, so the two cannot drift into disagreeing about what a link is.
 describe("isLinkable", () => {
   it("accepts a plain web address, embeddable or not", () => {
     expect(isLinkable("https://www.youtube.com/watch?v=abc")).toBe(true);
@@ -55,7 +55,7 @@ describe("isLinkable", () => {
   });
 
   it("rejects the typed-something-else case the create wizard used to accept", () => {
-    // "abc" got past a required field and was stored as a project's video.
+    // Plain text passes a required-field check but is not a link.
     expect(isLinkable("abc")).toBe(false);
     expect(isLinkable("uqewq")).toBe(false);
     expect(isLinkable("www.youtube.com/watch?v=abc")).toBe(false); // no scheme

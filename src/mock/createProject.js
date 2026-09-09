@@ -2,9 +2,8 @@ export const CREATE_PROJECT_STEPS = [
   { id: 1, label: "Basic Info" },
   { id: 2, label: "Story & Media" },
   { id: 3, label: "Team Members" },
-  // The step itself has said "Support Levels" since 2026-08-20; this label was still
-  // "Funding Goals", naming a thing the step does not collect and, after N3
-  // (2026-09-07), a thing the product no longer has.
+  // Matches the step's own heading. Projects have no funding goal, so naming one here
+  // would describe something the wizard does not collect.
   { id: 4, label: "Support Levels" },
   { id: 5, label: "Review & Submit" },
 ];
@@ -29,9 +28,6 @@ export const ROLE_BADGE = {
   "Industry Advisor":  "bg-orange-100 text-orange-700",
 };
 
-// CREATE_PROJECT_TIERS was deleted on 2026-08-20. It was DATA, not UI config, and the
-// wizard used it as the INITIAL state of step 4 - so every new project began with a
-// support level the creator never wrote ("Name listed on digital contributor wall"),
-// phrased as a reward, which is exactly what a support level is not. Harmless only
-// while tiers were dropped on submit; the moment they were saved for real it would
-// have been written straight into the database. Step 4 now starts empty.
+// Step 4 starts empty on purpose. It used to be seeded with an example support level,
+// which meant every new project began with a level the creator never wrote, phrased as
+// a reward rather than a commitment.

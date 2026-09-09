@@ -1,41 +1,26 @@
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
 
-// The shared dialog frame.
+// The shared dialog frame: overlay, stacking order, scroll behaviour and entrance
+// animation, so no screen has to rebuild them. Every modal in the app goes through it.
 //
-// Before 20/08 ten modals across nine files built their own overlay, and they had drifted
-// four ways — all four visible to a user:
+// The z-index sits above the header on purpose. A dialog the nav bar can paint over is
+// a dialog you can click through.
 //
-//   · 4 of the 10 were missing the .lp-modal class, so they appeared with no entrance
-//     animation while the other 6 eased in;
-//   · z-index was 1000, 50 or 100 depending on the file, against a header at 100;
-//   · the backdrop came in two opacities, black/40 and black/50;
-//   · most had no max-height, so a long dialog overflowed a short screen with no way to
-//     scroll to the buttons at the bottom.
+// `closable = false` is in use, not a spare knob: AdminUserManagement locks its Manage
+// Access dialog while roles are saving so nobody dismisses it mid-write.
 //
-// The z-index is deliberately ABOVE the header rather than a tidy z-50: a dialog that the
-// nav bar can paint over is a dialog you can click through.
+// `panelClassName` is for what a dialog owns itself, such as its padding or the brand
+// rule across the top of the success dialogs. It is not a way to redo the frame.
 //
-// ⚠️ `closable = false` is a behaviour in use, not a spare knob. AdminUserManagement locks
-// its Manage Access dialog while it is saving roles, so that nobody dismisses it
-// mid-write. Removing this prop would quietly reopen that hole.
+// `panelScroll = false` hands scrolling back to the caller. EditProject needs it: that
+// dialog has a fixed header and tab bar over a scrolling body, and scrolling the whole
+// panel would carry the tabs off the top of the screen. It is a prop rather than a
+// class through panelClassName because Tailwind classes don't resolve by their order in
+// the string, so overflow-y-auto and overflow-hidden would fight unpredictably.
 //
-// ⚠️ The four sidebar overlays and the header's mobile menu do NOT use this component.
-// They are not dialogs: they already agree with each other, they sit BELOW the header on
-// purpose, and they scroll with their own rules.
-// `panelClassName` is for what a dialog genuinely owns — its padding, and the details that
-// identify it, like the 5px brand rule across the top of the two success dialogs. It is
-// NOT a way to re-do the frame: the overlay, the stacking order, the scroll behaviour and
-// the entrance animation are exactly what this component exists to stop each screen from
-// reinventing.
-// `panelScroll = false` hands the scrolling back to the caller, and EditProject is why it
-// exists: that dialog is a column with a fixed header and tab bar and a scrolling body, so
-// letting the whole panel scroll instead would carry its tabs off the top of the screen.
-//
-// ⚠️ It is a PROP rather than something a caller overrides through panelClassName, because
-// Tailwind classes do not resolve by their order in the string — `overflow-y-auto` and
-// `overflow-hidden` would both be applied and which one won would depend on the order
-// Tailwind happened to emit them in the stylesheet. This repo has no tailwind-merge.
+// The sidebar overlays and the header's mobile menu don't use this component. They are
+// not dialogs: they sit below the header and scroll by their own rules.
 export default function Modal({
   onClose,
   maxWidth = 500,
@@ -44,15 +29,9 @@ export default function Modal({
   panelClassName = "",
   children,
 }) {
-  // Escape closes the dialog. Added 20/08 — this ADDS behaviour rather than moving style,
-  // which is why it landed in its own commit.
-  //
-  // ⚠️ The listener goes on `document`, not on the panel. The panel takes no focus, so a
-  // handler bound to it would silently do nothing until the user had already clicked
-  // inside — which is the one case where they do not need a shortcut.
-  //
-  // It honours `closable`, so the three dialogs that must not be dismissed by accident
-  // are not suddenly dismissable by keyboard instead.
+  // Escape closes the dialog. The listener goes on `document` rather than the panel,
+  // which takes no focus: a handler bound there would do nothing until the user had
+  // already clicked inside. It honours `closable`, so a locked dialog stays locked.
   useEffect(() => {
     if (!closable) return;
 
@@ -64,21 +43,16 @@ export default function Modal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [closable, onClose]);
 
-  // ⚠️ Rendered into document.body, and this is load-bearing rather than tidiness.
+  // Rendered into document.body, which is load-bearing rather than tidiness.
   //
-  // `position: fixed` is resolved against the nearest ancestor carrying a transform,
-  // filter, perspective, contain or will-change — not against the viewport. `.lp-reveal`
-  // leaves `transform: matrix(1,0,0,1,0,0)` behind once its entrance animation finishes,
-  // and an IDENTITY transform is still a transform for this purpose. So a Modal mounted
-  // inside a revealed block (measured on ProjectDetail 24/08: the panel landed at
-  // y = -414, entirely above the screen) shows a dark overlay and NO dialog.
+  // `position: fixed` resolves against the nearest ancestor carrying a transform, not
+  // against the viewport, and `.lp-reveal` leaves an identity transform behind once its
+  // animation finishes. A modal mounted inside a revealed block therefore renders its
+  // overlay somewhere off-screen: on screen that reads as "the page went dark and no
+  // dialog appeared". The portal removes the trap for every caller.
   //
-  // The nine modals that existed before this change all happened to be mounted at page
-  // level, outside any `.lp-*` wrapper, which is the only reason nobody had hit it. The
-  // portal removes the trap for every caller instead of asking each one to know about it.
-  //
-  // React still routes events through the React tree rather than the DOM tree, so the
-  // stopPropagation below and every caller's handlers behave exactly as before.
+  // React still routes events through the React tree, so the stopPropagation below and
+  // every caller's handlers behave as they would without the portal.
   return createPortal(
     <div
       className="lp-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
@@ -86,8 +60,7 @@ export default function Modal({
     >
       <div
         className={`lp-modal relative w-full rounded-xl bg-white shadow-2xl ${panelScroll ? "max-h-full overflow-y-auto" : ""} ${panelClassName}`}
-        // A runtime value, which is one of the three cases where inline style is still
-        // the right answer (CODE-GUIDE §7.1).
+        // A runtime value, one of the few cases where inline style beats a class.
         style={{ maxWidth: `${maxWidth}px` }}
         onClick={(e) => e.stopPropagation()}
       >

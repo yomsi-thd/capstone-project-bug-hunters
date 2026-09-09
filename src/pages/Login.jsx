@@ -20,18 +20,17 @@ export default function Login() {
 
   const validate = () => {
     const next = {};
-    // Email-only by Hiếu's decision (2026-08-06): users has no rmit_id column and
-    // findByEmail is the only lookup, so an RMIT ID would just 401.
+    // Email-only: `users` has no rmit_id column and findByEmail is the only lookup, so
+    // an RMIT ID would simply 401.
     if (!identifier.trim()) next.identifier = "Email is required";
     if (!password) next.password = "Password is required";
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
-  // AuthContext.login() calls POST /api/auth/login and only falls back to a mock
-  // account when the backend is unreachable. Hiếu's old handleBackendLogin was folded
-  // into it — the whole app reads the session from the context, so that is the right
-  // place for the API call.
+  // AuthContext.login() calls POST /api/auth/login and falls back to a mock account only
+  // when the backend is unreachable. The call lives there rather than here because the
+  // whole app reads the session from the context.
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
@@ -45,8 +44,8 @@ export default function Login() {
       return;
     }
 
-    // RequireAccess sends the attempted path along, so a user bounced off a guarded
-    // page lands back on it instead of on a generic dashboard.
+    // RequireAccess passes the attempted path along, so someone bounced off a guarded
+    // page lands back on it rather than on a generic dashboard.
     const from = location.state?.from;
     if (from) {
       navigate(from, { replace: true });
@@ -108,7 +107,7 @@ export default function Login() {
         <button
           type="submit"
           disabled={isSubmitting}
-          /* The lift-and-shadow hover is Tailwind now rather than two mouse handlers.
+          /* The lift-and-shadow hover is Tailwind rather than two mouse handlers.
              disabled: carries the submitting state, so "do not lift while submitting" is
              stated once instead of being re-tested inside the hover handler. */
           className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border-none bg-brand p-3.5 text-[14px] font-bold tracking-[0.04em] text-white transition-[background,transform,box-shadow] duration-150 hover:-translate-y-px hover:bg-brand-dark hover:shadow-[0_6px_16px_rgba(204,0,0,0.3)] disabled:cursor-default disabled:bg-[#e88a8a] disabled:hover:translate-y-0 disabled:hover:bg-[#e88a8a] disabled:hover:shadow-none"

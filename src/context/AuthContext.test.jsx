@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 
 // AuthContext calls the backend before falling back to the mock accounts, so both
-// API modules are stubbed — no test may touch the real network.
+// API modules are stubbed: no test may touch the real network.
 vi.mock("../api/authApi", () => ({
   login: vi.fn(),
   logout: vi.fn(() => Promise.resolve()),
@@ -21,7 +21,7 @@ import { AuthProvider, useAuth } from "./AuthContext";
 const STORAGE_KEY = "rmit_launchpad_user";
 const wrapper = ({ children }) => <AuthProvider>{children}</AuthProvider>;
 
-// An axios network error has no `response` property — that is the "backend is
+// An axios network error has no `response` property, which is the "backend is
 // unreachable" signal AuthContext uses to decide whether to fall back.
 function networkError() {
   return new Error("Network Error");
@@ -98,8 +98,7 @@ describe("AuthContext", () => {
     const { result } = renderAuth();
     await login(result, "admin1", "admin1@");
     expect(result.current.isAdmin).toBe(true);
-    // The 2026-08-24 role separation: an admin holds ADMIN alone, owns no projects
-    // and no Class Coins. Both of these were true before that date.
+    // An admin holds ADMIN alone and owns no projects and no Class Coins.
     expect(result.current.canCreate).toBe(false);
     expect(result.current.canInvest).toBe(false);
     // What replaced it: an admin may open the wizard, but only on behalf of someone.
@@ -141,7 +140,7 @@ describe("AuthContext", () => {
 
     expect(result.current.user.name).toBe("Renamed Student");
     expect(result.current.user.username).toBe("new@test.com");
-    // Untouched fields survive the merge — a patch must not wipe the roles.
+    // Untouched fields survive the merge: a patch must not wipe the roles.
     expect(result.current.roles).toEqual(["backer", "creator"]);
     expect(JSON.parse(localStorage.getItem(STORAGE_KEY)).name).toBe("Renamed Student");
   });
@@ -208,7 +207,7 @@ describe("AuthContext", () => {
 
       const { result } = renderAuth();
       // These are VALID mock credentials. If a 401 also fell back, this would sign
-      // in — exactly the hole this test guards.
+      // in, which is the hole this test guards.
       const res = await login(result, "student1", "student1@");
 
       expect(res.ok).toBe(false);
@@ -234,10 +233,9 @@ describe("AuthContext", () => {
       expect(result.current.isMockSession).toBe(true);
     });
 
-    // The fallback is a DEV convenience. A production build must report the
-    // outage instead, or Render's ~50s cold start reads as a wrong password.
-    // vi.stubEnv reaches import.meta.env, and unstubEnvs in afterEach puts it
-    // back so the surrounding tests keep their DEV behaviour.
+    // The fallback is a dev convenience. A production build reports the outage instead,
+    // or a cold start reads as a wrong password. vi.stubEnv reaches import.meta.env, and
+    // unstubEnvs in afterEach puts it back for the surrounding tests.
     describe("in a production build", () => {
       afterEach(() => {
         vi.unstubAllEnvs();

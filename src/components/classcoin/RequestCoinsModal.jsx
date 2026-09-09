@@ -5,20 +5,19 @@ import * as classCoinApi from "../../api/classCoinApi";
 import { errorMessage } from "../../api/apiError";
 import { NOTE_MAX_LENGTH, validateNote } from "./coinRequestRules";
 
-// Asking an admin for Class Coins (A7). Opened from TWO places — the Account page and the
-// empty-wallet state of the invest modal — so it knows nothing about a project and takes
-// no project prop.
+// Asks an admin for Class Coins. Opened from the Account page and from the invest
+// modal's empty-wallet state, so it knows nothing about any project and takes no project
+// prop.
 //
-// ⚠️ The note is REQUIRED, and that is a design decision rather than a habit: the admin
-// does not know who is asking (the client confirmed this on 2026-09-08), so a name and an
-// email are not enough to judge by and the queue would become a rubber stamp. See §3.4 of
-// the spec.
+// The note is required by design. The admin reviewing the queue does not know who is
+// asking, so a name and an email alone would leave nothing to judge by and the queue
+// would become a rubber stamp.
 export default function RequestCoinsModal({ onClose, onSent }) {
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
-  // The rule's error only appears after the first attempt — telling somebody they are
-  // wrong before they have typed anything is rude.
+  // The error only appears after the first attempt. Telling somebody they are wrong
+  // before they have typed anything is rude.
   const [tried, setTried] = useState(false);
 
   const noteError = validateNote(note);

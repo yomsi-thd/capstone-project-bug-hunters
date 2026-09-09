@@ -8,8 +8,8 @@ const FOOTER_LINKS = [
 
 export default function Footer({ isMobile }) {
   return (
-    // isMobile comes from the breakpoint hook rather than from a media query, so the two
-    // responsive switches below stay inline. Everything else is Tailwind.
+    // isMobile comes from the breakpoint hook rather than a media query, so the two
+    // switches below stay inline. Everything else is Tailwind.
     <footer
       className="bg-neutral-900 text-white"
       style={{ padding: isMobile ? "32px 16px 24px" : "40px 40px 32px" }}

@@ -2,29 +2,21 @@ import { Component } from "react";
 import { useLocation } from "react-router-dom";
 
 /**
- * ⚠️ THIS FILE KEEPS ITS INLINE STYLES ON PURPOSE — do not convert it to Tailwind.
+ * Keeps its inline styles on purpose. Everything else in the app is Tailwind; this file
+ * is the exception.
  *
- * The rest of the app moved to Tailwind on 2026-08-20. This is the ONE exception left,
- * and it is a decision rather than an oversight: if the measuring command in
- * CODE-GUIDE §7.2 prints this file, that is the right answer.
+ * This is the screen shown after everything else has failed, so it depends on as little
+ * as possible. Inline styles render even if the stylesheet never loaded, while a
+ * Tailwind class assumes a separate file arrived and parsed.
  *
- * This is the screen that appears when everything else has already failed. Inline styles
- * are the last link in the chain of things it refuses to depend on: they render correctly
- * EVEN IF THE STYLESHEET NEVER LOADED. A Tailwind class is a promise that a separate file
- * arrived and parsed; on the one screen whose whole job is to work when promises are
- * broken, that is the wrong trade. Consistency is worth less here than certainty.
+ * The fallback is self-contained for the same reason: no Header, no Footer, no useAuth,
+ * no router Link. If the crash came from the Header or from AuthContext, which sit on
+ * every page, rendering them again would throw inside the fallback. React would then
+ * look for the next boundary up, find none, and unmount everything, which is the blank
+ * page this component exists to prevent.
  *
- * The fallback is deliberately SELF-CONTAINED: no Header, no Footer, no useAuth, no
- * router Link.
- *
- * If the crash came from the Header or from AuthContext — which sit on every page —
- * a fallback that rendered them again would throw while rendering the fallback. React
- * then looks for the NEXT boundary up, finds none, and unmounts everything: the blank
- * page this component exists to prevent, only harder to diagnose. Plain markup cannot
- * fail that way.
- *
- * Defined at the top level, not inside ErrorBoundary's render — see the convention
- * note in CLAUDE.md: a component created during render remounts on every render.
+ * Defined at the top level rather than inside ErrorBoundary's render, since a component
+ * created during render remounts on every render.
  */
 function Fallback({ error, componentStack, onRetry }) {
   return (
@@ -161,31 +153,27 @@ function Fallback({ error, componentStack, onRetry }) {
 }
 
 /**
- * Catches render errors so one broken component cannot take the whole app down.
+ * Catches render errors so one broken component cannot take the whole app down. Without
+ * a boundary, React unmounts the entire tree on an uncaught render error and the user is
+ * left on a blank page with no way back but a refresh.
  *
- * Without a boundary anywhere in the tree, React's default for an uncaught render
- * error is to unmount EVERYTHING — the user gets a blank white page and F5 is the only
- * way back. That has already happened once here (AdminApprovals read `project.gallery[0]`
- * on a mapper that returned no gallery, and clicking REVIEW blanked the app).
+ * Only render errors reach a boundary. Throws inside event handlers and async code do
+ * not, so the pages handle those with their own try/catch and error states.
  *
- * Only render errors are caught. Errors thrown inside event handlers or in async code
- * never reach a boundary — the pages handle those with their own try/catch and error
- * states, so the gap is covered.
- *
- * A class is not a style choice: getDerivedStateFromError / componentDidCatch have no
- * hook equivalent, so a boundary cannot be a function component.
+ * It has to be a class: getDerivedStateFromError and componentDidCatch have no hook
+ * equivalent.
  */
 export default class ErrorBoundary extends Component {
   state = { error: null, componentStack: null };
 
   static getDerivedStateFromError(error) {
-    // Returning state here is what stops the unmount: the next render draws the
-    // fallback instead of the subtree that threw.
+    // Returning state is what stops the unmount: the next render draws the fallback
+    // instead of the subtree that threw.
     return { error };
   }
 
   componentDidCatch(error, info) {
-    // Logging only — the display is already decided by getDerivedStateFromError.
+    // Logging only. getDerivedStateFromError has already decided what to show.
     console.error("Render error caught by ErrorBoundary:", error, info?.componentStack);
     this.setState({ componentStack: info?.componentStack ?? null });
   }
@@ -209,12 +197,9 @@ export default class ErrorBoundary extends Component {
 }
 
 /**
- * The boundary as mounted in App: keyed on the pathname so navigating away builds a
- * fresh boundary and the app recovers on its own.
- *
- * Without the key the boundary holds its error state forever — the user could route to
- * a perfectly healthy page and still be looking at the error screen, with F5 the only
- * escape, which is most of what the boundary was meant to fix.
+ * The boundary as App mounts it, keyed on the pathname so navigating away builds a fresh
+ * one and the app recovers by itself. Without the key it would hold its error state for
+ * good, leaving the user on the error screen even after routing to a healthy page.
  */
 export function RouteErrorBoundary({ children }) {
   const location = useLocation();

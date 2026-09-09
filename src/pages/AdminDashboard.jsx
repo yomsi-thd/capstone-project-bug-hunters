@@ -20,24 +20,23 @@ export default function AdminDashboard() {
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  // Archive is the everyday action now; permanent delete is the second step, reachable
-  // only from the Archived bin. Separate targets so the two confirmations can never be
-  // confused with one another.
+  // Archive is the everyday action; permanent delete is the second step and is reachable
+  // only from the Archived bin. Separate targets, so the two confirmations cannot be
+  // mistaken for each other.
   const [archiveTarget, setArchiveTarget] = useState(null);
   const [archiveReason, setArchiveReason] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState(null);
-  // id of the row whose RESTORE is in flight — restore happens inline, with no modal.
+  // id of the row whose RESTORE is in flight. Restore happens inline, with no modal.
   const [restoringId, setRestoringId] = useState(null);
 
-  // GET /api/admin/projects — returns every project in every status, archived included.
-  // Every mutation below refetches through this rather than patching local state: the
-  // archive columns arrive with joins (archived_by_name) that a mutation response does
-  // not carry, so a hand-patched row would show the wrong name.
-  // Nothing here sets state before the first `await`: `loading` already starts true, so
-  // the effect below never triggers a synchronous cascading render
-  // (react-hooks/set-state-in-effect). Keep it that way if you edit this.
+  // Every project in every status, archived included. Mutations below refetch through
+  // this rather than patch local state, because the archive columns arrive with joins
+  // (archived_by_name) that a mutation response does not carry.
+  //
+  // Nothing here sets state before the first await: `loading` already starts true, so the
+  // effect below never causes a synchronous cascading render. Keep it that way.
   const loadProjects = useCallback(async () => {
     try {
       const rows = await adminApi.getAllProject();
@@ -50,15 +49,13 @@ export default function AdminDashboard() {
     }
   }, []);
 
-  // Wrapped in an async IIFE, matching every other fetch effect in the codebase:
-  // calling loadProjects() bare here trips react-hooks/set-state-in-effect, which reads
-  // the call graph and sees the setStates inside it.
+  // Wrapped in an async IIFE like every other fetch effect here. Calling loadProjects()
+  // bare trips react-hooks/set-state-in-effect, which follows the call graph into it.
   useEffect(() => { (async () => { await loadProjects(); })(); }, [loadProjects]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Archived projects live in their own bin, not mixed into the normal list — including
-  // under "All Statuses", which means "all moderation statuses", not "everything ever".
-  // Selecting Archived shows only those.
+  // Archived projects live in their own bin rather than mixed into the list, including
+  // under "All Statuses", which means every moderation status rather than everything.
   const showArchived = statusFilter === "Archived";
 
   const filtered = projects.filter(p => {
@@ -81,9 +78,8 @@ export default function AdminDashboard() {
     setActionError(null);
   };
 
-  // Archive — replaces the old delete button. The reason is required by the backend
-  // whenever an admin archives someone else's project, which on this screen is almost
-  // always the case, so the field is validated here too rather than round-tripping.
+  // The backend requires a reason whenever an admin archives someone else's project,
+  // which on this screen is nearly always, so validate it here rather than round-trip.
   const confirmArchive = async () => {
     if (!archiveReason.trim()) {
       setActionError("Please give a reason — the creator cannot restore this themselves.");
@@ -119,8 +115,8 @@ export default function AdminDashboard() {
     }
   };
 
-  // Permanent delete. The backend refuses this unless the project is already archived,
-  // so it is only ever offered from the Archived bin. The row goes for good.
+  // Permanent delete. The backend refuses it unless the project is already archived, so
+  // it is only offered from the Archived bin, and the row goes for good.
   const confirmDelete = async () => {
     setBusy(true);
     setActionError(null);
@@ -197,10 +193,9 @@ export default function AdminDashboard() {
       <div className="flex-1 flex flex-col min-w-0">
 
         <main className="flex-1 p-4 md:p-9 overflow-y-auto">
-          {/* CREATE FOR A CREATOR used to sit here beside the title. It moved to the
-              nav bar on 2026-08-28 so it is reachable from every page rather than only
-              this one — see Header, where it is gated on canCreateForOthers next to the
-              creators' START A PROJECT. Don't add a second copy back here. */}
+          {/* CREATE FOR A CREATOR lives on the nav bar rather than beside this title,
+              so it is reachable from every page. See Header, where it is gated on
+              canCreateForOthers next to the creators' START A PROJECT. */}
           <h1 className="text-2xl md:text-[28px] font-extrabold text-gray-900 mb-1">Project Management</h1>
           <p className="text-[14px] text-gray-400 mb-7">Oversee and manage all academic crowdfunding initiatives.</p>
 
@@ -213,12 +208,11 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          {/* Stats — now reactive to actual project list */}
+          {/* Stats, derived from the loaded project list */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-7 lp-stagger">
             {[
-              // Counted over live projects only. An archived project is in the bin, and
-              // counting it as a "Total Project" would make archiving look like it did
-              // nothing.
+              // Live projects only. Counting an archived one here would make archiving
+              // look as though it did nothing.
               { label: "Total Projects",    value: liveProjects.length,                                   icon: "▦",  accent: false },
               { label: "Pending Approvals", value: liveProjects.filter(p => p.status === "Pending").length, icon: "📋", accent: false },
               { label: "Archived",          value: archivedCount,                                         icon: "🗄", accent: false },
@@ -259,9 +253,9 @@ export default function AdminDashboard() {
               <option>Active</option>
               <option>Pending</option>
               <option>Flagged</option>
-              {/* The bin. Archived is a separate axis from the three above — a project
-                  in here still has its own Active/Pending verdict, which is what it
-                  returns to when restored. */}
+              {/* The bin. Archived is a separate axis from the three above: a project in
+                  here still holds its own verdict, which is what it returns to when
+                  restored. */}
               {/* Explicit value: the label carries a count, so without it the option's
                   value would be "Archived (3)" and never match showArchived. */}
               <option value="Archived">Archived ({archivedCount})</option>
@@ -282,7 +276,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="lp-stagger">
                   {filtered.length > 0 ? filtered.map((p, i) => {
-                    // The backend also has REJECTED, which STATUS_STYLE has no key for.
+                    // STATUS_STYLE has no key for REJECTED, which the backend also has.
                     const s = STATUS_STYLE[p.status] || { text: "text-gray-500", dot: "bg-gray-400" };
                     const cc = CAT_STYLE[p.category] || "bg-gray-100 text-gray-600";
                     return (
@@ -314,8 +308,8 @@ export default function AdminDashboard() {
                           <span className={`flex items-center gap-1.5 text-[12px] font-semibold ${s.text}`}>
                             <span className={`w-1.5 h-1.5 rounded-full inline-block ${s.dot}`} />{p.status}
                           </span>
-                          {/* Archived is shown ALONGSIDE the verdict, not instead of it —
-                              that verdict is what the project returns to on restore. */}
+                          {/* Archived is shown alongside the verdict rather than instead of
+                              it, since that verdict is what restore returns to. */}
                           {p.archived && (
                             <div className="mt-1">
                               <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-sm px-1.5 py-0.5">
@@ -332,15 +326,14 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-5 py-3.5">
-                          {/* A percentage and a progress bar stood here until N3
-                              (2026-09-07). The column is the running total now. */}
+                          {/* The running total, with no target to be a percentage of. */}
                           <span className="text-[13px] font-bold text-gray-900 whitespace-nowrap">{p.raised}</span>
                         </td>
                         <td className="px-5 py-3.5">
-                          {/* Archived rows get the two recovery-bin actions; live rows get
-                              ARCHIVE, which is now the only way a project can start
-                              leaving. Permanent delete is deliberately unreachable until
-                              a project sits in the bin — the backend enforces that too. */}
+                          {/* Archived rows get the two recovery actions; live rows get
+                              ARCHIVE, which is the only way a project starts leaving.
+                              Permanent delete is unreachable until a project sits in the
+                              bin, and the backend enforces that too. */}
                           {p.archived ? (
                             <div className="flex flex-wrap gap-1.5">
                               <button
@@ -383,9 +376,8 @@ export default function AdminDashboard() {
               </table>
             </div>
             <div className="px-5 py-3.5 flex flex-col sm:flex-row gap-3 justify-between items-center border-t border-gray-50">
-              {/* Counted within the bin being viewed. Against the raw projects.length it
-                  read "1–1 of 6" while the Total Projects card said 5, because that card
-                  excludes archived and this did not. */}
+              {/* Counted within the bin being viewed. Against the raw list it would
+                  disagree with the Total Projects card, which excludes archived. */}
               <span className="text-[12px] text-gray-400">
                 Showing 1–{filtered.length} of {showArchived ? archivedCount : liveProjects.length}
                 {showArchived ? " archived projects" : " projects"}
@@ -401,7 +393,7 @@ export default function AdminDashboard() {
       </div>
       </div>
 
-      {/* Archive Confirmation Modal — the ordinary "take it down" action. */}
+      {/* Archive confirmation: the ordinary "take it down" action. */}
       {archiveTarget && (
         <Modal onClose={closeModals} maxWidth={440} panelClassName="p-6">
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Archive Project</h2>
@@ -458,7 +450,7 @@ export default function AdminDashboard() {
         </Modal>
       )}
 
-      {/* Permanent Delete Modal — only reachable from the Archived bin. */}
+      {/* Permanent delete, reachable only from the Archived bin. */}
       {deleteTarget && (
         <Modal onClose={closeModals} maxWidth={420} panelClassName="p-6">
             <h2 className="text-[18px] font-bold text-gray-900 mb-3">Delete Permanently</h2>

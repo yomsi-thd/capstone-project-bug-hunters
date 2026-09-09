@@ -1,22 +1,19 @@
 import Avatar from "../ui/Avatar";
 
-// Indigo for BACKER, brand red for CREATOR. Deliberately NOT ui/Badge's tone vocabulary:
-// these two are not "success" or "danger", they are two sides of a relationship, and the
-// indigo exists so the creator's replies stand out in a thread of backers.
+// Indigo for BACKER, brand red for CREATOR. Not ui/Badge's tones, because these two are
+// not "success" or "danger" but two sides of a relationship, and the indigo is what makes
+// the creator's replies stand out in a thread of backers.
 const ROLE_STYLES = {
   BACKER: "bg-indigo-50 text-indigo-600",
   CREATOR: "bg-red-50 text-brand",
 };
 
-// The commenter's relationship to THIS project — not their account role.
+// The commenter's relationship to this project, not their account role. Named apart from
+// ui/RoleBadge for that reason: the two look alike and mean different things.
 //
-// ⚠️ Renamed from `RoleBadge` on 20/08. It used to share that name with the account-role
-// badge (now components/ui/RoleBadge.jsx) while meaning something completely different,
-// and the shared name was the trap: the next person tidying up would merge the two.
-//
-// The value comes from SQL, not from the roles table: CREATOR when the author owns the
-// project, BACKER when they actually invested in THAT project. From CLAUDE.md — reading
-// their account roles instead "would badge everyone BACKER and make it meaningless."
+// The value comes from SQL rather than the roles table, so it reads CREATOR when the
+// author owns this project and BACKER when they invested in it. Using account roles
+// would badge everyone BACKER and mean nothing.
 function CommentRoleBadge({ role }) {
   if (!role) return null;
   const tone = ROLE_STYLES[role] || "bg-neutral-100 text-neutral-600";
@@ -27,15 +24,14 @@ function CommentRoleBadge({ role }) {
   );
 }
 
-// `canDelete` is decided by the caller through canDeleteComment() rather than re-derived
-// here, so the one rule covers the roots and the replies alike. `onDelete` opens the
-// caller's confirmation dialog — this component never deletes anything itself, because the
-// warning about cascaded replies needs the thread, which only CommentList has.
+// The caller decides `canDelete` through canDeleteComment(), so one rule covers roots
+// and replies alike. `onDelete` opens the caller's confirmation dialog: this component
+// never deletes anything itself, since warning about cascaded replies needs the whole
+// thread and only CommentList has it.
 export default function CommentItem({ comment, isReply = false, canDelete = false, onDelete }) {
   return (
-    // 46px is the avatar (34px) plus the 12px gap, so a reply lines up under the parent's
-    // text rather than under its avatar. CommentList repeats the same offset for the reply
-    // box and the Reply button.
+    // 46px is the 34px avatar plus the 12px gap, so a reply lines up under the parent's
+    // text rather than its avatar. CommentList uses the same offset.
     <div className={`flex gap-3 ${isReply ? "mt-3 pl-[46px]" : "mt-0 pl-0"}`}>
       <Avatar name={comment.author} size={34} max={1} />
       <div className="flex-1">
@@ -44,8 +40,8 @@ export default function CommentItem({ comment, isReply = false, canDelete = fals
           <CommentRoleBadge role={comment.role} />
           <span className="text-[12px] text-neutral-400">• {comment.time}</span>
           {canDelete && (
-            // ml-auto rather than a wrapper: the row already wraps, and an extra flex
-            // container would break the badge's alignment on a narrow screen.
+            // ml-auto rather than a wrapper, since the row already wraps and another
+            // flex container would break the badge's alignment when narrow.
             <button
               type="button"
               onClick={() => onDelete?.(comment)}

@@ -1,22 +1,16 @@
 import EmptyState from "../ui/EmptyState";
 
 /**
- * The read-only list of a project's Support Levels.
+ * The read-only list of a project's Support Levels, shared by ProjectDetail's tab,
+ * AdminApprovals' review panel and EditProject's preview. The admin's copy is the one a
+ * project is approved from, so all three have to show the same thing.
  *
- * Shared by THREE screens — ProjectDetail's tab, AdminApprovals' review panel and
- * EditProject's preview — because three hand-written copies of the same list are three
- * places to drift apart, and the admin's copy is the one that decides whether a project
- * gets approved.
+ * It renders inside three very different shells, so it brings no page background or
+ * outer margin of its own.
  *
- * Tailwind, like the rest of the app since 20/08. It renders inside three very different
- * shells — a public tab, an admin review panel and an edit preview — so it deliberately
- * brings no page background or outer margin of its own.
- *
- * ⚠️ The explanatory line at the bottom is not decoration. A support level is a
- * COMMITMENT LEVEL, not a reward: the backer declares what they care about, and the
- * creator owes nothing — Class Coins have no real-world value and creators never receive
- * them, so the platform must not imply anything is being bought. Without that line the
- * data model is one thing and every reader assumes another.
+ * The explanatory line at the bottom is not decoration. A support level is a commitment,
+ * not a reward: the backer says what they care about and the creator owes nothing in
+ * return. Without that line, readers assume they are buying something.
  */
 export default function SupportLevels({ levels, emptyMessage, compact = false }) {
   const list = Array.isArray(levels) ? levels : [];
